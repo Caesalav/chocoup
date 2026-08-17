@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+/* Sistema oscuro cartográfico.
+ *
+ * Paleta muestreada de la referencia: lienzo marrón oscuro cálido para el mapa,
+ * paneles flotantes casi neutros y más claros que el fondo, titulares en blanco
+ * puro y dos acentos, naranja y verde-teal.
+ *
+ * Los paneles nunca son opacos: se apoyan en el lienzo con transparencia y
+ * desenfoque, que es lo que da la sensación de capas de la referencia. */
+@theme {
+  --color-base: #16130f;
+  --color-canvas: #221d19;
+  --color-land: #3b332b;
+  --color-contour: #5a4d43;
+
+  /* Mosaico de municipios: cuatro tonos casi iguales. La textura debe notarse
+     sin competir con los pines ni con las etiquetas. */
+  --color-land-1: #352f28;
+  --color-land-2: #3a332b;
+  --color-land-3: #3f372e;
+  --color-land-4: #443b31;
+  --color-border-muni: #4d423a;
+  --color-water: #46585d;
+  --color-neighbour: #29231f;
+  --color-panel: #1a1917;
+  --color-panel-high: #292929;
+
+  --color-ink: #fffdfa;
+  --color-body: #d8d5d1;
+  --color-muted: #8f8b88;
+  --color-faint: #837e7b;
+
+  --color-line: oklch(1 0 0 / 9%);
+  --color-line-strong: oklch(1 0 0 / 18%);
+
+  --color-amber: #f27a1e;
+  --color-amber-bright: #ff8c33;
+  --color-amber-soft: oklch(0.7 0.16 55 / 14%);
+
+  --color-teal: #0e7f66;
+  --color-teal-light: #4fb89e;
+  --color-teal-soft: oklch(0.55 0.09 170 / 16%);
+
+  --font-display: var(--font-display), Georgia, serif;
+  --font-sans: var(--font-sans), system-ui, sans-serif;
+}
+
+html {
+  background-color: var(--color-base);
+  color: var(--color-body);
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* Navegación y etiquetas en versalitas, como la referencia: la inicial a caja
+ * alta y el resto en capitales pequeñas, con mucho interletraje. */
+.smallcaps {
+  font-family: var(--font-display);
+  font-variant-caps: small-caps;
+  letter-spacing: 0.08em;
+}
+
+/* Etiquetas verticales del raíl izquierdo. */
+.rail-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  letter-spacing: 0.22em;
+}
+
+/* Evita el zoom automático de iOS al enfocar un campo: el equipo documenta
+   desde el móvil y perder el encuadre en cada input es un estorbo real. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+::selection {
+  background-color: var(--color-amber);
+  color: #16130f;
+}
+
+/* El carrusel inferior se arrastra en móvil sin barra visible. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Movimiento
+ *
+ * Tres reglas: sirve para explicar algo (de dónde viene, qué cambió, qué sigue),
+ * dura poco, y se apaga por completo si el sistema pide menos animación.
+ * Nada se mueve en bucle infinito salvo el latido de la acción principal, y ese
+ * se detiene solo a los pocos ciclos.
+ * ------------------------------------------------------------------------- */
+
+@keyframes surge-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes attention-ring {
+  0% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+@keyframes draw-check {
+  from {
+    stroke-dashoffset: 48;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Entrada escalonada: el contenido aparece en el orden en que se lee. */
+.enters {
+  animation: surge-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.enters-1 {
+  animation-delay: 0.05s;
+}
+.enters-2 {
+  animation-delay: 0.12s;
+}
+.enters-3 {
+  animation-delay: 0.19s;
+}
+
+/* Aro que late tres veces sobre la acción principal y se queda quieto. */
+.pulse-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--color-amber);
+  animation: attention-ring 2.4s ease-out 3;
+  pointer-events: none;
+}
+
+.draws-check {
+  stroke-dasharray: 48;
+  animation: draw-check 0.6s ease-out 0.15s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enters,
+  .draws-check,
+  .pulse-ring::after {
+    animation: none;
+  }
+  .draws-check {
+    stroke-dasharray: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
