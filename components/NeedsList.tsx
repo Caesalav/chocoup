@@ -1,42 +1,40 @@
-import Link from "next/link";
-import { CategoryChip, NeedStatusChip, UrgentChip } from "./ui/Chip";
-import type { Need } from "@/lib/types";
+import { NeedRow } from "./cards/NeedRow";
+import { cardGrid } from "./ui/styles";
+import type { Need, NeedCard } from "@/lib/types";
 
 type Props = {
-  needs: Need[];
+  needs: (Need | NeedCard)[];
   emptyLabel?: string;
+  /** En la lista general hay que decir de qué municipio y de qué caso sale cada
+   *  necesidad; dentro de un municipio, no: ya se sabe. */
+  showOrigin?: boolean;
+  /** Dos columnas, para la ficha del municipio. */
+  columns?: boolean;
 };
 
-export function NeedsList({ needs, emptyLabel }: Props) {
+const isCard = (need: Need | NeedCard): need is NeedCard => "cityName" in need;
+
+export function NeedsList({ needs, emptyLabel, showOrigin = false, columns = false }: Props) {
   if (needs.length === 0) {
     return emptyLabel ? <p className="text-sm text-muted">{emptyLabel}</p> : null;
   }
 
+  // Esta es la lista que se recorre buscando algo que uno pueda dar, así que
+  // cuantas más quepan de un vistazo, mejor. En una sola columna a 1400 px se
+  // veían cuatro de las veinte que hay.
   return (
-    <ul className="border-t border-line">
+    <ul className={columns ? "grid grid-cols-2 gap-3 lg:grid-cols-3" : cardGrid}>
       {needs.map((need) => (
-        <li key={need.id} className="border-b border-line py-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <CategoryChip category={need.category} />
-            <NeedStatusChip status={need.status} />
-            {need.urgent && need.status !== "cubierta" && <UrgentChip />}
-          </div>
-
-          <h3 className="mt-3 font-display text-xl leading-tight text-ink">{need.title}</h3>
-          {need.quantity && <p className="mt-1 text-sm text-body">{need.quantity}</p>}
-          {need.details && (
-            <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">{need.details}</p>
-          )}
-
-          {need.status !== "cubierta" && (
-            <Link
-              href={`/ofrecer?need=${need.id}`}
-              className="smallcaps mt-3 inline-flex items-center gap-2 text-[15px] text-amber transition-colors hover:text-amber-bright"
-            >
-              <span className="size-1.5 rounded-full bg-amber" />
-              Puedo aportar esto
-            </Link>
-          )}
+        <li key={need.id}>
+          <NeedRow
+            need={need}
+            compact={columns}
+            origin={
+              showOrigin && isCard(need)
+                ? { cityName: need.cityName, citySlug: need.citySlug, caseName: need.caseName }
+                : undefined
+            }
+          />
         </li>
       ))}
     </ul>

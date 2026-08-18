@@ -1,19 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Instrument_Serif } from "next/font/google";
+import { Bricolage_Grotesque, Outfit } from "next/font/google";
 import { DemoBanner } from "@/components/DemoBanner";
-import { SiteHeader } from "@/components/SiteHeader";
 import { SITE_NAME, SITE_TAGLINE } from "@/lib/constants";
+import { isDemoMode } from "@/lib/supabase/env";
 import "./globals.css";
 
-const sans = Geist({
+const sans = Outfit({
   variable: "--font-sans",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
 });
 
-const display = Instrument_Serif({
+const display = Bricolage_Grotesque({
   variable: "--font-display",
-  weight: "400",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
 });
 
 export const metadata: Metadata = {
@@ -23,18 +22,26 @@ export const metadata: Metadata = {
   },
   description:
     "Mapa y registro de la situación en municipios del Chocó tras el terremoto: necesidades por zona, casos de personas y fundaciones con las que coordinar donaciones.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${sans.variable} ${display.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col bg-base text-body">
+      {/* El color del papel lo pinta <html> y aquí no se repite, para que no haya
+          dos sitios donde cambiarlo. has-strip da alto a la franja de aviso para que
+          las pantallas a alto completo lo descuenten.
+
+          La navegación no vive aquí: la monta cada zona. El portal público
+          (app/(public)/layout.tsx) pone la barra inferior en el móvil y la
+          cabecera a partir de `lg`, nunca las dos; el panel del equipo monta la
+          suya. Este archivo solo envuelve a los dos. */}
+      <body className={`flex min-h-full flex-col text-body ${isDemoMode() ? "has-strip" : ""}`}>
         <DemoBanner />
-        {/* La cabecera flota sobre el lienzo, así que necesita este contexto. */}
-        <div className="relative flex flex-1 flex-col">
-          <SiteHeader />
-          {children}
-        </div>
+        <div className="relative flex flex-1 flex-col">{children}</div>
       </body>
     </html>
   );

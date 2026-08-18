@@ -1,4 +1,4 @@
--- Chuc-up: esquema inicial.
+-- Chocó-up: esquema inicial.
 -- Portal de documentación del viaje a Chocó (terremoto).
 --
 -- Reglas de acceso:
@@ -235,9 +235,12 @@ alter table public.photos      enable row level security;
 alter table public.needs       enable row level security;
 alter table public.offers      enable row level security;
 
--- Supabase ya concede estos permisos por defecto a las tablas nuevas de public.
--- Se repiten aquí para no depender de esa configuración: con RLS activo, el
--- permiso de tabla no abre nada que una política no permita.
+-- Supabase concede por defecto bastante más que esto a las tablas nuevas de
+-- public: el juego entero, a `anon` y a `authenticated`. Aquí se vuelve a
+-- conceder lo que de verdad hace falta para no depender de esa configuración,
+-- pero conceder no retira nada. Lo que sobra lo quita
+-- 0008_permiso_de_tabla_del_publico.sql, y esta lista es la que ese archivo deja
+-- en pie.
 grant select on public.cities, public.foundations, public.cases, public.photos, public.needs
   to anon, authenticated;
 grant insert on public.offers to anon, authenticated;

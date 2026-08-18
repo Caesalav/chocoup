@@ -3,7 +3,7 @@
 import { useActionState, useState, useSyncExternalStore } from "react";
 import { submitOffer, type OfferFormState } from "./actions";
 import { NEED_CATEGORIES } from "@/lib/constants";
-import { button, field } from "@/components/ui/styles";
+import { alertBox, button, field, panel } from "@/components/ui/styles";
 import type { OfferTarget } from "@/lib/types";
 
 /** Ejemplos que se pueden tocar: quien no sabe qué escribir, copia uno. */
@@ -41,6 +41,11 @@ function useHydrated(): boolean {
  * Se hidrata progresivamente: el servidor manda las tres preguntas visibles, así
  * que sin JavaScript el formulario sigue siendo un formulario normal, y solo al
  * hidratarse se convierte en pasos.
+ *
+ * Las etiquetas y los pies de aquí iban en versalitas apretadas, que era la voz
+ * de la etapa anterior del portal. Este es el formulario por el que entra toda
+ * la ayuda que ofrece la gente, y no puede sonar a otro sitio: van en frase, del
+ * tamaño del texto corrido, como las pastillas blandas del resto.
  */
 export function OfferForm({ target }: { target: OfferTarget | null }) {
   const [state, action, pending] = useActionState<OfferFormState, FormData>(submitOffer, null);
@@ -102,12 +107,12 @@ export function OfferForm({ target }: { target: OfferTarget | null }) {
               <span
                 key={index}
                 className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
-                  index <= step ? "bg-amber" : "bg-line-strong"
+                  index <= step ? "bg-accent" : "bg-line-strong"
                 }`}
               />
             ))}
           </div>
-          <p className="mt-3 text-[11px] uppercase tracking-[0.14em] text-faint">
+          <p className="mt-3 text-[13px] text-faint">
             Paso {step + 1} de {STEPS.length} · {STEPS[step].hint}
           </p>
         </div>
@@ -132,7 +137,7 @@ export function OfferForm({ target }: { target: OfferTarget | null }) {
             />
           </label>
 
-          <p className="mt-4 text-xs text-faint">O toca un ejemplo:</p>
+          <p className="mt-5 text-[13px] text-muted">O toca un ejemplo:</p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {EXAMPLES.map((example) => (
               <li key={example}>
@@ -142,7 +147,7 @@ export function OfferForm({ target }: { target: OfferTarget | null }) {
                     setResource(example);
                     setNudge("");
                   }}
-                  className="rounded-full border border-line-strong px-3.5 py-2 text-[13px] text-muted transition-[color,border-color,transform] duration-150 hover:border-amber hover:text-ink active:scale-[0.97]"
+                  className="rounded-full border border-line-strong px-3.5 py-2 text-[13px] text-muted transition-[color,border-color,scale] duration-150 hover:border-accent hover:text-ink active:scale-[0.97]"
                 >
                   {example}
                 </button>
@@ -199,6 +204,20 @@ export function OfferForm({ target }: { target: OfferTarget | null }) {
               Nunca lo publicamos. Solo el equipo lo ve, para escribirte.
             </span>
           </label>
+
+          {/* Sin marcar por omisión, y así se queda si nadie la toca: conservar la
+              privacidad no puede costar un gesto. La casilla dice qué pasa si se
+              marca, no qué pasa si no, porque lo que no se marca es lo normal. */}
+          <label className={`${field.checkboxRow} mt-5`}>
+            <input type="checkbox" name="publish_name" className={field.checkbox} />
+            <span>
+              Podéis publicar mi nombre en el registro de ayudas
+              <span className="mt-0.5 block text-xs text-muted">
+                Si no la marcas, tu ayuda aparecerá igual cuando llegue, pero sin decir de quién
+                viene. Tu contacto no se publica en ningún caso.
+              </span>
+            </span>
+          </label>
         </div>
       )}
 
@@ -219,8 +238,8 @@ export function OfferForm({ target }: { target: OfferTarget | null }) {
           </label>
 
           {isWizard && resource && (
-            <div className="mt-6 rounded-xl border border-line bg-panel/50 p-4">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-faint">Vas a enviar</p>
+            <div className={`${panel} mt-6 p-4`}>
+              <p className="text-[13px] text-faint">Vas a enviar</p>
               <p className="mt-1.5 text-[15px] text-ink">{resource}</p>
               {contact && <p className="mt-0.5 text-[13px] text-muted">Contacto: {contact}</p>}
             </div>
@@ -229,10 +248,7 @@ export function OfferForm({ target }: { target: OfferTarget | null }) {
       )}
 
       {(nudge || state?.error) && (
-        <p
-          role="alert"
-          className="enters mt-6 rounded-lg bg-amber-soft px-3.5 py-2.5 text-sm text-amber"
-        >
+        <p role="alert" className={`${alertBox} enters mt-6`}>
           {state?.error ?? nudge}
         </p>
       )}
@@ -262,7 +278,7 @@ export function OfferForm({ target }: { target: OfferTarget | null }) {
         )}
 
         {!isWizard || step === lastStep ? (
-          <p className="text-xs text-faint">El equipo te escribe al contacto que dejaste.</p>
+          <p className="text-[13px] text-faint">El equipo te escribe al contacto que dejaste.</p>
         ) : null}
       </div>
     </form>

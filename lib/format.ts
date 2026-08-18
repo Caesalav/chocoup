@@ -4,8 +4,8 @@ import { supabaseEnv } from "./supabase/env";
 /** El bucket es público, así que basta la URL directa del CDN. */
 export function photoUrl(storagePath: string): string {
   // Las fotos de muestra no están en Storage, sino en public/demo. Llevan el
-  // sello "muestra" incrustado y no muestran daños ni personas: nadie debe poder
-  // confundirlas con la documentación real del terremoto.
+  // sello "muestra" incrustado. Los paisajes no muestran daños; los retratos
+  // son caras de archivo, no de las familias de los textos.
   if (storagePath.startsWith("demo/")) {
     return `/${storagePath}.jpg`;
   }
@@ -82,6 +82,54 @@ const timeFormatter = new Intl.DateTimeFormat("es-CO", {
 
 export function formatDate(iso: string): string {
   return dateFormatter.format(new Date(iso));
+}
+
+/**
+ * Una fecha sin hora, como la que trae `delivered_on`: "2026-08-15".
+ *
+ * Va con su propio formateador anclado a UTC porque `new Date("2026-08-15")` es
+ * medianoche UTC, y con el reloj de Colombia detrás se imprimiría el día
+ * anterior. Una ayuda que llegó el 15 no puede leerse "14 de agosto".
+ */
+const dayFormatter = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+export function formatDay(date: string): string {
+  return dayFormatter.format(new Date(`${date.slice(0, 10)}T00:00:00Z`));
+}
+
+/**
+ * Un mes suelto, como el que trae `delivered_month` del registro público:
+ * "2026-08". No hay día que imprimir porque no llega ninguno; el día uno que se
+ * le pone aquí es solo para poder construir una fecha.
+ */
+const monthFormatter = new Intl.DateTimeFormat("es-CO", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+export function formatMonth(month: string): string {
+  return monthFormatter.format(new Date(`${month.slice(0, 7)}-01T00:00:00Z`));
+}
+
+/**
+ * Cuánto hace, en días. Sustituye a la campana de notificaciones de la
+ * referencia: en un portal que documenta un terremoto, lo que hay que saber al
+ * abrirlo es si esto sigue vivo.
+ *
+ * Se calcula en el servidor y en cada petición —las páginas del portal son
+ * dinámicas—, así que no hay riesgo de que el navegador diga otra cosa.
+ */
+export function relativeDays(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "Actualizado hoy";
+  if (days === 1) return "Actualizado ayer";
+  return `Actualizado hace ${days} días`;
 }
 
 export function formatDateTime(iso: string): string {

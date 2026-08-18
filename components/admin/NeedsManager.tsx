@@ -16,7 +16,7 @@ export function NeedsManager({
 }) {
   return (
     <div>
-      <form action={createNeed} className="rounded-xl border border-line bg-panel/60 p-4">
+      <form action={createNeed} className="rounded-xl border border-line bg-panel p-4">
         <input type="hidden" name="city_id" value={cityId} />
         {caseId && <input type="hidden" name="case_id" value={caseId} />}
 
@@ -69,7 +69,7 @@ export function NeedsManager({
       </form>
 
       {needs.length > 0 && (
-        <ul className="mt-4 divide-y divide-line rounded-xl border border-line bg-panel/60">
+        <ul className="mt-4 divide-y divide-line rounded-xl border border-line bg-panel">
           {needs.map((need) => (
             <li key={need.id} className="p-4">
               <div className="flex flex-wrap items-center gap-2">

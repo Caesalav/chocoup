@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { button, field } from "@/components/ui/styles";
+import { alertBox, button, field } from "@/components/ui/styles";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [message, setMessage] = useState("");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -14,39 +15,28 @@ export function LoginForm() {
     setStatus("sending");
 
     const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/admin`,
-      },
+      password,
     });
 
     if (error) {
       setStatus("error");
-      setMessage(error.message);
+      // Supabase contesta en inglés y con el mismo texto para correo que no
+      // existe y contraseña equivocada. Se traduce sin desglosarlo: decir cuál
+      // de los dos falló es decirle a un desconocido qué correos son del equipo.
+      setMessage(
+        /invalid login credentials/i.test(error.message)
+          ? "Ese correo y esa contraseña no coinciden."
+          : error.message,
+      );
       return;
     }
-    setStatus("sent");
-  }
 
-  if (status === "sent") {
-    return (
-      <div className="mt-6 rounded-xl border border-line bg-panel/70 p-5">
-        <h2 className="font-display text-xl text-ink">Revisa tu correo</h2>
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-          Enviamos un enlace de acceso a <span className="text-ink">{email}</span>. Ábrelo en este
-          mismo teléfono o computador: el enlace solo funciona en el navegador desde el que lo
-          pediste.
-        </p>
-        <button
-          type="button"
-          onClick={() => setStatus("idle")}
-          className={`${button.secondary} mt-4`}
-        >
-          Usar otro correo
-        </button>
-      </div>
-    );
+    // Recarga completa en vez de router.push: la sesión acaba de escribirse en
+    // una cookie y quien decide si se entra al panel es el servidor. El estado
+    // "Entrando…" se queda puesto a propósito hasta que la página se va.
+    window.location.assign("/admin");
   }
 
   return (
@@ -65,14 +55,26 @@ export function LoginForm() {
         />
       </label>
 
+      <label className="block">
+        <span className={field.label}>Contraseña</span>
+        <input
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className={field.input}
+        />
+      </label>
+
       {status === "error" && (
-        <p role="alert" className="rounded-lg bg-amber-soft px-3.5 py-2.5 text-sm text-amber">
-          {message || "No pudimos enviar el enlace. Revisa el correo e inténtalo de nuevo."}
+        <p role="alert" className={alertBox}>
+          {message || "No pudimos entrar. Inténtalo de nuevo."}
         </p>
       )}
 
       <button type="submit" className={button.primary} disabled={status === "sending"}>
-        {status === "sending" ? "Enviando…" : "Enviar enlace de acceso"}
+        {status === "sending" ? "Entrando…" : "Entrar"}
       </button>
     </form>
   );

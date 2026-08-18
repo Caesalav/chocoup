@@ -124,8 +124,13 @@ export function PhotoUploader({
       >
         {busy ? "Subiendo…" : "Añadir fotos"}
       </button>
-      <p className="mt-2 text-xs text-muted">
-        Se reducen en el teléfono antes de subir, para que lleguen con mala señal.
+      {/* Dentro de un caso hay un paso más que no se ve en el botón: una de estas
+          fotos va a ser el retrato de la persona, y hay que elegirla. Se dice aquí
+          porque es el momento en el que el equipo acaba de mirar las fotos y sabe
+          cuál es; el selector está justo debajo. */}
+      <p className="mt-2 text-xs leading-relaxed text-muted">
+        Se comprimen en el teléfono antes de subir, para que lleguen con mala señal.
+        {caseId && " Cuando terminen, marca abajo cuál es su retrato y encuadra cada foto."}
       </p>
 
       {items.length > 0 && (
@@ -133,12 +138,16 @@ export function PhotoUploader({
           {items.map((item) => (
             <li key={item.key} className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 truncate text-muted">{item.name}</span>
+              {/* Lo que falló va en el rojo de la escala y lo que subió en
+                  verde. Eran dos verdes casi iguales, y en una lista de diez
+                  fotos subiendo con mala señal hay que ver de un vistazo cuál
+                  se quedó por el camino. */}
               <span
                 className={
                   item.state === "error"
-                    ? "shrink-0 text-amber"
+                    ? "shrink-0 text-need-high"
                     : item.state === "listo"
-                      ? "shrink-0 text-teal-light"
+                      ? "shrink-0 text-accent-strong"
                       : "shrink-0 text-faint"
                 }
               >

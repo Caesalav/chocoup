@@ -18,8 +18,21 @@ export const CHOCO_PATH =
 /** Marco que ocupa la silueta. Chocó es alto y estrecho: casi 2,4 a 1. */
 export const LAND = { width: 420.3, height: 1000 };
 
-/** Margen a cada lado para las etiquetas de las ciudades. */
-export const GUTTER = 150;
+/**
+ * Margen a cada lado para las etiquetas de las ciudades.
+ *
+ * Era 150, y con eso el dibujo ocupaba el 58 % del ancho del SVG: el resto era
+ * aire reservado por si algún rótulo lo necesitaba, y en pantallas anchas el
+ * departamento acababa siendo una tira diminuta en medio de un SVG vacío.
+ *
+ * Con 100 el Chocó ocupa el 68 % y los rótulos siguen cabiendo: el más largo de
+ * los treinta municipios, "El Carmen de Atrato", mide unas 280 unidades a la
+ * escala del rótulo (ver `labelWidth` y `CITY_LABEL`), y desde el borde este del
+ * departamento hacia dentro le sobran. La cuenta la vuelve a hacer el código en
+ * cada colocación, así que subir el cuerpo del rótulo no rompe nada: como mucho
+ * manda algún nombre al otro lado.
+ */
+export const GUTTER = 100;
 
 export const VIEW_BOX = {
   minX: -GUTTER,
@@ -56,25 +69,15 @@ export function unprojectFromMap(x: number, y: number): { lat: number; lng: numb
   };
 }
 
-/** Un punto puede caer fuera del Chocó; el esquema no debe recortarse por eso. */
-export function isInsideView(x: number, y: number): boolean {
-  return (
-    x >= VIEW_BOX.minX &&
-    x <= VIEW_BOX.minX + VIEW_BOX.width &&
-    y >= 0 &&
-    y <= VIEW_BOX.height
-  );
-}
-
 export type MapPin = {
   id: string;
   name: string;
   slug: string;
   lat: number;
   lng: number;
-  /** Número de la insignia, que coincide con el del carrusel inferior. */
-  index?: number;
-  featured?: boolean;
+  /** Necesidades abiertas: de aquí sale el color de su municipio. Sin el dato,
+   *  la forma se pinta como no documentada, que es lo que de verdad sabemos. */
+  openNeeds?: number;
 };
 
 export type PlacedPin = MapPin & {
@@ -85,12 +88,46 @@ export type PlacedPin = MapPin & {
   anchor: "start" | "end";
 };
 
-const LABEL_GAP = 16;
-const MIN_LABEL_SPACING = 32;
-/** Ancho medio por carácter a font-size 27. Solo hace falta una estimación. */
-const CHAR_WIDTH = 13.5;
+const LABEL_GAP = 14;
+const MIN_LABEL_SPACING = 30;
 const MAX_X = LAND.width + GUTTER;
 const MIN_X = -GUTTER;
+
+/**
+ * Tipografía de los dos rótulos del mapa.
+ *
+ * Vive aquí, junto a las cuentas que la usan, y no en el componente que la
+ * dibuja: la colocación decide de qué lado cae cada nombre midiéndolo, y con el
+ * cuerpo en un archivo y la medida en otro, el día que alguien suba una letra el
+ * cálculo deja de valer sin avisar.
+ */
+export const CITY_LABEL = { fontSize: 21, letterSpacing: 2 };
+export const OCEAN_LABEL = { text: "OCÉANO PACÍFICO", fontSize: 20, letterSpacing: 5 };
+
+type LabelType = { fontSize: number; letterSpacing: number };
+
+/**
+ * Cuánto mide un rótulo escrito en mayúsculas.
+ *
+ * El 0,6 del cuerpo es el avance medio de una mayúscula en esta familia; medido
+ * contra lo que dibuja el navegador, el error no pasa de siete unidades
+ * ("QUIBDÓ" se queda corto por la Q y la Ó, "ISTMINA" se pasa por las íes). Es
+ * una estimación a propósito: medir de verdad exige una caja de texto y esto se
+ * calcula en el servidor, así que todo lo que decide con ella lleva holgura por
+ * encima de ese error.
+ */
+function labelWidth(text: string, { fontSize, letterSpacing }: LabelType): number {
+  return text.length * (fontSize * 0.6 + letterSpacing);
+}
+
+/** Alto del renglón. Un pelo más que la tinta —mayúsculas acentuadas incluidas—
+ *  porque de estas cajas dependen las colisiones y aquí sobrar es lo correcto. */
+const lineHeight = ({ fontSize }: LabelType) => fontSize * 1.4;
+
+/** Holgura alrededor de la tinta: el rótulo lleva un halo del color del papel de
+ *  cinco unidades y su ancho es estimado, así que la caja se ensancha por las
+ *  dos razones a la vez. */
+const LABEL_PAD = 8;
 
 /**
  * Sitúa cada ciudad y coloca su etiqueta hacia el margen más cercano, separando
@@ -102,10 +139,10 @@ const MIN_X = -GUTTER;
 export function placePins(pins: MapPin[]): PlacedPin[] {
   const placed = pins.map((pin) => {
     const { x, y } = projectToMap(pin.lat, pin.lng);
-    const labelWidth = pin.name.length * CHAR_WIDTH;
+    const width = labelWidth(pin.name, CITY_LABEL);
 
-    const fitsRight = x + LABEL_GAP + labelWidth <= MAX_X;
-    const fitsLeft = x - LABEL_GAP - labelWidth >= MIN_X;
+    const fitsRight = x + LABEL_GAP + width <= MAX_X;
+    const fitsLeft = x - LABEL_GAP - width >= MIN_X;
 
     let toLeft = x >= LAND.width / 2 ? false : true;
     if (toLeft && !fitsLeft && fitsRight) toLeft = false;
@@ -135,4 +172,159 @@ export function placePins(pins: MapPin[]): PlacedPin[] {
   }
 
   return placed;
+}
+
+/** Lo que un rótulo ya colocado le quita al mapa, en unidades del viewBox. */
+type Box = { x1: number; y1: number; x2: number; y2: number };
+
+/** El renglón se dibuja siete unidades por debajo del punto de anclaje, que es lo
+ *  que deja el bloque de mayúsculas centrado en la latitud de la ciudad; por eso
+ *  la caja se puede tomar centrada en `labelY`. */
+export const LABEL_BASELINE = 7;
+
+function cityBox(pin: PlacedPin): Box {
+  const width = labelWidth(pin.name, CITY_LABEL);
+  const half = lineHeight(CITY_LABEL) / 2;
+
+  return {
+    x1: (pin.anchor === "end" ? pin.labelX - width : pin.labelX) - LABEL_PAD,
+    x2: (pin.anchor === "end" ? pin.labelX : pin.labelX + width) + LABEL_PAD,
+    y1: pin.labelY - half - LABEL_PAD,
+    y2: pin.labelY + half + LABEL_PAD,
+  };
+}
+
+/** Resolución de la tabla de la costa. El contorno viene simplificado a 170
+ *  puntos sobre mil unidades de alto, así que muestrear más fino no descubriría
+ *  ninguna entrada de mar que el propio dibujo no tenga ya redondeada. */
+const COAST_STEP = 4;
+
+/**
+ * Borde oeste del dibujo a cada altura, tabulado una vez al cargar el módulo.
+ *
+ * El rótulo del océano tiene que caer en el agua, y dónde acaba el agua lo dice
+ * la silueta y nada más. `CHOCO_PATH` es un polígono de rectas, así que basta
+ * cortar sus aristas a la altura que se pregunte y quedarse con la x menor. Se
+ * tabula porque la búsqueda pregunta cientos de veces y el mapa se rehace en
+ * cada visita.
+ */
+const COAST = (() => {
+  const points = [...CHOCO_PATH.matchAll(/[ML]([\d.]+) ([\d.]+)/g)].map((match) => ({
+    x: Number(match[1]),
+    y: Number(match[2]),
+  }));
+
+  const rows: number[] = [];
+  for (let index = 0; index * COAST_STEP <= LAND.height; index += 1) {
+    const y = index * COAST_STEP;
+    let west = Infinity;
+
+    for (let k = 0; k < points.length; k += 1) {
+      const a = points[k];
+      const b = points[(k + 1) % points.length];
+      if (a.y === b.y || (a.y - y) * (b.y - y) > 0) continue;
+      west = Math.min(west, a.x + ((b.x - a.x) * (y - a.y)) / (b.y - a.y));
+    }
+
+    rows.push(west);
+  }
+  return rows;
+})();
+
+/** Dónde empieza la tierra a esa altura. Infinity donde no hay dibujo. */
+function westEdgeAt(y: number): number {
+  const index = Math.round(y / COAST_STEP);
+  return COAST[Math.min(Math.max(index, 0), COAST.length - 1)] ?? Infinity;
+}
+
+/**
+ * Tramo de latitud en el que el vecino del oeste es de verdad el Pacífico: de
+ * Punta Ardita, donde la costa del departamento toca Panamá, a la boca del San
+ * Juan, donde empieza el Valle del Cauca. Más al norte lo que hay al oeste del
+ * dibujo es el Darién, y un rótulo del Pacífico ahí estaría nombrando otra cosa.
+ */
+const PACIFIC = { northLat: 7.22, southLat: 4.2 };
+
+/** Diferencias de holgura menores que esto no son motivo para mover el rótulo
+ *  doscientas unidades, así que empatan y decide la altura. */
+const CLEARANCE_STEP = 5;
+
+/** Cada cuánto se prueba una altura. Cinco unidades son medio punto de pantalla
+ *  en el tamaño más grande en que se ve el mapa: afinar más solo añadiría vueltas
+ *  al bucle para mover el rótulo lo que no se ve. */
+const BAND_STEP = 5;
+
+/**
+ * Dónde cabe el rótulo del océano, o null si no cabe en ninguna parte.
+ *
+ * Se coloca después de los nombres de los municipios y les cede el sitio, nunca
+ * al revés: los nombres son el contenido del mapa y el del mar es atmósfera, el
+ * mismo orden que en un mapa impreso.
+ *
+ * Antes estaba clavado a media altura del encuadre, y ahí compartía carril con
+ * las etiquetas del oeste —que salen de la costa hacia el mar, porque el mar es
+ * lo que tienen al lado— así que "BAHÍA SOLANO" lo cruzaba. El conflicto no era
+ * de ese nombre sino del carril: con Juradó, Nuquí o el Bajo Baudó documentados
+ * volvería a pasar, y con otro nombre cada vez.
+ *
+ * Así que la altura se busca. Recorre las alturas posibles del tramo de costa,
+ * descuenta del agua lo que ocupan la tierra y las etiquetas que cruzan la
+ * franja, y se queda con el hueco más ancho de todos; si dos empatan gana el de
+ * media costa. El rótulo va girado, así que ocupa una franja estrecha y larga y
+ * cualquier etiqueta que la toque la invalida entera.
+ */
+export function placeOceanLabel(placed: PlacedPin[]): { x: number; y: number } | null {
+  const half = labelWidth(OCEAN_LABEL.text, OCEAN_LABEL) / 2;
+  const thickness = lineHeight(OCEAN_LABEL);
+
+  const north = projectToMap(PACIFIC.northLat, 0).y;
+  const south = projectToMap(PACIFIC.southLat, 0).y;
+  const middle = (north + south) / 2;
+
+  const boxes = placed.map(cityBox);
+  let best: { x: number; y: number; clearance: number } | null = null;
+
+  for (let y = north + half; y <= south - half; y += BAND_STEP) {
+    const top = y - half;
+    const bottom = y + half;
+
+    let coast = westEdgeAt(bottom);
+    for (let sample = top; sample < bottom; sample += COAST_STEP) {
+      coast = Math.min(coast, westEdgeAt(sample));
+    }
+    if (!Number.isFinite(coast)) continue;
+
+    // Lo que queda del agua entre el filo del encuadre y la costa una vez
+    // apartadas las etiquetas que cruzan la franja.
+    const shore = coast - LABEL_GAP;
+    const taken = boxes
+      .filter((box) => box.y1 < bottom && box.y2 > top)
+      .map((box) => [Math.max(box.x1, MIN_X), Math.min(box.x2, shore)] as const)
+      .filter(([x1, x2]) => x2 > x1)
+      .sort((a, b) => a[0] - b[0]);
+
+    const gaps: [number, number][] = [];
+    let edge = MIN_X;
+    for (const [x1, x2] of taken) {
+      if (x1 > edge) gaps.push([edge, x1]);
+      edge = Math.max(edge, x2);
+    }
+    if (edge < shore) gaps.push([edge, shore]);
+
+    for (const [x1, x2] of gaps) {
+      const clearance = (x2 - x1 - thickness) / 2;
+      if (clearance < 0) continue;
+
+      const step = Math.round(clearance / CLEARANCE_STEP);
+      const bestStep = best ? Math.round(best.clearance / CLEARANCE_STEP) : -1;
+      if (
+        step > bestStep ||
+        (step === bestStep && best && Math.abs(y - middle) < Math.abs(best.y - middle))
+      ) {
+        best = { x: (x1 + x2) / 2, y, clearance };
+      }
+    }
+  }
+
+  return best && { x: best.x, y: best.y };
 }

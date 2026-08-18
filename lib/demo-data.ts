@@ -7,15 +7,26 @@
  * El contenido es inventado. Sirve para valorar el diseño y el recorrido, no
  * como documentación de nada. El banner del portal lo deja claro en pantalla.
  */
+import { situationPhotos, withUpdatePhotos } from "./case-photos";
+import { savedFrame } from "./photo-frame";
+import { NEED_CATEGORIES } from "./constants";
 import type {
   AdminCityRow,
+  AidRecord,
   Case,
+  CaseCard,
   CasePage,
+  CaseSummary,
+  CaseUpdate,
+  CaseWithPhotos,
   CityCardData,
   CityPage,
   City,
+  DonationKey,
   Foundation,
+  FoundationEntry,
   Need,
+  NeedCard,
   NeedCategory,
   NeedOption,
   NeedStatus,
@@ -24,6 +35,9 @@ import type {
   OfferTarget,
   OfferWithContext,
   Photo,
+  PortalTotals,
+  TeamMemberEntry,
+  TeamSession,
 } from "./types";
 
 /** UUIDs con forma válida para que los enlaces del formulario funcionen igual. */
@@ -38,6 +52,7 @@ const CASE = 3;
 const NEED = 4;
 const PHOTO = 5;
 const OFFER = 6;
+const UPDATE = 7;
 
 const day = (n: number) => `2026-08-${String(n).padStart(2, "0")}T14:30:00.000Z`;
 
@@ -120,6 +135,17 @@ const cityBySlug = (slug: string) => demoCities.find((city) => city.slug === slu
 
 // ---------------------------------------------------------------------------
 // Fundaciones
+//
+// Una por municipio como máximo, que es lo que garantiza la base de datos
+// (`foundations_one_per_city`, ver 0004). Aquí había además una segunda
+// fundación en Quibdó, «aliada», para poder ver la tarjeta secundaria: ya no
+// existe esa tarjeta ni ese estado, y dejarla habría sido enseñar en el portal de
+// muestra una forma que la base de datos rechaza.
+//
+// Condoto y Nuquí se quedan sin ninguna a propósito: es como nace un municipio
+// —creado antes de la visita, con la fundación por levantar— y así se puede ver
+// que la ficha se sostiene sin canal de donación. Bojayá tiene fundación pero sin
+// enlace, que es el otro caso frecuente: se coordina por WhatsApp.
 // ---------------------------------------------------------------------------
 
 type FoundationSeed = Omit<Foundation, "id" | "city_id" | "created_at"> & { citySlug: string };
@@ -137,20 +163,6 @@ const foundationSeeds: FoundationSeed[] = [
     website: "https://atratovive.org",
     donation_url: "https://atratovive.org/donar",
     address: "Carrera 4 # 24-18, barrio Cesar Conto",
-    is_primary: true,
-  },
-  {
-    citySlug: "quibdo",
-    name: "Red de Mujeres del Chocó",
-    description: "Apoyan con acompañamiento psicosocial y cocinas comunitarias.",
-    contact_name: "Nubia Moreno",
-    phone: "",
-    whatsapp: "3126661144",
-    email: "redmujereschoco@correo.com",
-    website: "",
-    donation_url: "",
-    address: "",
-    is_primary: false,
   },
   {
     citySlug: "istmina",
@@ -163,7 +175,6 @@ const foundationSeeds: FoundationSeed[] = [
     website: "",
     donation_url: "https://vaki.co/vaki/istmina-unida",
     address: "Calle 8 # 3-40, frente a la casa de la cultura",
-    is_primary: true,
   },
   {
     citySlug: "bahia-solano",
@@ -177,7 +188,6 @@ const foundationSeeds: FoundationSeed[] = [
     website: "",
     donation_url: "https://vaki.co/vaki/mar-y-selva",
     address: "Calle principal, al lado de la Capitanía",
-    is_primary: true,
   },
   {
     citySlug: "bojaya",
@@ -190,7 +200,6 @@ const foundationSeeds: FoundationSeed[] = [
     website: "",
     donation_url: "",
     address: "Bellavista, casa comunal",
-    is_primary: true,
   },
 ];
 
@@ -215,9 +224,24 @@ type CaseSeed = {
   story: string;
   consent_to_publish: boolean;
   published: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
+const DANIELA = "Daniela, madre soltera reconstruye sola su casa";
+
 const caseSeeds: CaseSeed[] = [
+  {
+    citySlug: "quibdo",
+    display_name: DANIELA,
+    household: "3 personas, madre soltera y dos hijas",
+    story:
+      "Daniela Córdoba González es madre soltera y tiene dos hijas. En medio del temblor, su casa se desplomó y lo perdió prácticamente todo. Hoy enfrenta, junto a sus niñas, la incertidumbre de no tener un hogar. Queremos ayudarla a reconstruir no solo su casa, sino también la esperanza de volver a empezar.",
+    consent_to_publish: true,
+    published: true,
+    created_at: day(8),
+    updated_at: day(17),
+  },
   {
     citySlug: "quibdo",
     display_name: "Familia Mosquera Palacios",
@@ -290,20 +314,38 @@ const caseSeeds: CaseSeed[] = [
     consent_to_publish: true,
     published: true,
   },
+  // Este caso no tenía fotos; ahora lleva un retrato de archivo para que la
+  // tarjeta no quede en iniciales. El borrador sin imagen es Familia Ibargüen.
+  {
+    citySlug: "bojaya",
+    display_name: "Don Aristides Mena",
+    household: "Vive con su hija y dos nietos",
+    story:
+      "La cocina y el baño quedaron separados de la casa por una grieta que atraviesa el piso. Siguen durmiendo dentro porque el resto de la vivienda aguantó.\n\nLo que pide es que alguien mire la grieta antes de que empiecen las lluvias fuertes.",
+    consent_to_publish: true,
+    published: true,
+  },
 ];
 
-export const demoCases: Case[] = caseSeeds.map((seed, index) => {
-  const { citySlug, ...rest } = seed;
+/**
+ * Los casos sin su retrato todavía.
+ *
+ * El retrato apunta a una de sus fotos y las fotos se construyen más abajo —usan
+ * `caseByName`, así que no pueden ir antes—, de modo que `demoCases` se termina
+ * de armar en la sección de fotos. Aquí no falta nada más.
+ */
+const caseRows: Omit<Case, "portrait_photo_id" | "donation_url">[] = caseSeeds.map((seed, index) => {
+  const { citySlug, created_at, updated_at, ...rest } = seed;
   return {
     id: demoId(CASE, index),
     city_id: cityBySlug(citySlug).id,
-    created_at: day(7 + (index % 5)),
-    updated_at: day(12 + (index % 4)),
+    created_at: created_at ?? day(7 + (index % 5)),
+    updated_at: updated_at ?? day(12 + (index % 4)),
     ...rest,
   };
 });
 
-const caseByName = (name: string) => demoCases.find((row) => row.display_name === name)!;
+const caseByName = (name: string) => caseRows.find((row) => row.display_name === name)!;
 
 // ---------------------------------------------------------------------------
 // Necesidades
@@ -421,6 +463,23 @@ const needSeeds: NeedSeed[] = [
   // Casos
   {
     citySlug: "quibdo",
+    caseName: DANIELA,
+    category: "techo",
+    title: "Material para reconstruir la casa: bloque, cemento, tejas y madera",
+    quantity: "Para una vivienda de tres",
+    details: "El lote es propio. Daniela reconstruye sola, con sus dos hijas.",
+    urgent: true,
+  },
+  {
+    citySlug: "quibdo",
+    caseName: DANIELA,
+    category: "alimentos",
+    title: "Mercados mientras sale de la casa de la vecina",
+    quantity: "Para tres personas, un mes",
+    status: "parcial",
+  },
+  {
+    citySlug: "quibdo",
     caseName: "Familia Mosquera Palacios",
     category: "techo",
     title: "Bloque, cemento y una viga para rehacer la pared del fondo",
@@ -485,6 +544,13 @@ const needSeeds: NeedSeed[] = [
     details: "Doña Emérita se desplaza en silla de ruedas.",
     urgent: true,
   },
+  {
+    citySlug: "bojaya",
+    caseName: "Don Aristides Mena",
+    category: "techo",
+    title: "Revisión técnica de la grieta que atraviesa el piso",
+    details: "Antes de que empiecen las lluvias fuertes. Un maestro de obra del pueblo sirve.",
+  },
 ];
 
 export const demoNeeds: Need[] = needSeeds.map((seed, index) => ({
@@ -505,10 +571,10 @@ const needByTitle = (title: string) => demoNeeds.find((need) => need.title === t
 // ---------------------------------------------------------------------------
 // Fotos
 //
-// Las imágenes viven en public/demo y las resuelve photoUrl(). Son paisajes y
-// arquitectura del Chocó, sin personas y sin daños, con el sello "muestra"
-// incrustado: este portal documenta un terremoto real y una imagen inventada de
-// escombros sería indistinguible de una prueba.
+// Las imágenes viven en public/demo y las resuelve photoUrl(). Los paisajes y
+// la arquitectura del Chocó no llevan personas ni daños. Los retratos sí son
+// caras, de archivo y con el mismo sello «muestra»: no son las familias de los
+// textos. Una imagen inventada de escombros sería indistinguible de una prueba.
 //
 // Por eso los pies de foto describen lo que se ve de verdad y no los destrozos
 // que cuentan los textos. En campo, cada foto llega con su propio pie escrito por
@@ -531,20 +597,89 @@ const photoSeeds: PhotoSeed[] = [
   { citySlug: "bojaya", image: "choco-pueblo", caption: "Bellavista vista desde el río." },
   { citySlug: "bojaya", image: "choco-selva", caption: "La selva que rodea el casco urbano." },
 
+  { citySlug: "quibdo", caseName: DANIELA, image: "choco-pueblo", caption: "La cuadra donde estaba la casa de Daniela." },
+  { citySlug: "quibdo", caseName: DANIELA, image: "choco-edificio", caption: "El coliseo del barrio, cerca de donde duermen ahora." },
+  { citySlug: "quibdo", caseName: DANIELA, image: "choco-camino", caption: "El camino hasta el lote, el día que se documentó." },
+  { citySlug: "quibdo", caseName: DANIELA, image: "choco-selva", caption: "El lote, ya marcado, el día del censo." },
+  { citySlug: "quibdo", caseName: DANIELA, image: "choco-rio", caption: "El Atrato desde el lote, cuando se dibujó el plano." },
+  { citySlug: "quibdo", caseName: DANIELA, image: "choco-edificio", caption: "Donde se reunieron con el arquitecto." },
+  { citySlug: "quibdo", caseName: DANIELA, image: "choco-pueblo", caption: "La cuadra el día que llegaron los materiales." },
   { citySlug: "quibdo", caseName: "Familia Mosquera Palacios", image: "choco-pueblo", caption: "La cuadra donde vive la familia." },
   { citySlug: "quibdo", caseName: "Familia Mosquera Palacios", image: "choco-edificio", caption: "El coliseo donde duermen ahora." },
   { citySlug: "quibdo", caseName: "Familia Mosquera Palacios", image: "choco-selva", caption: "Los alrededores del barrio." },
+  { citySlug: "quibdo", caseName: "Familia Mosquera Palacios", image: "persona-josefa", caption: "Retrato de archivo, para la demostración." },
+  {
+    citySlug: "quibdo",
+    caseName: "Familia Mosquera Palacios",
+    image: "choco-camino",
+    caption: "El camino hasta la casa, el día del censo.",
+  },
+  {
+    citySlug: "quibdo",
+    caseName: "Familia Mosquera Palacios",
+    image: "choco-rio",
+    caption: "El Atrato visto desde el lote, cuando se dibujó el plano.",
+  },
+  {
+    citySlug: "quibdo",
+    caseName: "Familia Mosquera Palacios",
+    image: "choco-edificio",
+    caption: "El coliseo, donde se reunieron con el arquitecto.",
+  },
+  {
+    citySlug: "quibdo",
+    caseName: "Familia Mosquera Palacios",
+    image: "choco-pueblo",
+    caption: "La cuadra el día que descargaron los bloques.",
+  },
+  {
+    citySlug: "quibdo",
+    caseName: "Familia Mosquera Palacios",
+    image: "choco-selva",
+    caption: "Los alrededores, con los primeros bloques ya en el lote.",
+  },
+  {
+    citySlug: "quibdo",
+    caseName: "Doña Bernarda Rentería",
+    image: "choco-rio",
+    caption: "El río desde La Yesquita, el día que quedó alojada.",
+  },
+  {
+    citySlug: "bahia-solano",
+    caseName: "Familia Klinger Valencia",
+    image: "choco-costa",
+    caption: "La playa de El Valle, el día que se documentó el palafito.",
+  },
+  {
+    citySlug: "bahia-solano",
+    caseName: "Familia Klinger Valencia",
+    image: "choco-canoas",
+    caption: "Las lanchas del pueblo, cuando el mecánico revisó el motor.",
+  },
+  {
+    citySlug: "bojaya",
+    caseName: "Don Aristides Mena",
+    image: "choco-camino",
+    caption: "La subida a la casa, el día que se midió la grieta.",
+  },
   { citySlug: "quibdo", caseName: "Doña Bernarda Rentería", image: "choco-pueblo", caption: "La cuadra de doña Bernarda." },
   { citySlug: "quibdo", caseName: "Doña Bernarda Rentería", image: "choco-camino", caption: "El camino hasta su casa." },
+  { citySlug: "quibdo", caseName: "Doña Bernarda Rentería", image: "persona-bernarda", caption: "Retrato de archivo, para la demostración." },
   { citySlug: "quibdo", caseName: "Familia Asprilla Moreno", image: "choco-edificio", caption: "El puesto de salud del sector." },
   { citySlug: "quibdo", caseName: "Familia Asprilla Moreno", image: "choco-canoas", caption: "El puerto donde trabajan." },
+  { citySlug: "quibdo", caseName: "Familia Asprilla Moreno", image: "persona-asprilla", caption: "Retrato de archivo, para la demostración." },
   { citySlug: "istmina", caseName: "Familia Perea Córdoba", image: "choco-pueblo", caption: "El barrio de la familia." },
   { citySlug: "istmina", caseName: "Familia Perea Córdoba", image: "choco-edificio", caption: "La casa de la cultura, donde guardan sus cosas." },
+  { citySlug: "istmina", caseName: "Familia Perea Córdoba", image: "persona-perea", caption: "Retrato de archivo, para la demostración." },
   { citySlug: "istmina", caseName: "Yeison Córdoba y su hermana", image: "choco-pueblo", caption: "La calle de la casa." },
+  { citySlug: "istmina", caseName: "Yeison Córdoba y su hermana", image: "persona-tia", caption: "Retrato de archivo, para la demostración." },
   { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "choco-palafitos", caption: "Su palafito, sobre el estero." },
   { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "choco-canoas", caption: "La lancha con la que pescan." },
+  { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "persona-wilmar", caption: "Retrato de archivo, para la demostración." },
   { citySlug: "bojaya", caseName: "Familia Cuesta Bautista", image: "choco-pueblo", caption: "Bellavista, donde viven." },
   { citySlug: "bojaya", caseName: "Familia Cuesta Bautista", image: "choco-camino", caption: "La subida hasta la casa." },
+  { citySlug: "bojaya", caseName: "Familia Cuesta Bautista", image: "persona-cuesta", caption: "Retrato de archivo, para la demostración." },
+  { citySlug: "bojaya", caseName: "Don Aristides Mena", image: "persona-aristides", caption: "Retrato de archivo, para la demostración." },
 ];
 
 export const demoPhotos: Photo[] = photoSeeds.map((seed, index) => ({
@@ -555,8 +690,189 @@ export const demoPhotos: Photo[] = photoSeeds.map((seed, index) => ({
   thumb_path: `demo/${seed.image}-mini`,
   caption: seed.caption,
   sort_order: index,
+  focus_x: null,
+  focus_y: null,
+  zoom: null,
   created_at: day(9),
 }));
+
+/**
+ * El retrato de cada persona: cuál de sus fotos eligió el equipo.
+ *
+ * Ninguna es la primera de su caso, y eso es el ejemplo: si el retrato se tomara
+ * por orden, la tarjeta enseñaría la casa y no a quien vive en ella. Las caras
+ * son de archivo, con el sello «muestra»: no son las familias reales. Familia
+ * Ibargüen se queda sin retrato a propósito —es un borrador, y en campo habrá
+ * casos así— para que esa tarjeta se pueda ver en el panel.
+ */
+const portraitSeeds: Record<string, string> = {
+  "Familia Mosquera Palacios": "persona-josefa",
+  "Doña Bernarda Rentería": "persona-bernarda",
+  "Familia Asprilla Moreno": "persona-asprilla",
+  "Familia Perea Córdoba": "persona-perea",
+  "Yeison Córdoba y su hermana": "persona-tia",
+  "Familia Klinger Valencia": "persona-wilmar",
+  "Familia Cuesta Bautista": "persona-cuesta",
+  "Don Aristides Mena": "persona-aristides",
+};
+
+const donationSeeds: Record<string, string> = {
+  "Familia Mosquera Palacios": "https://vaki.co/vaki/mosquera-palacios",
+  "Familia Klinger Valencia": "https://vaki.co/vaki/klinger-valle",
+};
+
+export const demoCases: Case[] = caseRows.map((row) => ({
+  ...row,
+  donation_url: donationSeeds[row.display_name] ?? "",
+  portrait_photo_id:
+    demoPhotos.find(
+      (photo) =>
+        photo.case_id === row.id &&
+        photo.storage_path === `demo/${portraitSeeds[row.display_name]}`,
+    )?.id ?? null,
+}));
+
+// ---------------------------------------------------------------------------
+// Diario de seguimiento
+// ---------------------------------------------------------------------------
+
+type UpdateSeed = {
+  caseName: string;
+  happenedOn: string;
+  title: string;
+  body: string;
+  photoCaption: string;
+};
+
+const updateSeeds: UpdateSeed[] = [
+  {
+    caseName: DANIELA,
+    happenedOn: "2026-08-08",
+    title: "Se documentó lo que hay",
+    body: "La casa se desplomó con el temblor. Daniela y sus dos hijas lo perdieron casi todo. Están en casa de una vecina. Ella dio su consentimiento para publicar.",
+    photoCaption: "El camino hasta el lote, el día que se documentó.",
+  },
+  {
+    caseName: DANIELA,
+    happenedOn: "2026-08-10",
+    title: "Lo que ya se ha hecho",
+    body: "Se levantó el censo, se marcó el lote y se confirmó que el terreno es propio. Con eso se puede reconstruir en el mismo sitio.",
+    photoCaption: "El lote, ya marcado, el día del censo.",
+  },
+  {
+    caseName: DANIELA,
+    happenedOn: "2026-08-12",
+    title: "Plan de reconstrucción",
+    body: "Quedó el plano de una vivienda de tres: sala-cocina, un cuarto para Daniela y otro para las niñas. Se reconstruye sobre el mismo lote.",
+    photoCaption: "El Atrato desde el lote, cuando se dibujó el plano.",
+  },
+  {
+    caseName: DANIELA,
+    happenedOn: "2026-08-14",
+    title: "Arquitecto asignado",
+    body: "Carlos Murillo, de la fundación, queda a cargo de la obra. Daniela reconstruye con él: no hay más manos en la casa.",
+    photoCaption: "Donde se reunieron con el arquitecto.",
+  },
+  {
+    caseName: DANIELA,
+    happenedOn: "2026-08-16",
+    title: "Materiales entregados",
+    body: "Llegaron los primeros bloques, tejas y cuatro bultos de cemento. Falta el resto para cerrar muros y techo.",
+    photoCaption: "La cuadra el día que llegaron los materiales.",
+  },
+  {
+    caseName: "Familia Mosquera Palacios",
+    happenedOn: "2026-08-08",
+    title: "Se documentó lo que hay",
+    body: "La pared del fondo está en el suelo y el techo apoyado en una viga partida. Seis personas, tres de ellas niñas. Duermen en el coliseo. Josefa dio su consentimiento para publicar.",
+    photoCaption: "El camino hasta la casa, el día del censo.",
+  },
+  {
+    caseName: "Familia Mosquera Palacios",
+    happenedOn: "2026-08-10",
+    title: "Plan de reconstrucción",
+    body: "Se midió el lote y se dejó el plano de la pared y la viga. El resto de la casa se conserva. Con ese plano se pide el material.",
+    photoCaption: "El Atrato visto desde el lote, cuando se dibujó el plano.",
+  },
+  {
+    caseName: "Familia Mosquera Palacios",
+    happenedOn: "2026-08-12",
+    title: "Arquitecto asignado",
+    body: "Carlos Murillo, de la fundación, queda a cargo de la obra. Primera visita a la cuadra el mismo día.",
+    photoCaption: "El coliseo, donde se reunieron con el arquitecto.",
+  },
+  {
+    caseName: "Familia Mosquera Palacios",
+    happenedOn: "2026-08-14",
+    title: "Materiales entregados",
+    body: "Llegaron 80 bloques y 4 bultos de cemento. Los dejó un vecino de Kennedy. Faltan el resto de bloques y la viga.",
+    photoCaption: "La cuadra el día que descargaron los bloques.",
+  },
+  {
+    caseName: "Familia Mosquera Palacios",
+    happenedOn: "2026-08-16",
+    title: "Lo que ya está listo",
+    body: "El censo, el plano y el arquitecto. Los primeros bloques están en la cuadra. Falta cemento, la viga y terminar el muro para que puedan volver.",
+    photoCaption: "Los alrededores, con los primeros bloques ya en el lote.",
+  },
+  {
+    caseName: "Doña Bernarda Rentería",
+    happenedOn: "2026-08-10",
+    title: "Alojada en La Yesquita",
+    body: "Está en casa de una sobrina. Se pidió la medicación para la tensión a tres meses.",
+    photoCaption: "El río desde La Yesquita, el día que quedó alojada.",
+  },
+  {
+    caseName: "Familia Klinger Valencia",
+    happenedOn: "2026-08-09",
+    title: "Se documentó el palafito",
+    body: "Perdió tres pilotes. La lancha se partió contra el muelle.",
+    photoCaption: "La playa de El Valle, el día que se documentó el palafito.",
+  },
+  {
+    caseName: "Familia Klinger Valencia",
+    happenedOn: "2026-08-14",
+    title: "El motor se puede recuperar",
+    body: "Lo revisó el mecánico del pueblo. Piden madera para los pilotes y el arreglo.",
+    photoCaption: "Las lanchas del pueblo, cuando el mecánico revisó el motor.",
+  },
+  {
+    caseName: "Don Aristides Mena",
+    happenedOn: "2026-08-11",
+    title: "Se midió la grieta",
+    body: "Atraviesa cocina y baño. Se espera un maestro de obra antes de las lluvias fuertes.",
+    photoCaption: "La subida a la casa, el día que se midió la grieta.",
+  },
+];
+
+function photoByCaption(caseName: string, caption: string): Photo {
+  const row = caseByName(caseName);
+  const photo = demoPhotos.find(
+    (item) => item.case_id === row.id && item.caption === caption,
+  );
+  if (!photo) {
+    throw new Error(`Falta la foto de muestra «${caption}» en ${caseName}`);
+  }
+  return photo;
+}
+
+export const demoCaseUpdates: CaseUpdate[] = withUpdatePhotos(
+  updateSeeds.map((seed, index) => {
+    const row = caseByName(seed.caseName);
+    const photo = photoByCaption(seed.caseName, seed.photoCaption);
+    return {
+      id: demoId(UPDATE, index),
+      case_id: row.id,
+      city_id: row.city_id,
+      happened_on: seed.happenedOn,
+      title: seed.title,
+      body: seed.body,
+      photo_id: photo.id,
+      created_at: `${seed.happenedOn}T18:00:00.000Z`,
+    };
+  }),
+  demoPhotos,
+);
 
 // ---------------------------------------------------------------------------
 // Ofertas del público
@@ -573,6 +889,11 @@ type OfferSeed = {
   needTitle?: string;
   caseName?: string;
   citySlug?: string;
+  /** Día en que llegó. Solo lo entregado sale al registro público. */
+  deliveredOn?: string;
+  /** Autorización expresa para aparecer con nombre. Sin ella, la entrega se
+   *  publica igual pero sin decir de quién viene. */
+  publishName?: boolean;
 };
 
 const offerSeeds: OfferSeed[] = [
@@ -614,13 +935,15 @@ const offerSeeds: OfferSeed[] = [
   {
     offerer_name: "Rotary Club Medellín",
     offerer_contact: "3131112233",
-    resource: "25 tanques de 500 litros y pastillas potabilizadoras",
+    resource: "12 tanques de 500 litros y pastillas potabilizadoras",
     category: "agua",
     message: "Aprobado por la junta. Podemos despachar en cuanto haya transporte confirmado.",
     status: "aceptada",
     team_notes:
       "Hablé con Diana el martes. Van 12 tanques en el camión de Logística Aburrá; los otros 13 quedan para el siguiente viaje.",
     needTitle: "Tanques de almacenamiento",
+    deliveredOn: "2026-08-13",
+    publishName: true,
   },
   {
     offerer_name: "Droguería La Salud",
@@ -631,6 +954,43 @@ const offerSeeds: OfferSeed[] = [
     status: "aceptada",
     team_notes: "Yeimy le llevó la fórmula el miércoles. Entregado.",
     caseName: "Doña Bernarda Rentería",
+    deliveredOn: "2026-08-12",
+  },
+  // Entregada contra una necesidad de un caso: en la bandeja del equipo se ve
+  // para qué familia era, y en el registro público solo el municipio.
+  {
+    offerer_name: "Ferretería El Trapiche",
+    offerer_contact: "3105554433",
+    resource: "300 bloques y 15 bultos de cemento",
+    category: "techo",
+    message: "Vimos el caso en el portal. Ponemos el material; el transporte no podemos.",
+    status: "aceptada",
+    team_notes: "Llegó con el camión del jueves. Lo recibió la familia el viernes.",
+    needTitle: "Bloque, cemento y una viga para rehacer la pared del fondo",
+    deliveredOn: "2026-08-11",
+    publishName: true,
+  },
+  {
+    offerer_name: "Colegio San José",
+    offerer_contact: "rectoria@sanjose.edu.co",
+    resource: "300 cuadernos, lápices y dos uniformes",
+    category: "otro",
+    message: "Colecta de los cursos de bachillerato. Ya están empacados por tallas y por curso.",
+    status: "aceptada",
+    team_notes: "Llegaron con el camión del jueves. Los recibió Alberto en la casa de la cultura.",
+    citySlug: "istmina",
+    deliveredOn: "2026-08-14",
+    publishName: true,
+  },
+  {
+    offerer_name: "Marina Restrepo",
+    offerer_contact: "3182223344",
+    resource: "Flete de 8 toneladas de Medellín a Quibdó",
+    category: "transporte",
+    message: "Tengo un camión que sube vacío. No quiero que aparezca mi nombre en ninguna parte.",
+    status: "aceptada",
+    team_notes: "Subió el jueves con los tanques y los mercados. Confirmado por Yeimy al descargar.",
+    deliveredOn: "2026-08-13",
   },
   {
     offerer_name: "Donante anónimo",
@@ -662,6 +1022,8 @@ export const demoOffers: Offer[] = offerSeeds.map((seed, index) => {
     category: seed.category,
     message: seed.message ?? "",
     status: seed.status ?? "pendiente",
+    delivered_on: seed.deliveredOn ?? null,
+    publish_name: seed.publishName ?? false,
     team_notes: seed.team_notes ?? "",
     created_at: day(10 + (index % 5)),
   };
@@ -691,10 +1053,20 @@ export const demoOffersWithContext: OfferWithContext[] = demoOffers.map((offer) 
 
 const openNeedsOf = (needs: Need[]) => needs.filter((need) => need.status !== "cubierta").length;
 
+const categoriesOf = (needs: Need[]) => [
+  ...new Set(needs.filter((need) => need.status !== "cubierta").map((need) => need.category)),
+];
+
 const coverOf = (photos: Photo[]) => {
   const first = [...photos].sort((a, b) => a.sort_order - b.sort_order)[0];
   return first ? first.thumb_path || first.storage_path : null;
 };
+
+/** Las fotos de una persona, en el orden en que el equipo las dejó. */
+const photosOf = (caseId: string) =>
+  demoPhotos
+    .filter((photo) => photo.case_id === caseId)
+    .sort((a, b) => a.sort_order - b.sort_order);
 
 function visibleCases(cityId: string, includeDrafts: boolean): Case[] {
   return demoCases.filter(
@@ -708,10 +1080,12 @@ export function demoCityCards(): CityCardData[] {
     .filter((city) => city.published)
     .map((city) => {
       const needs = demoNeeds.filter((need) => need.city_id === city.id);
+      const covers = demoPhotos.filter((photo) => photo.city_id === city.id && photo.case_id === null);
       return {
         ...city,
-        coverPath: coverOf(
-          demoPhotos.filter((photo) => photo.city_id === city.id && photo.case_id === null),
+        coverPath: coverOf(covers),
+        coverFrame: savedFrame(
+          [...covers].sort((a, b) => a.sort_order - b.sort_order)[0] ?? null,
         ),
         openNeeds: openNeedsOf(needs),
         caseCount: visibleCases(city.id, false).length,
@@ -728,19 +1102,54 @@ export function demoCityPage(slug: string, includeDrafts: boolean): CityPage | n
   const city = demoCities.find((row) => row.slug === slug);
   if (!city || (!city.published && !includeDrafts)) return null;
 
+  const visible = visibleCases(city.id, includeDrafts);
+  const visibleIds = new Set(visible.map((row) => row.id));
+
   return {
     city,
-    foundations: demoFoundations.filter((row) => row.city_id === city.id),
+    foundation: demoFoundations.find((row) => row.city_id === city.id) ?? null,
     photos: demoPhotos.filter((row) => row.city_id === city.id && row.case_id === null),
     zoneNeeds: demoNeeds.filter((row) => row.city_id === city.id && row.case_id === null),
-    cases: visibleCases(city.id, includeDrafts).map((row) => {
-      const photos = demoPhotos.filter((photo) => photo.case_id === row.id);
-      return {
-        ...row,
-        coverPath: coverOf(photos),
-        openNeeds: openNeedsOf(demoNeeds.filter((need) => need.case_id === row.id)),
-      };
-    }),
+    caseNeeds: demoNeeds.filter(
+      (row) => row.case_id !== null && visibleIds.has(row.case_id),
+    ),
+    cases: visible.map((row) => detailCase(row)),
+  };
+}
+
+/** Un caso con lo que necesitan sus tarjetas: portada, retrato, cuántas faltan y de qué. */
+function summarizeCase(row: Case): CaseSummary {
+  const needs = demoNeeds.filter((need) => need.case_id === row.id);
+  const allPhotos = photosOf(row.id);
+  const photos = situationPhotos(
+    allPhotos,
+    row.portrait_photo_id,
+    demoCaseUpdates.filter((update) => update.case_id === row.id),
+  );
+  const portrait = allPhotos.find((photo) => photo.id === row.portrait_photo_id);
+
+  return {
+    ...row,
+    coverPath: coverOf(photos),
+    // La misma regla que en la capa de datos de verdad: el retrato se busca entre
+    // las fotos de este caso y no por identificador contra todas, así que ningún
+    // puntero descolocado puede acabar enseñando la cara de otra familia.
+    portraitPath: portrait ? portrait.thumb_path || portrait.storage_path : null,
+    portraitFrame: savedFrame(portrait ?? null),
+    openNeeds: openNeedsOf(needs),
+    categories: categoriesOf(needs),
+  };
+}
+
+/** El caso con sus fotos de la situación, que es lo que lleva la tarjeta de un municipio. */
+function detailCase(row: Case): CaseWithPhotos {
+  return {
+    ...summarizeCase(row),
+    photos: situationPhotos(
+      photosOf(row.id),
+      row.portrait_photo_id,
+      demoCaseUpdates.filter((update) => update.case_id === row.id),
+    ),
   };
 }
 
@@ -755,14 +1164,18 @@ export function demoCasePage(
   const caseRecord = visibleCases(city.id, includeDrafts).find((row) => row.id === caseId);
   if (!caseRecord) return null;
 
-  const cityFoundations = demoFoundations.filter((row) => row.city_id === city.id);
-
   return {
     city,
     caseRecord,
     photos: demoPhotos.filter((row) => row.case_id === caseRecord.id),
     needs: demoNeeds.filter((row) => row.case_id === caseRecord.id),
-    foundation: cityFoundations.find((row) => row.is_primary) ?? cityFoundations[0] ?? null,
+    updates: demoCaseUpdates
+      .filter((row) => row.case_id === caseRecord.id)
+      .sort(
+        (a, b) =>
+          a.happened_on.localeCompare(b.happened_on) || a.created_at.localeCompare(b.created_at),
+      ),
+    foundation: demoFoundations.find((row) => row.city_id === city.id) ?? null,
   };
 }
 
@@ -810,6 +1223,89 @@ export function demoOfferTarget(params: {
   return null;
 }
 
+/**
+ * Las vistas transversales sobre los datos de muestra. Respetan lo mismo que las
+ * de verdad: solo municipios publicados y solo casos con consentimiento, que es
+ * lo que en producción hacen las RLS.
+ */
+const publishedCities = () => demoCities.filter((city) => city.published);
+
+export function demoPortalTotals(): PortalTotals {
+  const cities = publishedCities();
+  const ids = new Set(cities.map((city) => city.id));
+  const needs = demoNeeds.filter((need) => ids.has(need.city_id));
+  const covered = needs.filter((need) => need.status === "cubierta").length;
+
+  return {
+    cities: cities.length,
+    cases: cities.reduce((sum, city) => sum + visibleCases(city.id, false).length, 0),
+    needs: needs.length,
+    coveredNeeds: covered,
+    openNeeds: needs.length - covered,
+    updatedAt:
+      cities.map((city) => city.updated_at).sort((a, b) => b.localeCompare(a))[0] ?? null,
+  };
+}
+
+export function demoCaseCards(): CaseCard[] {
+  return publishedCities()
+    .flatMap((city) =>
+      visibleCases(city.id, false).map((row) => ({
+        ...summarizeCase(row),
+        cityName: city.name,
+        citySlug: city.slug,
+      })),
+    )
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+}
+
+export function demoNeedCards(): NeedCard[] {
+  return publishedCities().flatMap((city) =>
+    demoNeeds
+      .filter((need) => need.city_id === city.id)
+      .map((need) => ({
+        ...need,
+        cityName: city.name,
+        citySlug: city.slug,
+        caseName: demoCases.find((row) => row.id === need.case_id)?.display_name ?? null,
+      })),
+  );
+}
+
+export function demoFoundationEntries(): FoundationEntry[] {
+  return publishedCities()
+    .flatMap((city) =>
+      demoFoundations
+        .filter((foundation) => foundation.city_id === city.id)
+        .map((foundation) => ({ ...foundation, cityName: city.name, citySlug: city.slug })),
+    )
+    .sort((a, b) => a.cityName.localeCompare(b.cityName, "es"));
+}
+
+/**
+ * La llave de transferencia del portal de muestra, y es inventada a propósito.
+ *
+ * La llave de verdad vive en un solo sitio: la fila de `public.donation_key`, que
+ * escribe la migración 0010 y que cambia coordinación desde el panel. Copiarla
+ * aquí la convertiría en dos sitios, y el segundo no se cambia desde ningún
+ * panel: el día que la llave cambiara, este archivo se quedaría enseñando la
+ * vieja a cualquiera que abriera el portal sin claves. Una llave caducada
+ * enseñada como buena es dinero perdido, así que la de muestra se ve de lejos que
+ * lo es.
+ *
+ * Lleva el nombre y la app puestos porque es también la pantalla de referencia:
+ * es donde se comprueba cómo queda el bloque con los tres datos escritos.
+ */
+export function demoDonationKey(): DonationKey {
+  return {
+    value: "@ejemplo",
+    app: "Nequi",
+    holder: "Fundación Atrato Vive (muestra)",
+    updatedAt: day(14),
+    updatedBy: teamSeeds[0].email,
+  };
+}
+
 export function demoAdminCities(): AdminCityRow[] {
   return demoCities.map((city) => ({
     ...city,
@@ -838,4 +1334,127 @@ export function demoNeedOptions(): NeedOption[] {
       cityName: demoCities.find((city) => city.id === need.city_id)?.name ?? "Sin municipio",
       caseName: demoCases.find((row) => row.id === need.case_id)?.display_name ?? null,
     }));
+}
+
+// ---------------------------------------------------------------------------
+// Registro público de ayudas
+//
+// Reproduce lo que hace la vista `public.aid_log`: solo lo entregado, solo de
+// municipios publicados, el mes y no el día, el municipio y no el caso, la
+// categoría y no el texto de quien ofreció, el nombre únicamente con autorización
+// y nunca el contacto —que aquí ni se copia—. Si esa vista cambia, esto cambia con
+// ella.
+// ---------------------------------------------------------------------------
+
+/**
+ * La categoría contra el vocabulario cerrado, igual que hace la vista.
+ *
+ * Esto NO es la garantía: la garantía está en el `case` de
+ * supabase/migrations/0005_registro_sin_texto_libre.sql, porque la vista es la API
+ * y aquí no hay ninguna. Es la copia que hace que el portal de muestra se
+ * comporte como el de verdad, incluido lo que pasa cuando `offers.category`
+ * —texto libre— trae algo que no está en la lista.
+ */
+function publicCategory(value: string): NeedCategory {
+  const known = NEED_CATEGORIES.find((option) => option.value === value);
+  return known ? known.value : "otro";
+}
+
+/**
+ * Una necesidad se puede nombrar si es del municipio. Las de un caso no: su
+ * título está escrito en la ficha de la familia, así que nombrarlo aquí sería
+ * decir qué recibió esa familia.
+ */
+function publicNeed(needId: string | null): Need | null {
+  const found = demoNeeds.find((row) => row.id === needId);
+  if (!found || found.case_id) return null;
+  if (!demoCities.find((city) => city.id === found.city_id)?.published) return null;
+  return found;
+}
+
+/**
+ * El nombre solo con autorización expresa, y no si dentro hay un teléfono o un
+ * correo: pasa que alguien escribe "Marta, 3167778899" en el campo del nombre, y
+ * publicarlo sería publicar el contacto que no autorizó.
+ */
+function publishableName(offer: Offer): string | null {
+  if (!offer.publish_name) return null;
+  if (/[0-9]{7}/.test(offer.offerer_name) || offer.offerer_name.includes("@")) return null;
+  return offer.offerer_name;
+}
+
+export function demoAidRecords(): AidRecord[] {
+  const openCityIds = new Set(publishedCities().map((city) => city.id));
+
+  return demoOffers
+    .filter(
+      (offer) =>
+        offer.delivered_on !== null && (offer.city_id === null || openCityIds.has(offer.city_id)),
+    )
+    .map((offer) => {
+      const city = demoCities.find((row) => row.id === offer.city_id && row.published) ?? null;
+      const need = publicNeed(offer.need_id);
+
+      return {
+        id: offer.id,
+        // `resource` no se copia. No es que no se pinte: es que el registro público
+        // no tiene ese dato, ni aquí ni en la vista.
+        category: publicCategory(offer.category),
+        delivered_month: offer.delivered_on!.slice(0, 7),
+        offerer_name: publishableName(offer),
+        city_name: city?.name ?? null,
+        city_slug: city?.slug ?? null,
+        need_title: need?.title ?? null,
+      };
+    })
+    // Por mes y, dentro del mes, por identificador: el mismo orden que pide la
+    // consulta de verdad. Ordenar por la fecha completa contaría el día.
+    .sort((a, b) => b.delivered_month.localeCompare(a.delivered_month) || a.id.localeCompare(b.id));
+}
+
+// ---------------------------------------------------------------------------
+// El equipo
+//
+// La sesión de muestra es de coordinación para que el panel se pueda recorrer
+// entero, incluida la pantalla de equipo. Con base de datos conectada esto
+// desaparece y el rol lo responde Postgres.
+// ---------------------------------------------------------------------------
+
+type TeamSeed = { email: string; nombre: string; role: TeamSession["role"]; cities: string[] };
+
+const teamSeeds: TeamSeed[] = [
+  { email: "muestra@chocoup.org", nombre: "Coordinación (muestra)", role: "coordinacion", cities: [] },
+  {
+    email: "yeimy@chocoup.org",
+    nombre: "Yeimy Palacios",
+    role: "documentacion",
+    cities: ["quibdo", "bojaya"],
+  },
+  {
+    email: "alberto@chocoup.org",
+    nombre: "Alberto Perea",
+    role: "documentacion",
+    cities: ["istmina"],
+  },
+  {
+    email: "erika@chocoup.org",
+    nombre: "Erika Klinger",
+    role: "documentacion",
+    cities: ["bahia-solano"],
+  },
+];
+
+export function demoTeamSession(): TeamSession {
+  const [coordination] = teamSeeds;
+  return { email: coordination.email, role: coordination.role, cityIds: [] };
+}
+
+export function demoTeamDirectory(): TeamMemberEntry[] {
+  return teamSeeds.map((seed, index) => ({
+    email: seed.email,
+    nombre: seed.nombre,
+    role: seed.role,
+    cityIds: seed.cities.map((slug) => cityBySlug(slug).id),
+    createdAt: day(4 + index),
+  }));
 }

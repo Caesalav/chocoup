@@ -3,17 +3,37 @@ import { createCity } from "@/app/admin/actions";
 import { LocationPicker } from "@/components/map/LocationPicker";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { field } from "@/components/ui/styles";
+import { currentTeam } from "@/lib/team";
 
 export const dynamic = "force-dynamic";
 
-export default function NewCityPage() {
+export default async function NewCityPage() {
+  // Abrir un municipio nuevo es abrir un frente de trabajo, y quien lo abre
+  // decide también quién lo atiende. La acción lo vuelve a comprobar.
+  const team = await currentTeam();
+
+  if (team?.role !== "coordinacion") {
+    return (
+      <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
+        <Link href="/admin" className="text-sm text-muted hover:text-ink hover:underline">
+          ← Panel
+        </Link>
+        <h1 className="mt-6 font-display text-3xl text-ink">Los municipios los crea coordinación</h1>
+        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
+          Si hace falta uno nuevo, pídelo por el grupo con el nombre y, si lo tienes, la ubicación.
+          En cuanto lo creen y te lo asignen, aparecerá en tu panel.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
       <Link
         href="/admin"
         className="smallcaps inline-flex items-center gap-2 text-[15px] text-muted transition-colors hover:text-ink"
       >
-        <span className="text-amber">←</span> Panel
+        <span className="text-accent">←</span> Panel
       </Link>
 
       <p className="mt-6 text-[11px] uppercase tracking-[0.18em] text-faint">Nuevo municipio</p>

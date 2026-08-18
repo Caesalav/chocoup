@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { CheckIcon } from "@/components/ui/icons";
 import { button } from "@/components/ui/styles";
 
 export const metadata: Metadata = {
@@ -8,32 +9,35 @@ export const metadata: Metadata = {
 
 export default function ThanksPage() {
   return (
-    <div className="mx-auto max-w-2xl px-5 pb-20 pt-32 sm:px-8">
-      {/* El visto se dibuja al entrar: confirma el envío sin necesidad de leer. */}
-      <span className="flex size-14 items-center justify-center rounded-full bg-teal-soft">
-        <svg viewBox="0 0 24 24" className="size-7" aria-hidden="true">
-          <path
-            d="M5 13l4.5 4.5L19 7"
-            className="draws-check stroke-teal-light"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </svg>
+    <div className="mx-auto max-w-2xl px-5 pb-8 pt-10 sm:px-8 lg:pb-24 lg:pt-16">
+      {/* El visto se dibuja al entrar: confirma el envío sin necesidad de leer.
+          Es el mismo glifo que lleva la pastilla «Cubierta», solo que a tamaño
+          de sello y con el trazo animado. */}
+      <span className="flex size-14 items-center justify-center rounded-full bg-accent-soft text-accent-strong">
+        <CheckIcon className="draws-check size-7 stroke-[2.5]" />
       </span>
 
-      <h1 className="enters enters-1 mt-6 font-display text-4xl leading-[1.05] text-ink sm:text-5xl">
+      <h1 className="enters enters-1 mt-6 font-display text-[30px] leading-tight text-ink">
         Gracias, lo recibimos
       </h1>
-      <p className="enters enters-2 mt-5 max-w-prose text-[17px] leading-[1.7] text-muted">
+      <p className="enters enters-2 mt-4 text-[15px] leading-relaxed text-muted">
         El equipo revisa las ofertas a diario y te escribe al contacto que dejaste. Si es algo
         urgente y prefieres no esperar, en la página del municipio está el WhatsApp de la fundación
         que trabaja allí.
       </p>
-      <div className="enters enters-3 mt-9 flex flex-wrap gap-3">
+      {/* Se dice aquí, recién enviada la oferta, porque es cuando importa saber qué
+          se va a publicar de esto y qué no. */}
+      <p className="enters enters-2 mt-4 text-[14px] leading-relaxed text-muted">
+        Cuando tu ayuda llegue al municipio, quedará anotada en el{" "}
+        <Link href="/ayudas" className="text-accent hover:underline">
+          registro de ayudas
+        </Link>
+        , con el mes en que llegó y el municipio. Tu contacto no se publica, y tu nombre solo si lo
+        autorizaste.
+      </p>
+      <div className="enters enters-3 mt-8 flex flex-wrap gap-3">
         <Link href="/" className={button.primary}>
-          Volver al mapa
+          Volver al inicio
         </Link>
         <Link href="/ofrecer" className={button.secondary}>
           Ofrecer otra cosa

@@ -1,16 +1,33 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { button } from "@/components/ui/styles";
 import { photoUrl, thumbUrl } from "@/lib/format";
+import { savedFrame } from "@/lib/photo-frame";
 import type { Photo } from "@/lib/types";
+import { FramedPhoto } from "@/components/ui/Photo";
 
+/**
+ * El carrete de fotos y su vista ampliada.
+ *
+ * Solo tiene dos formas, que es lo que el portal usa: sobre papel se arrastra en
+ * el móvil y se abre en rejilla a partir de `lg`; sobre la foto de portada de un
+ * municipio (`overlay`) va dentro del velo oscuro y sigue siendo carrete a
+ * cualquier ancho, porque ahí no hay sitio para una rejilla.
+ *
+ * Tenía una tercera —un mosaico cuadrado con la primera foto a doble ancho y el
+ * número incrustado en la esquina— que era la de la etapa anterior y que después
+ * de los dos rediseños no la pedía ninguna pantalla: quedaban las ramas, la
+ * opción `featureFirst` y una `variant` con un solo valor real.
+ */
 type Props = {
-  photos: Pick<Photo, "id" | "storage_path" | "thumb_path" | "caption">[];
-  /** Ancho de la primera foto: destaca la imagen de apertura de una ciudad. */
-  featureFirst?: boolean;
+  photos: Pick<Photo, "id" | "storage_path" | "thumb_path" | "caption" | "focus_x" | "focus_y" | "zoom">[];
+  /** Sobre la foto de portada: el carrete va en el velo oscuro y no se
+   *  convierte en rejilla al ensanchar. */
+  overlay?: boolean;
 };
 
-export function PhotoGrid({ photos, featureFirst = false }: Props) {
+export function PhotoGrid({ photos, overlay = false }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const close = useCallback(() => setOpenIndex(null), []);
@@ -43,50 +60,58 @@ export function PhotoGrid({ photos, featureFirst = false }: Props) {
 
   return (
     <>
-      <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+      <ul
+        className={
+          overlay
+            ? "no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-5 px-5 sm:scroll-px-8 sm:px-8"
+            : "no-scrollbar -mx-5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-5 px-5 lg:mx-0 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] lg:gap-3 lg:overflow-visible lg:px-0"
+        }
+      >
         {photos.map((photo, index) => (
           <li
             key={photo.id}
             className={
-              featureFirst && index === 0 ? "col-span-2 sm:col-span-2 sm:row-span-2" : undefined
+              overlay
+                ? "w-[6.1rem] shrink-0 snap-start sm:w-[7.25rem]"
+                : "w-[6.1rem] shrink-0 snap-start lg:w-auto"
             }
           >
             <button
               type="button"
               onClick={() => setOpenIndex(index)}
-              className="group relative block w-full overflow-hidden rounded-lg border border-line bg-land"
+              className={`group relative block w-full overflow-hidden bg-land transition-colors ${
+                overlay
+                  ? "rounded-2xl ring-1 ring-paper/40 hover:ring-paper/70"
+                  : "rounded-lg border border-line hover:border-line-strong"
+              }`}
             >
-              <img
+              <FramedPhoto
                 src={thumbUrl(photo)}
                 alt={photo.caption || "Situación documentada"}
-                loading={index < 3 ? "eager" : "lazy"}
-                className={`w-full object-cover opacity-90 transition-opacity group-hover:opacity-100 ${
-                  featureFirst && index === 0 ? "aspect-4/3" : "aspect-square"
-                }`}
+                frame={savedFrame(photo)}
+                eager={index < 3}
+                className="aspect-[3/2] w-full"
               />
-              <span className="absolute left-2 top-2 rounded-full bg-base/70 px-2 py-0.5 text-[10px] font-medium tabular-nums text-body backdrop-blur">
-                {String(index + 1).padStart(2, "0")}
-              </span>
             </button>
-            {photo.caption && (
-              <p className="mt-2 text-xs leading-snug text-faint">{photo.caption}</p>
-            )}
           </li>
         ))}
       </ul>
+      {!overlay && (
+        <p className="mt-2 text-[12px] text-faint lg:hidden">Desliza · toca para ampliar</p>
+      )}
 
       {active && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex flex-col bg-base/95 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex flex-col bg-paper/95 p-4 backdrop-blur-sm"
           onClick={close}
         >
           <div className="flex justify-end">
             <button
               type="button"
               onClick={close}
-              className="smallcaps rounded-full px-4 py-2 text-[15px] text-muted hover:text-ink"
+              className={button.ghost}
             >
               Cerrar
             </button>
@@ -95,10 +120,13 @@ export function PhotoGrid({ photos, featureFirst = false }: Props) {
             className="flex min-h-0 flex-1 items-center justify-center"
             onClick={(event) => event.stopPropagation()}
           >
+            {/* El filete es lo que le da un canto a la foto: sobre el negro de
+                antes se recortaba sola, y sobre papel una imagen de cielo o de
+                playa se derrama en el fondo sin él. */}
             <img
               src={photoUrl(active.storage_path)}
               alt={active.caption || "Situación documentada"}
-              className="max-h-full max-w-full object-contain"
+              className="max-h-full max-w-full rounded-lg border border-line object-contain"
             />
           </div>
           <div
@@ -108,7 +136,7 @@ export function PhotoGrid({ photos, featureFirst = false }: Props) {
             <button
               type="button"
               onClick={() => step(-1)}
-              className="smallcaps rounded-full px-3 py-2 text-[15px] text-muted hover:text-ink"
+              className={button.ghost}
             >
               Anterior
             </button>
@@ -118,7 +146,7 @@ export function PhotoGrid({ photos, featureFirst = false }: Props) {
             <button
               type="button"
               onClick={() => step(1)}
-              className="smallcaps rounded-full px-3 py-2 text-[15px] text-muted hover:text-ink"
+              className={button.ghost}
             >
               Siguiente
             </button>

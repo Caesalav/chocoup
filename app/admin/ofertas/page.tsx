@@ -5,7 +5,8 @@ import { CategoryChip, OfferStatusChip } from "@/components/ui/Chip";
 import { eyebrow, field, panel } from "@/components/ui/styles";
 import { getNeedOptions, getOffers } from "@/lib/admin-data";
 import { OFFER_STATUSES } from "@/lib/constants";
-import { contactHref, formatDateTime } from "@/lib/format";
+import { contactHref, formatDateTime, formatDay } from "@/lib/format";
+import { currentTeam } from "@/lib/team";
 import type { OfferStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,13 @@ export default async function OffersPage({ searchParams }: Props) {
   const active = FILTERS.some((filter) => filter.value === estado) ? estado! : "pendiente";
   const status = active === "todas" ? undefined : (active as OfferStatus);
 
-  const [offers, needOptions] = await Promise.all([getOffers(status), getNeedOptions()]);
+  const [offers, needOptions, team] = await Promise.all([
+    getOffers(status),
+    getNeedOptions(),
+    currentTeam(),
+  ]);
+
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
@@ -34,6 +41,20 @@ export default async function OffersPage({ searchParams }: Props) {
         Cada oferta trae un contacto que solo ve el equipo. Al aceptarla, escríbele y ponla en
         contacto con la fundación del municipio o con la familia.
       </p>
+      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
+        Cuando la ayuda llegue de verdad, anota el día. Eso —y solo eso— es lo que la publica en el{" "}
+        <Link href="/ayudas" className="text-accent hover:underline">
+          registro de ayudas
+        </Link>
+        . Ahí sale qué era, el mes y el municipio: no el día que anotas aquí, no a qué caso fue, no
+        el contacto, y el nombre de quien la dio solo si lo autorizó.
+      </p>
+      {team?.role === "documentacion" && (
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
+          Aquí ves las ofertas de los municipios que tienes asignados. Las que llegan sin municipio
+          las reparte coordinación.
+        </p>
+      )}
 
       <nav className="mt-6 flex flex-wrap gap-2">
         {FILTERS.map((filter) => (
@@ -42,7 +63,7 @@ export default async function OffersPage({ searchParams }: Props) {
             href={`/admin/ofertas?estado=${filter.value}`}
             className={`smallcaps rounded-full px-4 py-1.5 text-[15px] transition-colors ${
               active === filter.value
-                ? "bg-amber text-base"
+                ? "bg-accent text-paper"
                 : "border border-line text-muted hover:border-line-strong hover:text-ink"
             }`}
           >
@@ -63,6 +84,11 @@ export default async function OffersPage({ searchParams }: Props) {
                 <div className="flex flex-wrap items-center gap-2">
                   <OfferStatusChip status={offer.status} />
                   <CategoryChip category={offer.category} />
+                  {offer.delivered_on && (
+                    <span className="text-xs text-accent-strong">
+                      Llegó el {formatDay(offer.delivered_on)}
+                    </span>
+                  )}
                   <span className="text-xs text-faint">{formatDateTime(offer.created_at)}</span>
                 </div>
 
@@ -77,7 +103,7 @@ export default async function OffersPage({ searchParams }: Props) {
                       href={href}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="text-amber hover:underline"
+                      className="text-accent hover:underline"
                     >
                       {offer.offerer_contact}
                     </a>
@@ -158,6 +184,27 @@ export default async function OffersPage({ searchParams }: Props) {
                     </label>
                   </div>
 
+                  {/* La fecha es lo único que convierte una promesa en una ayuda
+                      registrada. Va con máximo de hoy: el registro público es de
+                      lo que ya llegó, no de lo que va a llegar. El día exacto se
+                      queda en esta bandeja; fuera solo sale el mes. */}
+                  <label className="block">
+                    <span className={field.label}>¿Qué día llegó?</span>
+                    <input
+                      type="date"
+                      name="delivered_on"
+                      max={today}
+                      defaultValue={offer.delivered_on ?? ""}
+                      className={field.input}
+                    />
+                    <span className={field.hint}>
+                      Déjalo vacío mientras siga siendo una promesa. Al poner fecha, la oferta queda
+                      como aceptada y la entrega sale en el registro público con el mes, no con el
+                      día. Lo que sí se publica tal cual es el texto de la oferta: si ese texto
+                      señala a una persona concreta, háblalo antes de marcarla.
+                    </span>
+                  </label>
+
                   <label className="block">
                     <span className={field.label}>Notas del equipo</span>
                     <textarea
@@ -168,6 +215,29 @@ export default async function OffersPage({ searchParams }: Props) {
                       placeholder="Quién llamó, qué se acordó, cuándo llega"
                     />
                   </label>
+
+                  {/* La autorización la marca quien ofrece, en su formulario, y el
+                      equipo no la puede marcar por ella. Al revés sí: alguien
+                      llama y pide que le quiten el nombre, y eso tiene que poder
+                      hacerse en el momento. */}
+                  {offer.publish_name ? (
+                    <label className={field.checkboxRow}>
+                      <input type="checkbox" name="revoke_name" className={field.checkbox} />
+                      <span>
+                        Quitar su nombre del registro público
+                        <span className="mt-0.5 block text-xs text-muted">
+                          Autorizó aparecer como{" "}
+                          <span className="text-ink">{offer.offerer_name}</span>. Marca esto si pide
+                          que lo quitemos.
+                        </span>
+                      </span>
+                    </label>
+                  ) : (
+                    <p className="text-xs leading-relaxed text-muted">
+                      No autorizó que se publique su nombre, así que la entrega aparecerá sin él.
+                      Solo puede autorizarlo la persona, desde el formulario.
+                    </p>
+                  )}
 
                   <SubmitButton variant="secondary">Guardar</SubmitButton>
                 </form>

@@ -17,6 +17,11 @@ function uuidOrNull(formData: FormData, key: string): string | null {
   return /^[0-9a-f-]{36}$/i.test(value) ? value : null;
 }
 
+function checked(formData: FormData, key: string): boolean {
+  const value = formData.get(key);
+  return value === "on" || value === "true";
+}
+
 export async function submitOffer(
   _previous: OfferFormState,
   formData: FormData,
@@ -51,12 +56,18 @@ export async function submitOffer(
   const supabase = await createSupabaseServerClient();
 
   // Sin .select(): el público no tiene permiso de lectura sobre las ofertas.
+  //
+  // `publish_name` es lo único que decide si esta persona aparece con nombre en el
+  // registro público, y solo puede llegar de aquí: el panel del equipo puede
+  // retirar el nombre pero no concederlo. Si la casilla no viene, va en falso,
+  // que es el valor por omisión de la columna.
   const { error } = await supabase.from("offers").insert({
     offerer_name: name,
     offerer_contact: contact,
     resource,
     category,
     message,
+    publish_name: checked(formData, "publish_name"),
     need_id: uuidOrNull(formData, "need_id"),
     case_id: uuidOrNull(formData, "case_id"),
     city_id: uuidOrNull(formData, "city_id"),

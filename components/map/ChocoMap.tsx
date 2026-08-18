@@ -1,194 +1,197 @@
 import Link from "next/link";
-import { CHOCO_PATH, LAND, placePins, viewBoxAttr, type MapPin } from "@/lib/choco-map";
-import { MUNICIPALITIES, NEIGHBOURS_PATH, RIVERS_PATH } from "@/lib/choco-texture";
+import {
+  CHOCO_PATH,
+  CITY_LABEL,
+  LABEL_BASELINE,
+  OCEAN_LABEL,
+  placeOceanLabel,
+  placePins,
+  viewBoxAttr,
+  type MapPin,
+} from "@/lib/choco-map";
+import { plural } from "@/lib/format";
+import { paintMunicipalities, TIER_FILL } from "@/lib/needs-scale";
 
 type Props = {
   pins: MapPin[];
-  /** Con valor, cada ciudad enlaza a `${linkBase}/${slug}`. */
-  linkBase?: string;
-  /** Ciudad que se resalta, para la vista de un solo municipio. */
+  /** Construye el enlace de cada municipio documentado. Sin esto el mapa es un
+   *  dibujo: se usa así en la ficha, donde no hay a dónde ir. */
+  hrefFor?: (pin: MapPin) => string;
+  /** Municipio elegido: se le marca el contorno y el resto se apaga un punto. */
   activeSlug?: string;
-  /** Oculta rótulos y textura, para usos pequeños donde solo importa la forma. */
+  /** Solo la silueta y el punto, para usos diminutos donde el mosaico se
+   *  convertiría en papilla: a 96 px de ancho, la separación entre municipios
+   *  mide menos de medio píxel. */
   bare?: boolean;
-  /** El tamaño lo decide quien lo usa: el lienzo lo limita en alto y la ficha en ancho. */
+  /** El tamaño lo decide quien lo usa: /mapa lo limita en alto, la ficha de un
+   *  municipio en ancho. */
   className: string;
-  /** Cambiar solo si hay dos mapas detallados en la misma página. */
-  clipId?: string;
 };
 
-const TONES = ["fill-land-1", "fill-land-2", "fill-land-3", "fill-land-4"];
+/** Separación entre municipios: es el papel del fondo asomando entre las formas,
+ *  no una línea de color, así que el mosaico funciona sobre cualquier fondo. */
+const GAP = 3;
 
 /**
- * Esquema del Chocó con las ciudades documentadas.
+ * El Chocó como mosaico de sus 30 municipios, coloreados por necesidades
+ * abiertas.
  *
  * Sin JavaScript y sin servicio de mapas: es SVG renderizado en el servidor y
- * los enlaces son <a>. La textura son tres capas de datos abiertos horneadas en
- * el bundle (municipios, ríos y departamentos vecinos), unos 19 KB en total.
- *
- * Los trazos anchos detrás del relleno dejan solo su mitad exterior a la vista,
- * lo que produce el halo de curvas de nivel alrededor de la costa.
+ * los enlaces son <a>, así que /mapa funciona con la señal del Chocó y
+ * compartido por WhatsApp. Las formas son del DANE (lib/choco-texture) y no se
+ * mueven nunca: no hay cámara, ni zoom, ni máscara, ni detalle de calles.
+ * Elegir un municipio cambia colores y contornos, jamás el encuadre.
  */
-export function ChocoMap({
-  pins,
-  linkBase,
-  activeSlug,
-  bare = false,
-  className,
-  clipId = "recorte-choco",
-}: Props) {
+export function ChocoMap({ pins, hrefFor, activeSlug, bare = false, className }: Props) {
+  const painted = paintMunicipalities(pins);
+  const active = activeSlug ? painted.find((shape) => shape.city?.slug === activeSlug) : undefined;
   const placed = placePins(pins);
+  const ocean = bare ? null : placeOceanLabel(placed);
+
+  // Con enlaces dentro, el mapa no puede ser role="img": ese rol convierte en
+  // decoración todo lo que hay debajo y los municipios dejarían de existir para
+  // un lector de pantalla. Como grupo con nombre se anuncia el mapa y, dentro,
+  // cada municipio.
+  const interactive = Boolean(hrefFor) && !bare;
 
   return (
     <svg
       viewBox={viewBoxAttr}
       className={className}
-      role="img"
-      aria-label={`Mapa del Chocó con ${pins.length} municipios documentados`}
+      role={interactive ? "group" : "img"}
+      aria-label={
+        bare
+          ? "Situación del municipio dentro del Chocó"
+          : `Mapa del Chocó con ${plural(pins.length, "municipio documentado", "municipios documentados")}`
+      }
     >
-      {!bare && (
-        <defs>
-          <clipPath id={clipId}>
-            <path d={CHOCO_PATH} />
-          </clipPath>
-        </defs>
-      )}
+      {bare ? (
+        <path
+          d={CHOCO_PATH}
+          className="fill-land stroke-contour"
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+        />
+      ) : (
+        painted.map((shape) => {
+          const href = shape.city && hrefFor ? hrefFor(shape.city) : null;
+          // Con un municipio elegido los demás bajan un punto. No desaparecen:
+          // la silueta del departamento la forman los 30, no los documentados.
+          const dimmed = Boolean(active) && shape.id !== active?.id;
 
-      {/* Departamentos vecinos: masas de tierra apenas insinuadas, para que el
-          Chocó no flote en el vacío. Sin relleno se leerían como alambres. */}
-      {!bare && (
-        <>
-          <path d={NEIGHBOURS_PATH} className="fill-neighbour" />
-          <path
-            d={NEIGHBOURS_PATH}
-            className="fill-none stroke-contour"
-            strokeWidth={1}
-            opacity={0.3}
-          />
-        </>
-      )}
-
-      {/* Halo de curvas de nivel alrededor de la costa. */}
-      <g className="stroke-contour">
-        <path d={CHOCO_PATH} className="fill-none" strokeWidth={52} opacity={0.09} />
-        <path d={CHOCO_PATH} className="fill-none" strokeWidth={34} opacity={0.12} />
-        <path d={CHOCO_PATH} className="fill-none" strokeWidth={18} opacity={0.18} />
-      </g>
-
-      <path d={CHOCO_PATH} className="fill-land" />
-
-      {/* Mosaico de los 30 municipios: la textura principal del mapa. */}
-      {!bare && (
-        <g clipPath={`url(#${clipId})`}>
-          {MUNICIPALITIES.map((municipality) => (
+          const region = (
             <path
-              key={municipality.id}
-              d={municipality.d}
-              className={`${TONES[municipality.tone]} stroke-border-muni`}
-              strokeWidth={0.8}
+              d={shape.d}
+              className={`${TIER_FILL[shape.tier]} stroke-paper`}
+              strokeWidth={GAP}
+              strokeLinejoin="round"
+              opacity={dimmed ? 0.7 : undefined}
             />
-          ))}
-          <path d={RIVERS_PATH} className="fill-none stroke-water" strokeWidth={3.5} />
-        </g>
+          );
+
+          return href && shape.city ? (
+            <Link
+              key={shape.id}
+              href={href}
+              scroll={false}
+              aria-label={shape.city.name}
+              className="map-region"
+            >
+              {region}
+            </Link>
+          ) : (
+            <g key={shape.id}>{region}</g>
+          );
+        })
       )}
 
-      <path
-        d={CHOCO_PATH}
-        className="fill-none stroke-contour"
-        strokeWidth={2}
-        strokeLinejoin="round"
-      />
+      {/* El contorno del elegido va en su propia pasada, encima del mosaico
+          entero: dentro del grupo lo taparía la separación de sus vecinos, que
+          se dibujan después. */}
+      {active && !bare && (
+        <path
+          d={active.d}
+          className="fill-none stroke-ink"
+          strokeWidth={4}
+          strokeLinejoin="round"
+          pointerEvents="none"
+        />
+      )}
 
-      {!bare && (
+      {/* El rótulo del mar va donde queda sitio: la altura y la separación de la
+          costa las calcula `placeOceanLabel` a partir de la silueta y de los
+          nombres ya colocados. Si no queda hueco no se dibuja, que es mejor que
+          cruzarse con el nombre de un municipio. */}
+      {ocean && (
         <text
-          x={-108}
-          y={LAND.height * 0.32}
+          x={ocean.x}
+          y={ocean.y}
           className="fill-faint"
-          fontSize={24}
-          letterSpacing={5}
-          transform={`rotate(-90 ${-108} ${LAND.height * 0.32})`}
+          fontSize={OCEAN_LABEL.fontSize}
+          letterSpacing={OCEAN_LABEL.letterSpacing}
+          transform={`rotate(-90 ${ocean.x} ${ocean.y})`}
           textAnchor="middle"
         >
-          OCÉANO PACÍFICO
+          {OCEAN_LABEL.text}
         </text>
       )}
 
-      {placed.map((pin) => {
-        const featured = pin.featured || pin.slug === activeSlug;
-        const radius = featured ? 17 : 14;
+      {/* Rótulos al final, para que ninguna forma posterior los tape, y sin
+          puntero: lo que se pulsa es el municipio, que es un blanco enorme. El
+          nombre además está en la lista de al lado. */}
+      <g pointerEvents="none">
+        {placed.map((pin) => {
+          const isActive = pin.slug === activeSlug;
 
-        const mark = (
-          <g className="[&_circle]:transition-transform hover:[&_circle]:scale-110">
-            {Math.abs(pin.labelY - pin.y) > 2 && (
-              <line
-                x1={pin.x}
-                y1={pin.y}
-                x2={pin.labelX + (pin.anchor === "end" ? 6 : -6)}
-                y2={pin.labelY - 7}
-                className="stroke-line-strong"
-                strokeWidth={1.5}
-              />
-            )}
+          return (
+            <g key={pin.id}>
+              {Math.abs(pin.labelY - pin.y) > 2 && (
+                <line
+                  x1={pin.x}
+                  y1={pin.y}
+                  x2={pin.labelX + (pin.anchor === "end" ? 6 : -6)}
+                  y2={pin.labelY - 5}
+                  className="stroke-line-strong"
+                  strokeWidth={1.5}
+                />
+              )}
 
-            {featured && (
+              {/* Sobre el mosaico el punto va en tinta, que se lee igual encima
+                  del gris y encima del rojo profundo; en la ficha, donde el
+                  fondo es tierra plana y no hay escala que respetar, marca el
+                  "aquí" con el verde de marca. Y ahí va tres veces más grande
+                  porque el radio son unidades de mapa: a 96 px de ancho, un
+                  punto de cinco unidades es medio píxel. */}
               <circle
                 cx={pin.x}
                 cy={pin.y}
-                r={radius + 9}
-                className="fill-none stroke-amber"
-                strokeWidth={2}
-                opacity={0.45}
+                r={bare ? 15 : 6}
+                className={`stroke-paper ${bare ? "fill-accent" : "fill-ink"}`}
+                strokeWidth={bare ? 5 : 2}
               />
-            )}
-            <circle
-              cx={pin.x}
-              cy={pin.y}
-              r={radius + 3}
-              className="fill-base"
-              opacity={0.55}
-            />
-            <circle
-              cx={pin.x}
-              cy={pin.y}
-              r={radius}
-              className={featured ? "fill-amber" : "fill-teal"}
-            />
-            {pin.index !== undefined && (
-              <text
-                x={pin.x}
-                y={pin.y + 6}
-                textAnchor="middle"
-                fontSize={16}
-                className={featured ? "fill-base" : "fill-ink"}
-                fontWeight={500}
-              >
-                {String(pin.index).padStart(2, "0")}
-              </text>
-            )}
 
-            {!bare && (
-              <text
-                x={pin.labelX}
-                y={pin.labelY + 9}
-                textAnchor={pin.anchor}
-                fontSize={27}
-                className={`stroke-base ${featured ? "fill-ink" : "fill-body"}`}
-                strokeWidth={7}
-                style={{ paintOrder: "stroke" }}
-              >
-                {pin.name}
-              </text>
-            )}
-          </g>
-        );
-
-        return linkBase ? (
-          <Link key={pin.id} href={`${linkBase}/${pin.slug}`} aria-label={pin.name}>
-            {mark}
-          </Link>
-        ) : (
-          <g key={pin.id}>{mark}</g>
-        );
-      })}
+              {/* El trazo del color del papel hace de halo bajo las letras: el
+                  rótulo cae casi siempre sobre un municipio vecino y sin él se
+                  pierde contra el relleno. */}
+              {!bare && (
+                <text
+                  x={pin.labelX}
+                  y={pin.labelY + LABEL_BASELINE}
+                  textAnchor={pin.anchor}
+                  fontSize={CITY_LABEL.fontSize}
+                  letterSpacing={CITY_LABEL.letterSpacing}
+                  fontWeight={isActive ? 600 : 500}
+                  className={`stroke-paper ${isActive ? "fill-ink" : "fill-body"}`}
+                  strokeWidth={5}
+                  style={{ paintOrder: "stroke" }}
+                >
+                  {pin.name.toUpperCase()}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </g>
     </svg>
   );
 }

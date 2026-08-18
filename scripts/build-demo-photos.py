@@ -5,13 +5,15 @@ y les incrusta el sello "muestra". El sello va dentro de la zona que sobrevive a
 los recortes cuadrado y 3:2 que hacen las galerías, así que ninguna imagen puede
 acabar en pantalla sin él.
 
-Uso: python3 scripts/build-demo-photos.py <carpeta-de-origen>
+Uso:
+  python3 scripts/build-demo-photos.py <carpeta-de-origen>
+  python3 scripts/build-demo-photos.py <carpeta-de-origen> persona-josefa persona-bernarda
 """
 
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 FONT = "/System/Library/Fonts/Supplemental/Georgia.ttf"
 OUT = Path(__file__).resolve().parent.parent / "public" / "demo"
@@ -25,6 +27,14 @@ NAMES = [
     "choco-camino",
     "choco-selva",
     "choco-edificio",
+    "persona-josefa",
+    "persona-bernarda",
+    "persona-asprilla",
+    "persona-perea",
+    "persona-tia",
+    "persona-wilmar",
+    "persona-cuesta",
+    "persona-aristides",
 ]
 
 # Ancho final de cada versión. La grande es para la vista ampliada; la miniatura
@@ -69,11 +79,6 @@ def stamp(image: Image.Image) -> None:
 def build(source: Path, name: str) -> None:
     original = Image.open(source).convert("RGB")
 
-    # El portal es oscuro: sin bajar un poco la luz y el color, las fotos saltan
-    # fuera de la página en lugar de apoyarse en ella.
-    original = ImageEnhance.Brightness(original).enhance(0.92)
-    original = ImageEnhance.Color(original).enhance(0.9)
-
     for suffix, (width, quality) in SIZES.items():
         height = round(width * original.height / original.width)
         resized = original.resize((width, height), Image.LANCZOS).convert("RGBA")
@@ -84,19 +89,20 @@ def build(source: Path, name: str) -> None:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print(__doc__)
         return 2
 
     assets = Path(sys.argv[1])
+    names = sys.argv[2:] or NAMES
     OUT.mkdir(parents=True, exist_ok=True)
 
-    missing = [name for name in NAMES if not (assets / f"{name}.png").exists()]
+    missing = [name for name in names if not (assets / f"{name}.png").exists()]
     if missing:
         print(f"Faltan en {assets}: {', '.join(missing)}")
         return 1
 
-    for name in NAMES:
+    for name in names:
         build(assets / f"{name}.png", name)
     return 0
 

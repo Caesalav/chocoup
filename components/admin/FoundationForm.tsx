@@ -11,7 +11,7 @@ export function FoundationForm({
   foundation?: Foundation;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-panel/60 p-4">
+    <div className="rounded-xl border border-line bg-panel p-4">
       <form action={saveFoundation} className="grid gap-3 sm:grid-cols-2">
         <input type="hidden" name="city_id" value={cityId} />
         {foundation && <input type="hidden" name="id" value={foundation.id} />}
@@ -110,20 +110,11 @@ export function FoundationForm({
           </span>
         </label>
 
-        <label className={`${field.checkboxRow} sm:col-span-2`}>
-          <input
-            type="checkbox"
-            name="is_primary"
-            defaultChecked={foundation ? foundation.is_primary : true}
-            className={field.checkbox}
-          />
-          <span>
-            Es la fundación madre del municipio
-            <span className="mt-0.5 block text-xs text-muted">
-              Aparece destacada como canal de donación en la página pública.
-            </span>
-          </span>
-        </label>
+        {/* Aquí iba una casilla de «es la fundación madre del municipio». Se fue
+            con la columna: hay una fundación por municipio y es la madre por
+            definición, así que la casilla no elegía nada y sin marcar hacía que la
+            página pública rotulara de aliada el único canal de donación del
+            pueblo. Una casilla menos que acordarse de marcar con prisa. */}
 
         <div className="sm:col-span-2">
           <SubmitButton>{foundation ? "Guardar fundación" : "Añadir fundación"}</SubmitButton>

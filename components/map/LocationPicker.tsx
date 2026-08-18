@@ -91,12 +91,12 @@ export function LocationPicker({ initialLat = null, initialLng = null }: Props) 
           />
           {point && (
             <>
-              <circle cx={point.x} cy={point.y} r={11} className="fill-amber" />
+              <circle cx={point.x} cy={point.y} r={11} className="fill-accent" />
               <circle
                 cx={point.x}
                 cy={point.y}
                 r={22}
-                className="fill-none stroke-amber"
+                className="fill-none stroke-accent"
                 strokeWidth={3}
                 opacity={0.5}
               />
@@ -121,7 +121,7 @@ export function LocationPicker({ initialLat = null, initialLng = null }: Props) 
         </p>
       </div>
 
-      {geoError && <p className="mt-2 text-xs text-amber">{geoError}</p>}
+      {geoError && <p className="mt-2 text-xs text-need-high">{geoError}</p>}
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="block">

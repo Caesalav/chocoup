@@ -1,75 +1,210 @@
 @import "tailwindcss";
 
-/* Sistema oscuro cartográfico.
+/* Sistema claro sobre papel.
  *
- * Paleta muestreada de la referencia: lienzo marrón oscuro cálido para el mapa,
- * paneles flotantes casi neutros y más claros que el fondo, titulares en blanco
- * puro y dos acentos, naranja y verde-teal.
+ * Paleta muestreada de la referencia: fondo de papel cálido, tarjetas casi
+ * blancas con el borde finísimo, tinta casi negra.
  *
- * Los paneles nunca son opacos: se apoyan en el lienzo con transparencia y
- * desenfoque, que es lo que da la sensación de capas de la referencia. */
+ * ---------------------------------------------------------------------------
+ * Dos familias de color, y no se mezclan
+ *
+ * VERDE (`accent`) es la marca —selva de la bandera del Chocó— y por tanto todo
+ * lo que se hace: botones, enlaces, la barra de navegación, y la pastilla de una
+ * necesidad ya cubierta, que es la única forma de "hecho" que existe aquí.
+ *
+ * ESCALA CÁLIDA (`need-*`) es el calor del dato: cuánto falta. Pinta los
+ * municipios del mapa y, con los mismos tonos, las pastillas de estado de una
+ * necesidad. Así el chip «Urgente» de Quibdó y la forma de Quibdó en el mapa
+ * dicen lo mismo con el mismo color.
+ *
+ * La regla existe porque se rompió: cuando la urgencia se pintaba con el verde
+ * de marca, «Abierta», «Urgente» y «Cubierta» eran tres verdes medios seguidos y
+ * la urgencia dejaba de leerse. En un portal que reparte ayuda eso no es
+ * cosmético. Y en el otro sentido, más verde nunca puede significar más
+ * necesidad: se leería como “mejor” y aquí significa lo contrario.
+ *
+ * ---------------------------------------------------------------------------
+ * Superficies: la escala crece hacia abajo, y el estado no vive en el relleno
+ *
+ * Este diseño es todo tarjetas, y una tarjeta tiene que poder decir que está
+ * bajo el dedo, elegida o pulsada. Por arriba no queda sitio: papel, panel y
+ * panel alto se llevan nueve y dos niveles de 255, y el techo es el blanco. Un
+ * cambio de relleno entre esos tres es literalmente invisible —así lo intentaba
+ * la portada anterior con el filete, y no se veía.
+ *
+ * De modo que la escala se amplía en la única dirección con recorrido, hacia el
+ * hueco: `land` y `canvas` son superficies MÁS OSCURAS que el papel y sirven
+ * para lo que se hunde (marco de una foto que no existe, canal de una barra de
+ * progreso, pista de un carrusel). De hueco a frente: land, canvas, paper,
+ * panel, panel-high.
+ *
+ * Y el estado se muda fuera del relleno, a tres señales que sí tienen rango:
+ *   - sombra (--shadow-card -> --shadow-lift -> --shadow-press)
+ *   - el borde, que se oscurece de line a line-strong y, al pulsar, a tinta
+ *   - movimiento: cuatro píxeles arriba al pasar por encima, un 3 % de
+ *     encogimiento al pulsar
+ * Para lo elegido la señal es un aro de tinta, que es lo que ya hace el mapa con
+ * el municipio abierto; ahora mismo ninguna lista del portal tiene selección, así
+ * que no hay receta suelta esperando a que alguien la use.
+ *
+ * Las recetas están en components/ui/styles.ts y nadie debería escribirlas a
+ * mano en una página.
+ * ------------------------------------------------------------------------- */
 @theme {
-  --color-base: #16130f;
-  --color-canvas: #221d19;
-  --color-land: #3b332b;
-  --color-contour: #5a4d43;
+  /* El papel se llama `paper` y no `base` porque `base` es además un tamaño de
+     letra de Tailwind. Con la ficha llamada así, `text-base` dejaba de emitir
+     `font-size: 1rem` y emitía `color: var(--color-base)`: los cuatro sitios que
+     lo escribían para pedir tamaño —los tres campos de components/ui/styles.ts y
+     el buscador— se quedaron sin tamaño sin que nadie lo notara, porque 16 px es
+     también lo que heredaban. Y al revés era peor: quien escribiera `text-base`
+     esperando tamaño se llevaba letra color papel sobre papel. No rompía por un
+     detalle del orden de la hoja —`.text-ink` sale 56 líneas después de
+     `.text-base` y ganaba por eso, no por especificidad—. Ningún nombre de esta
+     paleta debe coincidir con una utilidad de Tailwind. */
+  --color-paper: #f6f3ee;
+  --color-canvas: #efece5;
+  --color-land: #e7e2d9;
+  --color-contour: #b9b1a4;
 
-  /* Mosaico de municipios: cuatro tonos casi iguales. La textura debe notarse
-     sin competir con los pines ni con las etiquetas. */
-  --color-land-1: #352f28;
-  --color-land-2: #3a332b;
-  --color-land-3: #3f372e;
-  --color-land-4: #443b31;
-  --color-border-muni: #4d423a;
-  --color-water: #46585d;
-  --color-neighbour: #29231f;
-  --color-panel: #1a1917;
-  --color-panel-high: #292929;
+  /* Escala por necesidades abiertas: el único color del mapa. Los cinco valores
+     tienen que ordenarse de un vistazo y sin leer la leyenda, así que el gris de
+     "sin documentar" es el más claro de todos —se hunde en el papel— y el rojo
+     es el único tono que sobrevive a mirar el mapa de reojo. */
+  --color-need-blank: #e8e4dd;
+  --color-need-none: #d3ccc0;
+  --color-need-low: #f3b591;
+  --color-need-mid: #e2743f;
+  --color-need-high: #a92a1a;
 
-  --color-ink: #fffdfa;
-  --color-body: #d8d5d1;
-  --color-muted: #8f8b88;
-  --color-faint: #837e7b;
+  /* Los dos pesos que la escala necesita cuando deja de pintar formas y pasa a
+     escribir palabras. `need-mid` a pelo sobre papel se queda en 2,8:1, así que
+     una pastilla «Abierta» lleva el tono en el relleno y una versión bajada del
+     mismo naranja —mismo tono OKLCH, 44°— en la tinta: 5,9:1 sobre su relleno.
+     `need-high` sí aguanta como texto (6,3:1) y por eso no necesita pareja. */
+  --color-need-mid-soft: oklch(0.68 0.15 45 / 22%);
+  --color-need-mid-strong: #94380a;
+  --color-need-high-soft: oklch(0.49 0.17 31 / 14%);
 
-  --color-line: oklch(1 0 0 / 9%);
-  --color-line-strong: oklch(1 0 0 / 18%);
+  --color-panel: #fdfbf7;
+  --color-panel-high: #ffffff;
 
-  --color-amber: #f27a1e;
-  --color-amber-bright: #ff8c33;
-  --color-amber-soft: oklch(0.7 0.16 55 / 14%);
+  --color-ink: #191411;
+  --color-body: #3a332d;
+  --color-muted: #5c534b;
+  --color-faint: #736a62;
 
-  --color-teal: #0e7f66;
-  --color-teal-light: #4fb89e;
-  --color-teal-soft: oklch(0.55 0.09 170 / 16%);
+  /* Negro con alfa: sobre papel una línea blanca no existe. */
+  --color-line: oklch(0 0 0 / 10%);
+  --color-line-strong: oklch(0 0 0 / 20%);
 
-  --font-display: var(--font-display), Georgia, serif;
-  --font-sans: var(--font-sans), system-ui, sans-serif;
+  /* Selva chocoana: el verde de la mitad de la bandera. Es el único verde del
+     portal. Antes eran dos —`amber`, que no era ámbar, y `teal`, a dieciséis
+     grados de tono de distancia— y a la vista eran el mismo color con dos
+     nombres, así que nadie podía saber cuál tocaba.
+
+     `-strong` es la versión de más peso, y en claro eso quiere decir más
+     oscura: el hover no puede ir hacia la luz cuando el fondo ya es lo más
+     claro de la página. `-soft` es el relleno de una pastilla. */
+  --color-accent: #1b7a4c;
+  --color-accent-strong: #145c39;
+  --color-accent-soft: oklch(0.55 0.13 155 / 14%);
+
+  /* Sombras cálidas, no negras. Sobre un papel con este amarillo, una sombra
+     neutra se lee como suciedad gris; con el tono del papel dentro parece luz.
+     Son cuatro y se usan enteras, sin mezclar: reposo, levantada al pasar por
+     encima, hundida al pulsar, y flotante para lo que va anclado a la pantalla
+     —la barra inferior y la de acciones— que no descansa sobre nada. */
+  --shadow-card: 0 1px 2px oklch(0.3 0.03 55 / 5%), 0 2px 6px -2px oklch(0.3 0.03 55 / 7%);
+  --shadow-lift: 0 3px 6px oklch(0.3 0.03 55 / 8%), 0 14px 28px -8px oklch(0.3 0.03 55 / 26%);
+  --shadow-press: 0 1px 1px oklch(0.3 0.03 55 / 12%);
+  --shadow-float: 0 4px 10px oklch(0.3 0.03 55 / 10%), 0 16px 36px -10px oklch(0.3 0.03 55 / 28%);
+
+  --font-display: var(--font-display), "Bricolage Grotesque", system-ui, sans-serif;
+  --font-sans: var(--font-sans), "Outfit", system-ui, sans-serif;
+}
+
+/* Alto de la franja superior (el aviso de datos de muestra). Lo descuenta todo
+   lo que quiere ocupar la pantalla entera —hoy, el mapa de /mapa a través de
+   `.screen-h`—: sin esto, lo que va anclado abajo, la leyenda y el pie de
+   estado, caía fuera de la vista. Vale 0 cuando no hay aviso. */
+:root {
+  --strip-h: 0px;
+
+  /* Alto reservado por la barra inferior de navegación, que va fija y tapa lo
+     que quede debajo. Lo publica aquí y no en el componente porque quien lo
+     tiene que descontar es cada pantalla, no la barra. Son la pastilla (60) más
+     su aire (8 arriba, 16 abajo) y, en un móvil con muesca, la zona segura. */
+  --nav-h: calc(84px + env(safe-area-inset-bottom, 0px));
+
+  /* Alto de la cabecera de escritorio. La barra inferior es un recurso de móvil
+     —el pulgar llega abajo, no arriba— y en pantalla ancha ese mismo mapa de
+     destinos se muda a una cabecera. Nunca están las dos: la barra desaparece a
+     partir de `lg` y la cabecera no existe por debajo. */
+  --head-h: 72px;
+}
+.has-strip {
+  --strip-h: 76px;
+}
+@media (min-width: 640px) {
+  .has-strip {
+    --strip-h: 36px;
+  }
+}
+
+/* Alto útil de una pantalla completa: lo que queda de la ventana después de la
+   franja de aviso y de lo que ocupe la navegación, que abajo en el móvil y
+   arriba en el escritorio. */
+.screen-h {
+  height: calc(100svh - var(--strip-h, 0px) - var(--nav-h));
+}
+@media (min-width: 1024px) {
+  .screen-h {
+    height: calc(100svh - var(--strip-h, 0px) - var(--head-h));
+  }
 }
 
 html {
-  background-color: var(--color-base);
+  background-color: var(--color-paper);
   color: var(--color-body);
-  color-scheme: dark;
+  color-scheme: light;
   -webkit-text-size-adjust: 100%;
 }
 
 body {
   font-family: var(--font-sans);
+  letter-spacing: 0.01em;
 }
 
-/* Navegación y etiquetas en versalitas, como la referencia: la inicial a caja
- * alta y el resto en capitales pequeñas, con mucho interletraje. */
+/* Titulares: grotesk construida, como el logo. Semibold y tracking
+   cerrado para que «Chocó-up» y los municipios pesen como marca. */
+.font-display {
+  font-optical-sizing: auto;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+/* La voz del panel del equipo: la misma familia en versalitas, más aire. Es lo
+   que queda de la etapa anterior, y se queda a propósito —el panel es una
+   herramienta y no el portal—. En las pantallas públicas no se usa: allí todo
+   pasó a frase normal, porque unas mayúsculas apretadas a 11 px pesan más que
+   la frase que acompañan. */
 .smallcaps {
   font-family: var(--font-display);
   font-variant-caps: small-caps;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
 }
 
-/* Etiquetas verticales del raíl izquierdo. */
-.rail-label {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  letter-spacing: 0.22em;
+/* La flecha del desplegable. `appearance-none` iguala el campo entre navegadores
+   pero también le quita el triángulo, y entonces un <select> es exactamente un
+   <input> de texto: en /ofrecer la gente tocaba «¿De qué tipo es?» e intentaba
+   escribir. Va como imagen de fondo y no como pseudoelemento porque un <select>
+   no admite ::after. */
+.select-chevron {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.2 1.6 6 6.4l4.8-4.8' fill='none' stroke='%235c534b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  background-size: 0.7rem;
 }
 
 /* Evita el zoom automático de iOS al enfocar un campo: el equipo documenta
@@ -83,8 +218,8 @@ body {
 }
 
 ::selection {
-  background-color: var(--color-amber);
-  color: #16130f;
+  background-color: var(--color-accent);
+  color: var(--color-paper);
 }
 
 /* El carrusel inferior se arrastra en móvil sin barra visible. */
@@ -93,6 +228,125 @@ body {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Fotografía
+ *
+ * Las fotos de este portal las hace el equipo con el móvil, en campo y con la
+ * luz que haya: un coliseo con colchones a contraluz, una fachada agrietada a
+ * mediodía. No están compuestas y no se puede contar con que el motivo esté
+ * centrado ni con que la imagen sea oscura.
+ *
+ * De ahí las reglas de abajo: dos encuadres —el de una situación y el de una
+ * persona, que no miran al mismo sitio— y los velos de contraste.
+ * ------------------------------------------------------------------------- */
+
+/* Encuadre de una SITUACIÓN: el albergue, la fachada, la lancha. Un poco por
+   debajo del centro por dos motivos que apuntan al mismo sitio: en una foto de
+   campo el motivo suele estar en la mitad baja —el suelo del albergue, la grieta
+   del zócalo— y el sello «muestra» de las imágenes de archivo va incrustado abajo
+   en el centro. Recortando desde el 62 % ninguno de los dos se pierde.
+
+   `--photo-x/y/z` las pone el encuadre que el equipo guardó en esa foto. Sin
+   ellas vale este recorte. `scale` es la propiedad suelta de Tailwind 4, no
+   `transform`: así no pisa el `translate` de una tarjeta que se levanta. El
+   marco (`overflow-hidden` en el componente) es el que recorta el acercamiento. */
+.photo-crop {
+  object-fit: cover;
+  object-position: var(--photo-x, 50%) var(--photo-y, 62%);
+  scale: var(--photo-z, 1);
+  transform-origin: var(--photo-x, 50%) var(--photo-y, 62%);
+}
+
+/* Encuadre de una PERSONA. Es la misma operación al revés, y tiene que ser otra
+   clase: en un retrato la cara está arriba.
+
+   Con el 62 % de arriba, una foto de pie en una caja cuadrada solo deja ver del
+   33 % al 80 % de la altura del original —medido sobre la primera foto real del
+   portal, 1320x2868— y la cabeza se queda fuera. Desde el 22 % la ventana pasa a
+   ser del 12 % al 58 %: la cara entra y lo que se pierde es el suelo, que en un
+   retrato no dice nada. El sello «muestra» cae con él, y aquí eso da igual: lo
+   que tiene que sobrevivir es la cara.
+
+   No es detección de caras ni pretende serlo, y por eso el número peca de alto:
+   equivocarse hacia arriba deja aire sobre la cabeza y equivocarse hacia abajo
+   decapita a alguien, que en un portal que documenta personas no es un empate.
+
+   Ojo: esto solo cambia algo cuando el original es más alto que la caja. En una
+   foto horizontal metida en un círculo el recorte es lateral y la componente
+   vertical no interviene —de ahí que el fallo no apareciera hasta la primera
+   foto de una persona de pie—.
+
+   Si el equipo encuadró esta foto, `--photo-y` pisa el 22 %. */
+.photo-portrait {
+  object-fit: cover;
+  object-position: var(--photo-x, 50%) var(--photo-y, 22%);
+  scale: var(--photo-z, 1);
+  transform-origin: var(--photo-x, 50%) var(--photo-y, 22%);
+}
+
+/* Velos de contraste.
+ *
+ * Los números están calculados contra la foto imposible —un cielo del Chocó
+ * quemado, blanco puro— y no contra las de muestra, que son oscuras y perdonan
+ * cualquier cosa. Al componer negro con alfa `a` sobre blanco queda un sRGB de
+ * 1-a: con a = 0,78 el resultado es 0,22, luminancia 0,036, y el texto blanco
+ * encima da 12:1. Aun al 0,64 quedan 6,7:1.
+ *
+ * La consecuencia de diseño es que TODO texto sobre foto vive en el tercio
+ * bajo del velo. Por encima del 55 % el degradado ya no garantiza nada. */
+.veil-b {
+  background-image: linear-gradient(
+    to top,
+    oklch(0 0 0 / 82%) 0%,
+    oklch(0 0 0 / 78%) 22%,
+    oklch(0 0 0 / 64%) 38%,
+    oklch(0 0 0 / 40%) 55%,
+    oklch(0 0 0 / 18%) 74%,
+    transparent 94%
+  );
+}
+
+/* Velo de arriba, para los mandos que flotan sobre la foto. Es mucho más suave
+   porque cada botón lleva además su propia pastilla oscura: lo que este resuelve
+   es que el botón no se pierda contra una fachada blanca, no la legibilidad del
+   icono, que la pone la pastilla. */
+.veil-t {
+  background-image: linear-gradient(
+    to bottom,
+    oklch(0 0 0 / 46%) 0%,
+    oklch(0 0 0 / 20%) 46%,
+    transparent 100%
+  );
+}
+
+/* El mismo cálculo que .veil-b pero hacia abajo, para mandos que flotan arriba
+   de una foto a sangre cuando el título ya no vive allí. */
+.veil-head {
+  background-image: linear-gradient(
+    to bottom,
+    oklch(0 0 0 / 62%) 0%,
+    oklch(0 0 0 / 74%) 34%,
+    oklch(0 0 0 / 70%) 58%,
+    oklch(0 0 0 / 40%) 78%,
+    transparent 100%
+  );
+}
+
+/* Velo de la ficha de municipio: el nombre y el texto descriptivo van sobre la
+   foto, en el tercio bajo, con letras claras. Tiene que cubrir más altura que
+   .veil-b porque un párrafo de 15 px necesita meseta, no solo un titular. */
+.veil-hero {
+  background-image: linear-gradient(
+    to top,
+    oklch(0 0 0 / 88%) 0%,
+    oklch(0 0 0 / 82%) 22%,
+    oklch(0 0 0 / 70%) 42%,
+    oklch(0 0 0 / 42%) 62%,
+    oklch(0 0 0 / 16%) 82%,
+    transparent 100%
+  );
 }
 
 /* ---------------------------------------------------------------------------
@@ -149,6 +403,12 @@ body {
 .enters-3 {
   animation-delay: 0.19s;
 }
+/* El cuarto lo pidió /donaciones al ganar la llave de transferencia arriba: la
+   pantalla pasó de tres bloques a cuatro y sin este escalón los dos últimos
+   entraban juntos. */
+.enters-4 {
+  animation-delay: 0.26s;
+}
 
 /* Aro que late tres veces sobre la acción principal y se queda quieto. */
 .pulse-ring::after {
@@ -156,7 +416,7 @@ body {
   position: absolute;
   inset: 0;
   border-radius: 9999px;
-  border: 2px solid var(--color-amber);
+  border: 2px solid var(--color-accent);
   animation: attention-ring 2.4s ease-out 3;
   pointer-events: none;
 }
@@ -164,6 +424,68 @@ body {
 .draws-check {
   stroke-dasharray: 48;
   animation: draw-check 0.6s ease-out 0.15s both;
+}
+
+/* ---------------------------------------------------------------------------
+ * Mapa
+ * ------------------------------------------------------------------------- */
+
+/* Municipio documentado: lo que recibe el clic es la forma entera, que se
+   acierta mucho mejor que un punto. Al pasar por encima se oscurece su relleno
+   en vez de dibujarle un contorno porque los 30 municipios se pintan en cadena
+   y el trazo de separación de los siguientes taparía el del que está debajo. */
+.map-region {
+  cursor: pointer;
+}
+.map-region path {
+  transition: filter 0.18s ease;
+}
+.map-region:hover path,
+.map-region:focus-visible path {
+  filter: brightness(0.93) saturate(1.06);
+}
+
+/* ---------------------------------------------------------------------------
+ * Intro: Colombia y dentro el Chocó
+ *
+ * Sitúa el departamento para quien no sabe dónde queda, que es casi cualquiera
+ * de fuera de Colombia. Es una capa que se acerca y se disuelve encima del mapa;
+ * el mapa de debajo está quieto y no se entera, así que no hace falta cámara ni
+ * contra-escalar nada. El componente decide si se monta (una vez por sesión, y
+ * nunca con prefers-reduced-motion); aquí solo vive el movimiento.
+ * ------------------------------------------------------------------------- */
+
+@keyframes intro-hold-then-zoom {
+  0%,
+  26% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.6);
+  }
+}
+
+@keyframes intro-hold-then-fade {
+  0%,
+  26% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* El primer cuarto de la animación está quieto a propósito: sin ese respiro no
+   hay tiempo de reconocer el país antes de que empiece el acercamiento. */
+.intro-veil {
+  animation: intro-hold-then-fade 2.1s cubic-bezier(0.6, 0, 0.2, 1) both;
+}
+.intro-zoom {
+  /* El Chocó dentro del marco de Colombia: el zoom tiene que ir hacia él. */
+  transform-origin: 17% 38%;
+  animation: intro-hold-then-zoom 2.1s cubic-bezier(0.6, 0, 0.2, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

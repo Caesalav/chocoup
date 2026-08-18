@@ -1,50 +1,111 @@
+"use client";
+
 import Link from "next/link";
-import { CHOCO_PATH, LAND } from "@/lib/choco-map";
-import { SITE_NAME } from "@/lib/constants";
+import { usePathname } from "next/navigation";
+import { Logo } from "@/components/Logo";
+import { activeHref, DONATE, SECTIONS, TABS, type Destination } from "@/components/nav/destinations";
+import { shell } from "@/components/ui/styles";
 
-const NAV = [
-  { href: "/", label: "Municipios" },
-  { href: "/ofrecer", label: "Ofrecer recurso" },
-  { href: "/admin", label: "Equipo" },
-] as const;
+/**
+ * La navegación de escritorio.
+ *
+ * Es el mismo mapa que la barra inferior del móvil, repartido como cabe arriba:
+ * la marca es el inicio, las secciones van a la izquierda y a la derecha
+ * quedan las acciones —situarse, buscar, ofrecer— y el botón de donar.
+ *
+ * Aquí van en palabras y abajo en iconos, que es lo que pide cada sitio: en una
+ * barra de 60 px cabe un dibujo, en una cabecera de 1400 cabe el nombre. Lo que
+ * sí es idéntico es la marca de lo abierto —una pastilla maciza, la misma que
+ * usan la barra del móvil y las pestañas del municipio—, con la salvedad de que
+ * sobre papel la pastilla es de tinta y sobre la barra oscura es de papel.
+ *
+ * Es cliente por `usePathname`, pero Next la pinta también en el servidor: el
+ * HTML llega con los enlaces puestos y la sección marcada, así que sin
+ * JavaScript funciona igual.
+ */
 
-/** La silueta del departamento como marca: es la forma del proyecto. */
-function Mark() {
+/** Las secciones de la cabecera, sin donar: eso va como botón a la derecha. */
+const HEADER_SECTIONS = SECTIONS.filter((item) => item.href !== DONATE.href);
+
+/** Las acciones, que son las de la barra inferior menos el inicio: eso ya lo es
+ *  la marca, y repetirlo al lado sería el mismo enlace dos veces. */
+const ACTIONS = TABS.filter((tab) => tab.href !== "/");
+
+const item =
+  "flex min-h-10 items-center rounded-full px-3.5 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const idle = "text-body hover:bg-line hover:text-ink";
+const open = "bg-ink font-medium text-paper";
+
+export function SiteHeader({ className = "" }: { className?: string }) {
+  const pathname = usePathname();
+  const branch = activeHref(pathname, [...SECTIONS, ...ACTIONS]);
+  const atHome = pathname === "/";
+  // Donar sale de la fila de secciones y va como botón, así que su estado
+  // abierto se marca aquí y no en `branch`.
+  const onDonate = branch === DONATE.href;
+
+  const links = (items: readonly Destination[]) =>
+    items.map(({ href, label }) => (
+      <li key={href}>
+        <Link
+          href={href}
+          aria-current={href === branch ? "page" : undefined}
+          className={`${item} ${href === branch ? open : idle}`}
+        >
+          {label}
+        </Link>
+      </li>
+    ));
+
   return (
-    <svg
-      viewBox={`0 0 ${LAND.width} ${LAND.height}`}
-      className="h-8 w-auto shrink-0"
-      aria-hidden="true"
+    <header
+      className={`sticky top-0 z-40 h-[var(--head-h)] border-b border-line bg-paper/90 backdrop-blur ${className}`}
     >
-      <path d={CHOCO_PATH} className="fill-amber" />
-    </svg>
-  );
-}
-
-export function SiteHeader() {
-  return (
-    <header className="absolute inset-x-0 top-0 z-40">
-      <div className="mx-auto flex max-w-[1400px] items-center gap-6 px-5 py-5 sm:px-8">
-        <Link href="/" className="group flex items-center gap-3">
-          <Mark />
-          <span className="font-display leading-[1.05]">
-            <span className="block text-[19px] text-ink">{SITE_NAME}</span>
-            <span className="block text-[13px] tracking-[0.12em] text-muted">Chocó</span>
+      <div className={`${shell} flex h-full items-center gap-6`}>
+        <Link
+          href="/"
+          aria-current={atHome ? "page" : undefined}
+          className="group flex shrink-0 items-center gap-2 text-[22px] leading-none"
+        >
+          <Logo
+            className={`h-[1.05em] w-auto shrink-0 transition-colors ${
+              atHome ? "text-accent" : "text-ink group-hover:text-accent"
+            }`}
+          />
+          <span className="font-display text-ink">
+            Chocó<span className="text-accent">-up</span>
           </span>
         </Link>
 
-        <nav className="ml-auto hidden items-center gap-10 lg:flex xl:gap-16">
-          {NAV.map((item) => (
-            <Link key={item.href} href={item.href} className="smallcaps text-[15px] text-body transition-colors hover:text-ink">
-              {item.label}
-            </Link>
-          ))}
+        <nav aria-label="Secciones del portal" className="hidden lg:block">
+          <ul className="flex items-center gap-1">{links(HEADER_SECTIONS)}</ul>
         </nav>
 
-        {/* Menú móvil sin JavaScript. */}
-        <details className="ml-auto lg:hidden">
+        <nav aria-label="Acciones" className="ml-auto hidden lg:block">
+          <ul className="flex items-center gap-1">
+            {links(ACTIONS)}
+            <li>
+              <Link
+                href={DONATE.href}
+                aria-current={onDonate ? "page" : undefined}
+                className={`${item} bg-accent font-medium text-paper hover:bg-accent-strong hover:text-paper`}
+              >
+                {DONATE.label}
+              </Link>
+            </li>
+          </ul>
+        </nav>
+
+        {/* Menú sin JavaScript para cuando la cabecera es lo único que hay: el
+            panel del equipo la monta a cualquier ancho, y ahí sí puede quedarse
+            estrecha. En el portal público no llega a verse nunca —por debajo de
+            `lg` manda la barra inferior— pero el panel es una web y no una app.
+
+            El desplegable va opaco y por encima de todo: cae sobre la tabla del
+            panel y no puede leerse a través. */}
+        <details className="group relative ml-auto lg:hidden">
           <summary
-            className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-line-strong bg-panel/70 backdrop-blur [&::-webkit-details-marker]:hidden"
+            className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-line-strong bg-panel-high [&::-webkit-details-marker]:hidden"
             aria-label="Abrir menú"
           >
             <span className="relative block h-2.5 w-4">
@@ -52,17 +113,9 @@ export function SiteHeader() {
               <span className="absolute inset-x-0 bottom-0 h-px bg-body" />
             </span>
           </summary>
-          <div className="absolute right-5 mt-3 flex w-56 flex-col rounded-xl border border-line bg-panel/95 p-2 backdrop-blur-md">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="smallcaps rounded-lg px-3 py-2.5 text-[16px] text-body hover:bg-line hover:text-ink"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          <ul className="absolute right-0 z-50 mt-3 flex w-60 flex-col gap-0.5 rounded-2xl border border-line bg-panel-high p-2 shadow-float">
+            {links([...HEADER_SECTIONS, ...ACTIONS, DONATE])}
+          </ul>
         </details>
       </div>
     </header>

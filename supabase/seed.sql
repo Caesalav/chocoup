@@ -4,7 +4,8 @@
 -- documentar, y solo salen al portal público cuando alguien los publica.
 -- Así nadie tiene que buscar coordenadas en el mapa con mala señal.
 --
--- Ejecuta este archivo después de 0001_init.sql.
+-- Ejecuta este archivo después de las migraciones de supabase/migrations, en
+-- orden: la fila del equipo lleva rol, y la columna la crea 0002.
 
 insert into public.cities (name, slug, lat, lng, summary, published) values
   ('Quibdó',                'quibdo',                5.6947, -76.6611, '', false),
@@ -20,7 +21,11 @@ insert into public.cities (name, slug, lat, lng, summary, published) values
 on conflict (slug) do nothing;
 
 -- Allowlist del equipo. Sin una fila aquí, un usuario puede entrar pero no
--- escribir nada. Cambia los correos por los reales antes del viaje.
-insert into private.team_members (email, nombre) values
-  ('cambiame@ejemplo.com', 'Cambiar por el equipo real')
-on conflict (email) do nothing;
+-- escribir nada. Cambia el correo por el real antes del viaje.
+--
+-- Esta primera fila va en coordinación porque es la que reparte todo lo demás:
+-- desde /admin/equipo se invita al resto y se le asignan municipios. Sin al menos
+-- una persona de coordinación, nadie puede dar permisos a nadie.
+insert into private.team_members (email, nombre, role) values
+  ('chocoup26@gmail.com', 'Charlie', 'coordinacion')
+on conflict (email) do update set role = excluded.role;
