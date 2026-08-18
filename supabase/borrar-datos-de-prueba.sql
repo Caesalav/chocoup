@@ -22,9 +22,14 @@
 -- les quita la marca, el resumen inventado y la publicación, que es como los deja
 -- supabase/seed.sql.
 --
--- De los diez de la semilla quedan cuatro: los seis que no llegaron a tener fotos
--- se quitaron para revisar el diseño sin tarjetas vacías. Vuelven pasando otra vez
--- supabase/seed.sql, que los reinserta con sus coordenadas y sin publicar.
+-- Los diez de la semilla están cargados. Si alguna vez faltara alguno, vuelve
+-- pasando otra vez supabase/seed.sql, que los reinserta con sus coordenadas y sin
+-- publicar.
+--
+-- Lo que este archivo NO toca, y conviene saberlo antes de ejecutarlo con prisa:
+-- el caso real de Quibdó —publicado, con consentimiento, retrato, doce fotos en
+-- Storage, cinco avances y dos necesidades—, el propio Quibdó, y la llave de
+-- transferencia de public.donation_key, que es la de verdad.
 
 begin;
 
@@ -59,12 +64,35 @@ where name like '%(prueba)%';
 
 commit;
 
--- Comprobación: las cinco tablas de contenido vacías y los diez municipios sin
--- publicar. Si algo no da cero, quedó contenido sin marcar.
-select (select count(*) from public.cases)       as casos,
-       (select count(*) from public.needs)       as necesidades,
-       (select count(*) from public.photos)      as fotos,
-       (select count(*) from public.offers)      as ofertas,
-       (select count(*) from public.foundations) as fundaciones,
-       (select count(*) from public.cities)      as municipios,
+-- Comprobación: que no quede nada marcado y que el contenido real siga en pie.
+--
+-- Esto NO cuenta filas totales, y el cambio importa. Contarlas fue lo primero
+-- que se escribió aquí, cuando la base solo tenía la carga de prueba: entonces
+-- «cero casos» quería decir «no quedó nada sin marcar». Hoy hay un caso real
+-- publicado en Quibdó, con sus doce fotos, sus cinco avances y sus dos
+-- necesidades, así que ese cero ya no puede darse nunca y leerlo como un fallo
+-- llevaría a borrar a mano justo lo que hay que conservar.
+--
+-- Lo que tiene que dar cero es la primera columna. Las otras son el caso real,
+-- que este archivo no toca.
+select (select count(*) from public.cases where story like 'CASO DE PRUEBA%')
+     + (select count(*) from public.photos where storage_path like 'demo/%')
+     + (select count(*) from public.offers where offerer_name like '%(prueba)%')
+     + (select count(*) from public.foundations where name like '%(prueba)%')
+     + (select count(*) from public.cities where name like '%(prueba)%')
+         as restos_de_prueba, -- tiene que ser 0
+       (select count(*) from public.cases)  as casos_que_quedan,
+       (select count(*) from public.needs)  as necesidades_que_quedan,
+       (select count(*) from public.photos) as fotos_que_quedan,
+       (select count(*) from public.cities) as municipios,
        (select count(*) from public.cities where published) as publicados;
+
+-- Y si algún día vuelve a haber contenido de prueba que este archivo no cubra,
+-- lo delata su identificador: todo lo que carga supabase/datos-de-prueba.sql
+-- lleva uno que empieza por 00000000-0000-4000-8000-.
+select 'casos' as tabla, count(*) from public.cases where id::text like '00000000-0000-4000-8000-%'
+union all select 'fotos', count(*) from public.photos where id::text like '00000000-0000-4000-8000-%'
+union all select 'necesidades', count(*) from public.needs where id::text like '00000000-0000-4000-8000-%'
+union all select 'avances', count(*) from public.case_updates where id::text like '00000000-0000-4000-8000-%'
+union all select 'ofertas', count(*) from public.offers where id::text like '00000000-0000-4000-8000-%'
+union all select 'fundaciones', count(*) from public.foundations where id::text like '00000000-0000-4000-8000-%';
