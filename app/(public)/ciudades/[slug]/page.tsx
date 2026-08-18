@@ -229,7 +229,7 @@ export default async function CityPage({ params, searchParams }: Props) {
                        ahora retrato, qué le está pasando y el carrusel de esa
                        persona, y en una columna de 300 px el carrusel serían
                        sellos de correos. */
-                    <ul className="grid gap-3 sm:grid-cols-2">
+                    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {cases.map((caseRecord) => (
                         <li key={caseRecord.id}>
                           <CaseBigCard caseRecord={caseRecord} citySlug={city.slug} />

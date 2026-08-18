@@ -201,7 +201,19 @@ export const shell = "mx-auto w-full max-w-[1400px] px-5 sm:px-8";
  * lee como una rejilla rota; las que tienen una acción al final la anclan abajo
  * para que el hueco caiga entre bloques y no dentro.
  */
-export const cardGrid = "grid gap-3 sm:grid-cols-2 xl:grid-cols-3";
+/*
+ * `grid-cols-1` no es redundante y quitarlo rompe el móvil. Sin plantilla
+ * explícita, la única columna se dimensiona con `auto`, o sea `minmax(auto, 1fr)`,
+ * y ese mínimo es el min-content de la tarjeta: el nombre de un caso va en una
+ * sola línea (`truncate` es `white-space: nowrap`), así que el mínimo es el
+ * nombre entero sin cortar. La columna crecía hasta ahí y la página se iba de
+ * ancho —«Daniela, madre soltera reconstruye sola su casa» dejaba /casos con 555
+ * px de rejilla en una pantalla de 390 y el nombre cortado por el borde—.
+ * `grid-cols-1` es `repeat(1, minmax(0, 1fr))`: el 0 es lo que deja que
+ * `truncate` recorte en vez de empujar. Las variantes de `sm` en adelante ya lo
+ * traían, y por eso solo se veía en el móvil.
+ */
+export const cardGrid = "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3";
 
 /**
  * Columna de lectura. Un párrafo de "Qué ocurre" cruzando 1400 px son 200

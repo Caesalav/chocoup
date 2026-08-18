@@ -127,7 +127,7 @@ export default async function HomePage() {
               )}
             </div>
 
-            <ul className="mt-4 grid gap-3 lg:grid-cols-2">
+            <ul className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
               {cases.slice(0, CASES_ON_HOME).map((caseCard) => (
                 <li key={caseCard.id}>
                   <CaseRow caseCard={caseCard} />
