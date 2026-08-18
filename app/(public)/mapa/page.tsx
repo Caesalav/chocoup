@@ -21,7 +21,7 @@ export const metadata: Metadata = {
  * El mapa, que en la etapa anterior mandaba en la portada y ahora es su propia
  * vista.
  *
- * Dejó de mandar porque de un mapa del Chocó no sale una decisión: veintiséis de
+ * Dejó de mandar porque de un mapa del Chocó no sale una decisión: veintisiete de
  * los treinta municipios están sin documentar y salen en gris. Lo que sí hace es
  * situar, y para eso hay que buscarlo. Por eso la apertura Colombia → Chocó vive
  * aquí y no en el inicio: esta es la pantalla en la que alguien de fuera se
@@ -130,7 +130,7 @@ export default async function MapPage({ searchParams }: Props) {
       <aside className="enters enters-2 hidden lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col">
         <h2 className={screenTitle}>Municipios documentados</h2>
         <p className="mt-2 text-[14px] leading-relaxed text-muted">
-          Los que salen en color. Los otros veintiséis siguen en gris porque nadie ha llegado
+          Los que salen en color. Los otros veintisiete siguen en gris porque nadie ha llegado
           todavía, no porque estén bien.
         </p>
         <ul className="mt-5 grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 overflow-y-auto">

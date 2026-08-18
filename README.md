@@ -5,14 +5,15 @@ que cualquier persona pueda ofrecer un recurso concreto.
 
 - **Público:** mapa del Chocó, ficha de cada municipio con fotos, su fundación madre —una
   por municipio—, necesidades de la zona y casos de personas. Botón para ofrecer recursos
-  sin crear cuenta, y dos formas de enviar dinero: la **llave de transferencia** del portal,
-  escrita para copiarla, y el canal oficial de la fundación de ese municipio. En
-  `/donaciones`, la llave arriba y las dos formas de dar dinero en dos pestañas: la fundación
-  de cada municipio y las familias documentadas. En `/ayudas`, el registro público de lo que
-  ya llegó: de qué tipo era, en qué mes y a qué municipio, anónimo salvo autorización expresa.
+  sin crear cuenta, y el **canal de donación** de quien recibe: cada municipio tiene el suyo
+  y cada caso el suyo, en forma de llave de transferencia escrita para copiarla o de enlace
+  de recaudación. **No hay ningún canal común**, y quien no tiene ninguno lo dice con esas
+  palabras. En `/donaciones`, dos pestañas: los municipios a los que se les puede enviar
+  dinero y las familias documentadas. En `/ayudas`, el registro público de lo que ya llegó:
+  de qué tipo era, en qué mes y a qué municipio, anónimo salvo autorización expresa.
 - **Equipo:** panel en `/admin` para crear municipios, subir fotos, registrar necesidades,
-  publicar casos, gestionar la bandeja de ofertas, cambiar la llave de transferencia y
-  repartir permisos por municipio.
+  publicar casos, gestionar la bandeja de ofertas, registrar a dónde va el dinero de cada
+  municipio y de cada caso, y repartir permisos por municipio.
 
 Stack: Next.js 16 (App Router) · Tailwind CSS 4 · Supabase (Postgres, Auth, Storage).
 El mapa es un esquema del Chocó en SVG, sin librería de mapas ni servicio de tiles.
@@ -100,17 +101,21 @@ En el panel de Supabase, **SQL Editor**, pega y ejecuta **en este orden**:
    usa.
 9. `supabase/migrations/0009_encuadre_de_fotos.sql` — el encuadre y el zoom de cada foto,
    para poder recolocar una imagen ya subida sin volver a subirla.
-10. `supabase/migrations/0010_llave_de_transferencia.sql` — la llave de transferencia del
-    portal, una para todo, con su valor inicial dentro y solo editable por coordinación.
-11. `supabase/seed.sql` — los 10 municipios del Chocó con sus coordenadas, sin publicar.
+10. `supabase/migrations/0010_llave_de_transferencia.sql` — **superada por `0011`**. Crea una
+    llave de transferencia global; la siguiente la retira. Se pega solo por completitud del
+    histórico y **nunca suelta**.
+11. `supabase/migrations/0011_canal_de_donacion.sql` — el canal de donación de cada municipio
+    y de cada caso, en llave o en enlace, solo escribible por coordinación; y fuera la llave
+    global.
+12. `supabase/seed.sql` — los 10 municipios del Chocó con sus coordenadas, sin publicar.
 
-**Son diez migraciones**, y `0009` no es opcional: `lib/data.ts` pide `focus_x`, `focus_y`
+**Son once migraciones**, y `0009` no es opcional: `lib/data.ts` pide `focus_x`, `focus_y`
 y `zoom` por su nombre en la ficha del municipio y en las listas de casos, así que una base
-con `0001`–`0008` deja esas pantallas sin casos y sin ningún error a la vista. `0010` tampoco
-lo es si se espera poder donar: sin ella no hay llave, y un caso sin canal propio y sin
-fundación en su municipio se puede leer y no se le puede enviar nada.
+con `0001`–`0008` deja esas pantallas sin casos y sin ningún error a la vista. `0011` tampoco
+lo es si se espera poder donar: sin ella no hay dónde escribir a dónde va el dinero de nadie,
+y las fichas se leen sin que se les pueda enviar nada.
 
-Las diez se pueden volver a ejecutar sin romper nada. El orden importa tres veces:
+Las once se pueden volver a ejecutar sin romper nada. El orden importa cuatro veces:
 
 - `0002` estrecha las políticas que crea `0001`, así que si algún día vuelves a pegar
   `0001`, **pega `0002` detrás** o el equipo se queda otra vez con permiso para todo.
@@ -120,6 +125,9 @@ Las diez se pueden volver a ejecutar sin romper nada. El orden importa tres vece
 - `0008` recorta los permisos de esa misma vista, que se crea entera cada vez, así que si
   vuelves a pegar `0005`, **pega `0008` detrás**. Las tablas no tienen ese problema: se
   crean con `if not exists` y volver a pegarlas no las recrea.
+- `0010` crea la llave global que `0011` retira, así que si vuelves a pegar `0010`,
+  **pega `0011` detrás**. Sola, `0010` devuelve al portal un destino de dinero común a todo
+  el Chocó, que es justo el modelo que se corrigió.
 
 `0004` es la única que puede negarse a aplicarse, y lo hace a propósito: si algún
 municipio tiene ya dos fundaciones cargadas a mano, para y dice cuál es. Cada fundación
@@ -133,7 +141,7 @@ Antes de tocar una migración, y después, conviene correr:
 npm run verify:sql
 ```
 
-Ejecuta el esquema contra un Postgres real en memoria (sin Docker) y comprueba las 183
+Ejecuta el esquema contra un Postgres real en memoria (sin Docker) y comprueba las 187
 reglas de acceso: que un caso sin consentimiento no se pueda publicar, que quien documenta
 no pueda escribir en un municipio que no tiene asignado, que los contactos de las ofertas
 no sean legibles por el público —ni por política ni por permiso de tabla, y cada barrera se
@@ -146,11 +154,13 @@ qué llegó pertenezca siempre al vocabulario cerrado de nueve categorías, que 
 pueda tener dos fundaciones con dos enlaces de donación y que la migración que impone esa
 regla se niegue a aplicarse en vez de borrar una de las dos, que el retrato de una persona
 no pueda ser la foto de otra, que el encuadre de una foto solo lo pueda mover quien
-documenta ese municipio, que la llave de transferencia sea una sola y solo la pueda cambiar
-coordinación —ni quien documenta ni el público, y nadie en absoluto crear una segunda ni
-borrar la única—, que el rastro de quién la cambió lo escriba la base de datos y no quien
-llama, que volver a pegar su migración no devuelva la llave vieja, y que despublicar un
-municipio esconda todo su contenido.
+documenta ese municipio, que **el canal de donación de un municipio o de un caso solo lo
+ponga coordinación** —comprobado también desde la sesión de quien documenta ese mismo
+municipio, que es la única que llega hasta ahí, y comprobando además que esa persona sigue
+pudiendo guardar el resto de la ficha—, que un canal sea una llave o un enlace y nunca los
+dos, que un caso sin canal propio no herede el de nadie, que el público los lea y no los
+toque, que la llave global del portal ya no exista ni vuelva al volver a pegar las
+migraciones, y que despublicar un municipio esconda todo su contenido, canales incluidos.
 
 Comprueba además una cosa que no es del esquema: que su propia lista de migraciones no se
 haya quedado corta. Un archivo nuevo en `supabase/migrations` que nadie haya añadido a
@@ -188,7 +198,7 @@ Los dos roles:
 | Publicar un municipio | Sí | No |
 | Crear o borrar municipios | Sí | No |
 | Fundación y enlace de donación | Sí | No |
-| La llave de transferencia del portal | Sí | No |
+| El canal de donación de un municipio o de un caso | Sí | No |
 | Ofertas y su contacto | Todas | Solo las de sus municipios |
 | Invitar y asignar | Sí | No |
 
@@ -273,12 +283,17 @@ desplegar. Después añade la URL definitiva a *Redirect URLs* en Supabase.
    retrato. Es la que sale recortada en redondo en la tarjeta del municipio, así que elige
    una en la que se le vea a ella y no la de la casa. Se puede dejar sin retrato: la
    tarjeta pone sus iniciales y se lee igual de bien.
-5. **Publicar** el municipio cuando esté listo. Hasta entonces nada de ese municipio es
+5. **A dónde va el dinero.** Coordinación registra el canal del municipio en su ficha y el de
+   cada familia en la suya: una llave de transferencia o un enlace de recaudación, nunca los
+   dos. Quien documenta no ve ese campo y no puede tocarlo; pasa el dato por el grupo. Sin
+   canal, la ficha dice que todavía no hay a dónde enviar, y eso es correcto: **no se usa el
+   de otro**.
+6. **Publicar** el municipio cuando esté listo. Hasta entonces nada de ese municipio es
    visible para el público.
-6. **Ofertas.** Cuando alguien ofrece un recurso desde el portal, aparece en
+7. **Ofertas.** Cuando alguien ofrece un recurso desde el portal, aparece en
    `/admin/ofertas` con su contacto. Se acepta, se vincula a la necesidad que cubre y se
    pone en contacto con la fundación o la familia.
-7. **Cuando la ayuda llegue**, anotar el día en esa misma oferta. La fecha es lo que la
+8. **Cuando la ayuda llegue**, anotar el día en esa misma oferta. La fecha es lo que la
    publica en `/ayudas`, y allí sale con el mes y el municipio: nunca el día ni el caso al
    que fue, sin contacto y sin nombre salvo que la persona lo autorizara.
 
@@ -296,8 +311,10 @@ es el resumen.
 - [ ] Comprobado que quien documenta ve "Solo lectura" en un municipio que no es suyo.
 - [ ] Al menos un municipio publicado con fotos y fundación real, para que el portal no
       esté vacío cuando se comparta el enlace.
-- [ ] La llave de transferencia comprobada en `/admin/donaciones`, con la app y el nombre del
-      titular puestos, y una transferencia de prueba hecha de verdad desde otro teléfono.
+- [ ] Los canales de donación repasados en `/admin/donaciones`, y los de tipo llave con su
+      app y el nombre del titular puestos.
+- [ ] Una transferencia de prueba hecha de verdad, desde otro teléfono, a cada canal que se
+      vaya a publicar.
 - [ ] Una oferta de prueba enviada desde `/ofrecer` y revisada en `/admin/ofertas`.
 - [ ] Esa oferta marcada como entregada, y comprobado que sale en `/ayudas` sin nombre.
 - [ ] Probado desde el móvil con datos, no solo con WiFi.
@@ -505,56 +522,119 @@ barras fijas apiladas se comen un tercio de un móvil.
 
 ## Cómo llega el dinero
 
-El portal **no cobra ni procesa pagos**. Hay dos destinos y son cosas distintas:
+El portal **no cobra ni procesa pagos**, y **no tiene ningún canal común**. Cada destino
+pertenece a quien lo recibe y hay tres sitios donde puede vivir:
 
-**La llave de transferencia del portal.** Una sola, la misma en todas las pantallas
-(`public.donation_key`, migración `0010`). Sale escrita entera y en grande en `/donaciones`,
-en la ficha de cada municipio y en la de cada caso, con los pasos para pegarla en la app y con
-el nombre que la app tiene que mostrar antes de confirmar. **Se cambia en un solo sitio:
-`/admin/donaciones`**, y solo coordinación.
+**El canal del municipio** (`cities.donation_key` / `cities.donation_url`, migración `0011`).
+Lo abre coordinación para ese pueblo. Sale en la ficha del municipio y en `/donaciones`.
 
-**El enlace de donación de una fundación.** Es de esa fundación y solo afecta a su municipio
-(`foundations.donation_url`, un botón «Donar dinero» en su tarjeta). El dinero para una
-persona concreta no expone su Nequi ni su número: se envía a través de la fundación del
-municipio con el nombre de la familia como referencia (por WhatsApp o su enlace), que es quien
-ya rinde cuentas en terreno. Así se evita la suplantación y la persona no queda con su
-teléfono publicado.
+**El canal de un caso** (`cases.donation_key` / `cases.donation_url`). Es de esa familia y
+solo sale en su ficha.
 
-### Por qué la llave no es una columna más de la fundación
+**El enlace de donación de una fundación** (`foundations.donation_url`, un botón «Donar
+dinero» en su tarjeta). Es de esa fundación, sale bajo su nombre y es ella quien rinde
+cuentas de lo que entra por ahí.
 
-Es la pregunta obvia, porque el modelo ya tiene un sitio para el destino del dinero. Tres
-razones, y la tercera es la que decide:
+Los tres van rotulados con de quién son. Esa es la diferencia con lo que había antes y con lo
+que 0004 tuvo que arreglar en las fundaciones: dos destinos pueden convivir en la misma
+pantalla mientras cada uno diga a quién pertenece; lo que no puede es que la página elija uno
+por su cuenta.
 
-- **Una llave no es un enlace.** Un enlace se pulsa; una llave se copia y se pega en otra
-  aplicación. `@soschoco` metido en un campo de URL sale como `https://@soschoco` —eso hace
-  `externalUrl()` con lo que no trae esquema—, o sea un enlace roto en el botón más importante
-  del portal. Así que necesita su propio campo y su propia forma de presentarse.
-- **Es una para todo, y la fundación es una por municipio.** Colgarla de la fundación la
-  obligaría a repetirse pueblo a pueblo: cambiarla serían treinta ediciones y bastaría
-  equivocarse en una para que un municipio quedara enviando el dinero a otro sitio, sin que
-  nada en la pantalla lo delatara. La llave va a cambiar, así que «un solo sitio» no es orden:
-  es la única forma de que cambiarla no pueda salir a medias.
-- **Tiene que funcionar sin fundación.** Hoy no hay ninguna registrada en la base real, y sin
-  los datos de contacto de una no la va a haber pronto. Una llave que solo aparece cuando
-  exista la fundación deja el único caso publicado exactamente como estaba: legible y sin nada
-  que darle.
+### Sin canal propio, no hay canal
+
+**Un caso sin canal no hereda ninguno**: ni el de su municipio, ni el de su fundación, ni uno
+del portal. Su ficha dice con esas palabras que todavía no hay a dónde enviarle. Lo mismo un
+municipio sin canal y sin fundación.
+
+Heredar sería mandar el dinero a un sitio que nadie eligió para esa persona, y en silencio:
+quien lee la historia de una familia y transfiere cree estar dándole a ella. Es el mismo
+criterio que ya se aplicaba cuando dos fundaciones ambiguas dejaban la ficha sin botón de
+donar en vez de adivinar cuál recibía.
+
+Está garantizado en dos capas que no dependen entre sí: `donationChannel()`
+(`lib/donation-channel.ts`) solo recibe la fila de quien recibe, así que no tiene con qué
+rellenar el hueco aunque alguien lo intentara; y las páginas no consultan el canal de nadie
+más para pintar el de uno.
+
+### Por qué el canal del municipio vive en el municipio y no en su fundación
+
+Es la pregunta obvia, porque el modelo ya tenía un sitio para el destino del dinero de un
+pueblo. Tres razones, y la primera decide sola:
+
+- **Quibdó no tiene fundación**, y es el único municipio real publicado. Colgar el canal de la
+  fundación deja sin canal posible justo al pueblo que tiene una persona documentada
+  esperando. Un municipio existe siempre; una fundación es opcional y en la base real no hay
+  ninguna.
+- **Inventar una fundación para colgar de ella una llave sería publicar el nombre de una
+  organización que no existe.** La tarjeta de la fundación escribe su nombre, su descripción y
+  su contacto: una fundación de mentira es una mentira en la tarjeta más delicada del portal,
+  y con un botón de dinero dentro.
+- **Son dos cosas distintas y las dos legítimas.** El enlace de una fundación es suyo y ella
+  responde por él; el canal del municipio lo abre coordinación para el pueblo y no pertenece a
+  ninguna organización. Conviven en la misma columna, cada uno con su rótulo.
+
+### Un canal es una llave o un enlace, nunca las dos
+
+Unos destinos son llaves de transferencia —`@soschoco`, que se copia y se pega en la app del
+banco— y otros son enlaces de recaudación —una Vaki, que se pulsa—. Los dos formatos existen
+en los dos niveles, y no caben en un solo campo: una llave metida en un campo de URL sale como
+`https://@soschoco` —eso hace `externalUrl()` con lo que no trae esquema—, o sea un enlace
+válido que no lleva a ninguna parte, en el botón más importante de la pantalla.
+
+Lo impide una restricción de la base de datos (`cities_donation_one_channel`,
+`cases_donation_one_channel`) y lo vuelve a impedir la capa de datos, que ante los dos puestos
+devuelve «sin canal» en vez de elegir. Con los dos llenos, «el canal» volvería a ser «el que la
+página mire primero», que es el destino del dinero decidido por un orden. En terreno el fallo
+real es cambiar de destino con prisa y olvidar borrar el anterior.
+
+Con una llave van además **en qué app se pega** y **a nombre de quién aparece**. El segundo es
+la única defensa de quien dona: la llave no dice nada por sí misma y el nombre que la app
+muestra antes de confirmar sí. Vacío es un estado válido y es la verdad cuando no consta; el
+portal pide mirarlo igual, sin decir cuál es la respuesta correcta. Inventarlo enseñaría a
+ignorar esa comprobación.
+
+### Quién puede cambiarlo
+
+**Solo coordinación**, y en tres capas que no dependen entre sí: la ficha no ofrece el campo,
+la Server Action lo rechaza, y el disparador `guard_donation_channel` de `0011` para el cambio
+aunque la llamada llegue desde fuera de la web.
+
+La tercera no es redundante y es la que hacía falta pensar. Con las fundaciones bastaba una
+política de tabla, porque nadie de documentación escribe ahí. Aquí no: **quien documenta un
+municipio sí puede editar sus casos**, es su trabajo y lo hace desde el móvil delante de la
+familia, así que las políticas de fila dejan pasar la escritura entera y el canal necesita su
+propia comprobación dentro de ella. El disparador mira el cambio y no el valor, de modo que
+esa misma persona sigue guardando la ficha completa con el canal ya puesto sin tropezar con
+él.
+
+Por lo mismo, el canal no viaja en el formulario del caso ni en el del municipio: va en su
+propio formulario y con su propio botón. Cambiar a dónde va el dinero de alguien no puede ser
+un efecto de guardar su historia.
 
 ### Por qué en la base de datos y no en una constante del proyecto
 
-Una constante en `lib/constants.ts` también viviría en un solo sitio, y sería más simple y más
-barata: nada que consultar y nada que proteger. Pierde en lo único que aquí decide, que es
-cómo se cambia. Editar una constante es tocar el repositorio, hacer commit y esperar un
-despliegue; y la llave va a cambiar pronto, con el equipo de viaje y sin nadie delante de un
-portátil. Una fila se cambia desde el panel en un minuto y desde un teléfono.
+Una constante en `lib/constants.ts` sería más simple y más barata: nada que consultar y nada
+que proteger. Pierde en lo único que aquí decide, que es cómo se cambia. Editar una constante
+es tocar el repositorio, hacer commit y esperar un despliegue; y estos destinos van a cambiar
+pronto, con el equipo de viaje y sin nadie delante de un portátil. Una fila se cambia desde el
+panel en un minuto y desde un teléfono.
 
-El precio de traerla a la base es que pasa a ser un dato escribible, o sea una superficie
-nueva por la que se puede desviar dinero, así que entra con el cerrojo puesto: **solo
-coordinación**, comprobado en la pantalla, en la Server Action y en la política
-`donation_key_coordination`; **nadie puede crear una segunda ni borrar la única** —no hay
-política que lo permita ni permiso de tabla que lo conceda—; solo puede existir una fila
-(`donation_key_one_row`); y la propia fila guarda **desde qué sesión se cambió**, escrito por
-un disparador desde el correo del token y no por quien llama. Las 183 comprobaciones de
-`verify:sql` incluyen todo eso.
+El precio es que pasa a ser un dato escribible, o sea una superficie por la que se puede
+desviar dinero. Las 187 comprobaciones de `verify:sql` cubren todo eso, incluida la que
+importa de verdad: que la sesión de quien documenta ese mismo municipio no pueda tocarlo.
+
+### `/admin/donaciones` ya no edita nada
+
+Ahí estaba el formulario de la llave global. Ahora es **el repaso de todos los destinos que el
+portal publica**, en una lista y sin un solo campo. Cada canal se edita en la ficha de quien lo
+recibe; un formulario allí sería un segundo sitio donde cambiar lo mismo.
+
+La pantalla existe porque repartir los canales tuvo un precio: con un solo campo bastaba
+mirarlo para saber a dónde iba el dinero, y con uno por pueblo y uno por familia hay que poder
+recorrerlos de un vistazo. Es así como se detecta el que no debería estar ahí, y es la
+pantalla que se abre el día que el dinero aparezca donde no debe. Lista también los escritos
+que aún no salen —municipio sin publicar, caso en borrador—, aparte y marcados: se revisan
+cuando todavía no hay dinero de por medio.
 
 ### Se ve sin JavaScript
 
@@ -562,8 +642,12 @@ La llave va escrita en el HTML, en cuerpo grande, monoespaciada y con `select-al
 toque la selecciona entera y se puede copiar a mano o teclear. El botón «Copiar la llave»
 **no se renderiza en el servidor**: aparece solo si el navegador trae portapapeles, porque
 copiar no existe sin JavaScript y un botón muerto sería peor que ninguno. Monoespaciada
-porque la llave va a cambiar y la siguiente puede llevar un `1` junto a una `l`; quien la
+porque un canal va a cambiar y el siguiente puede llevar un `1` junto a una `l`; quien la
 teclee a mano no tiene que adivinar.
+
+El enlace es un `<a>` de toda la vida, y debajo del botón va el destino escrito, monoespaciado
+y partible: un botón no dice a dónde lleva hasta que se pulsa, y aquí lo que hay al otro lado
+es dinero.
 
 ### Una fundación por municipio
 
@@ -587,7 +671,7 @@ notificaciones por correo de cada oferta nueva (la bandeja del panel cumple esa 
 ```
 app/(public)/          portal público: mapa, municipios, casos, ayudas, ofrecer, entrar
 app/admin/             panel del equipo (protegido) y Server Actions
-app/admin/donaciones/  la llave de transferencia del portal (solo coordinación)
+app/admin/donaciones/  repaso de todos los destinos de dinero, en lectura (solo coordinación)
 app/admin/equipo/      invitar, dar rol y asignar municipios (solo coordinación)
 app/auth/              callback del enlace de acceso y cierre de sesión
 components/            UI compartida, mapas y componentes del panel

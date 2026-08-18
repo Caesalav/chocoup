@@ -1,6 +1,11 @@
 import { CheckIcon } from "@/components/ui/icons";
-import type { NeedStatus, OfferStatus } from "@/lib/types";
-import { needCategoryLabel, needStatusLabel, offerStatusLabel } from "@/lib/constants";
+import type { NeedStatus, OfferRecordState, OfferStatus } from "@/lib/types";
+import {
+  needCategoryLabel,
+  needStatusLabel,
+  offerStateLabel,
+  offerStatusLabel,
+} from "@/lib/constants";
 
 /**
  * Pastilla blanda, la de la referencia: caja redonda, texto normal y en frase.
@@ -57,18 +62,79 @@ export function NeedStatusChip({ status }: { status: NeedStatus }) {
   );
 }
 
-/** La bandeja del equipo usa el mismo reparto: lo que espera va en cálido, lo
- *  resuelto en verde. */
+/**
+ * La bandeja del equipo usa el mismo reparto: lo que espera va en cálido, lo
+ * resuelto en verde.
+ *
+ * Y lo que ya no está en juego se queda sin color, que es donde caen las otras
+ * dos. «Rechazada» va al aire: el filete y nada dentro, porque hay un veredicto
+ * escrito pero no un resultado que celebrar ni una espera que atender.
+ *
+ * «Retirada» es el caso raro de los cuatro y por eso no cabía en ninguno de los
+ * tres estilos que ya había. En verde diría que salió bien y en cálido que sigue
+ * esperando, y las dos serían mentira; con el filete de «Rechazada» se leerían
+ * como la misma cosa, que es justo lo que no son —una es un no y la otra una
+ * baja—. Así que se queda en la familia sin color, pero rellena en vez de al
+ * aire: la pastilla se hunde al tono del papel de fondo (`canvas`, un peldaño por
+ * debajo del `panel` sobre el que se pinta la fila), que es literalmente lo que le
+ * ha pasado a la oferta. Macizo contra filete se distingue de reojo y sin
+ * depender del tono, así que aguanta en escala de grises igual que el visto de
+ * «Cubierta» ahí arriba. El texto sube a `muted` porque `faint` sobre `canvas` se
+ * queda en 4,5:1 raspando; así son 6,4:1.
+ *
+ * No lleva dibujo propio —una cruz, una raya— porque el único hueco para
+ * distinguirla estaba en el relleno: el filete discontinuo ya es de `DraftChip`
+ * («Sin publicar», «Solo lectura») y tacharle la palabra a una pastilla que dice
+ * «Retirada» se lee tan fácil como lo contrario de lo que pone.
+ */
 const offerStatusStyles: Record<OfferStatus, string> = {
   pendiente: "bg-need-mid-soft text-need-mid-strong",
   aceptada: "bg-accent-soft text-accent-strong",
   rechazada: "border border-line text-faint",
+  retirada: "bg-canvas text-muted",
 };
 
 export function OfferStatusChip({ status }: { status: OfferStatus }) {
   return (
     <span className={`${base} ${offerStatusStyles[status] ?? offerStatusStyles.pendiente}`}>
       {offerStatusLabel(status)}
+    </span>
+  );
+}
+
+/**
+ * Lo mismo para quien lee `/ofrecido`, y aparte a propósito.
+ *
+ * No es la pastilla de arriba con otras etiquetas: son dos vocabularios y solo
+ * coinciden en el color. El del equipo dice en qué punto de la bandeja está una
+ * oferta; este dice cuánto se puede contar con ella, que es la única pregunta que
+ * trae quien mira el muro. Compartir componente obligaría a que las dos escalas
+ * se muevan juntas para siempre, y no tienen por qué: aquí solo hay dos valores y
+ * la vista `public.offer_log` no publica los otros dos.
+ *
+ * «Confirmada» va en el verde lavado de lo que ya está hecho, porque alguien del
+ * equipo habló con esa persona. «Sin confirmar» va en el cálido de lo que espera
+ * —el mismo tramo con el que se pinta una necesidad abierta— pero **al aire, con
+ * el filete y sin relleno**, que es el recurso que ya usa «Parcial» ahí arriba
+ * para decir «lo mismo, a medio hacer». Un lavado verde y un lavado cálido están
+ * a la misma luminancia, así que a un ojo que no separe rojo de verde el tono no
+ * le diría nada; macizo contra al aire se ve igual en escala de grises, y es lo
+ * que sostiene la diferencia cuando el color no llega.
+ *
+ * Y «Confirmada» no lleva visto, aunque «Cubierta» lo lleve y aquí quedaría a
+ * mano: un visto se lee como «ya está», y lo que hay confirmado en esta pantalla
+ * es una promesa que todavía no ha llegado a ningún sitio. La pastilla que dice
+ * lo más parecido a un éxito es justo la que no puede insinuarlo.
+ */
+const offerStateStyles: Record<OfferRecordState, string> = {
+  sin_confirmar: "border border-need-mid-strong/35 text-need-mid-strong",
+  confirmada: "bg-accent-soft text-accent-strong",
+};
+
+export function OfferStateChip({ state }: { state: OfferRecordState }) {
+  return (
+    <span className={`${base} ${offerStateStyles[state] ?? offerStateStyles.sin_confirmar}`}>
+      {offerStateLabel(state)}
     </span>
   );
 }

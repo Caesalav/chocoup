@@ -1,45 +1,48 @@
 import Link from "next/link";
 
-export type DonationView = "fundaciones" | "causas";
+export type DonationView = "municipios" | "fundaciones" | "causas";
 
 /**
- * Las fundaciones son la vista por defecto y viven en /donaciones a secas.
+ * Los municipios son la vista por defecto y viven en /donaciones a secas.
  *
  * Es la misma decisión que en el mapa: colgarle un parámetro a lo normal solo
  * alarga la dirección que más se comparte, y aquí la dirección que se comparte es
- * «a dónde va el dinero». Cualquier valor que no sea "causas" cae en fundaciones,
- * así que un enlace mal copiado desde un WhatsApp abre una pantalla y no un error.
+ * «a dónde va el dinero». Cualquier valor que no sea de las otras dos pestañas
+ * cae en municipios, así que un enlace mal copiado desde un WhatsApp abre una
+ * pantalla y no un error.
  */
 export function parseDonationView(value: string | undefined): DonationView {
-  return value === "causas" ? "causas" : "fundaciones";
+  if (value === "causas") return "causas";
+  if (value === "fundaciones") return "fundaciones";
+  return "municipios";
 }
 
 const VIEWS: { id: DonationView; label: string; href: string }[] = [
-  { id: "fundaciones", label: "Fundaciones", href: "/donaciones" },
+  { id: "municipios", label: "Municipios", href: "/donaciones" },
+  { id: "fundaciones", label: "Fundaciones", href: "/donaciones?ver=fundaciones" },
   { id: "causas", label: "Causas", href: "/donaciones?ver=causas" },
 ];
 
 /**
- * Las dos formas de dar dinero: a un municipio o a una familia.
+ * Las tres formas de mirar a quién donar: un pueblo, su fundación o una familia.
  *
- * Dos enlaces y no un componente con estado, por lo mismo que el resto de los
+ * Tres enlaces y no un componente con estado, por lo mismo que el resto de los
  * conmutadores del portal: sin JavaScript funciona igual, y cada pestaña se puede
- * pegar en un WhatsApp —que es como llega aquí la gente— y abre lo que quien la
- * mandó estaba mirando.
- *
- * El conmutador no crece con la página: dos pestañas de 700 px dejan de leerse
- * como un conmutador y pasan a ser dos botones sueltos.
+ * pegar en un WhatsApp.
  */
 export function DonationTabs({
   active,
+  cityCount,
   foundationCount,
   caseCount,
 }: {
   active: DonationView;
+  cityCount: number;
   foundationCount: number;
   caseCount: number;
 }) {
   const counts: Record<DonationView, number> = {
+    municipios: cityCount,
     fundaciones: foundationCount,
     causas: caseCount,
   };
@@ -47,7 +50,7 @@ export function DonationTabs({
   return (
     <nav
       aria-label="Formas de donar"
-      className="grid grid-cols-2 rounded-full border border-line bg-panel-high p-1 shadow-card sm:max-w-md"
+      className="grid grid-cols-3 rounded-full border border-line bg-panel-high p-1 shadow-card sm:max-w-xl"
     >
       {VIEWS.map((view) => {
         const selected = view.id === active;
@@ -57,7 +60,7 @@ export function DonationTabs({
             key={view.id}
             href={view.href}
             aria-current={selected ? "page" : undefined}
-            className={`flex min-h-11 items-center justify-center gap-2 rounded-full text-[14px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+            className={`flex min-h-11 items-center justify-center gap-1.5 rounded-full px-1 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:gap-2 sm:text-[14px] ${
               selected ? "bg-ink text-paper" : "text-muted hover:text-ink"
             }`}
           >

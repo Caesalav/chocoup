@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteCase, updateCase } from "@/app/admin/actions";
+import { deleteCase, saveCaseDonationChannel, updateCase } from "@/app/admin/actions";
+import { DonationChannelForm } from "@/components/admin/DonationChannelForm";
 import { NeedsManager } from "@/components/admin/NeedsManager";
 import { PhotoManager } from "@/components/admin/PhotoManager";
 import { ProgressManager } from "@/components/admin/ProgressManager";
@@ -28,6 +29,7 @@ export default async function AdminCasePage({ params }: Props) {
   if (!data) notFound();
 
   const { city, caseRecord, photos, needs, updates } = data;
+  const isCoordination = team?.role === "coordinacion";
 
   // Sin este municipio asignado, la historia se lee pero no se toca. Y se lee
   // porque quien llega detrás necesita saber qué se documentó ya de esta familia.
@@ -120,22 +122,6 @@ export default async function AdminCasePage({ params }: Props) {
             />
           </label>
 
-          <label className="block">
-            <span className={field.label}>A dónde donarle dinero</span>
-            <input
-              name="donation_url"
-              type="url"
-              inputMode="url"
-              defaultValue={caseRecord.donation_url}
-              className={field.input}
-              placeholder="https://…"
-            />
-            <span className={field.hint}>
-              Vaki, Nequi o la cuenta de esta familia. Si lo dejas vacío, el botón de donar lleva al
-              canal de la fundación del municipio.
-            </span>
-          </label>
-
           <label className={field.checkboxRow}>
             <input
               type="checkbox"
@@ -165,6 +151,50 @@ export default async function AdminCasePage({ params }: Props) {
 
           <SubmitButton>Guardar caso</SubmitButton>
         </form>
+      </section>
+
+      {/* El canal de donación, fuera del formulario de arriba y con su propio
+          botón. Dos motivos y los dos pesan: cambiar a dónde va el dinero de una
+          persona no puede ser un efecto de guardar su historia, y este campo solo
+          lo escribe coordinación mientras el resto de la ficha lo escribe también
+          quien documenta este municipio. */}
+      <section className="mt-10">
+        <h2 className="font-display text-2xl text-ink">A dónde va su dinero</h2>
+        {isCoordination ? (
+          <>
+            <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted">
+              El canal de {caseRecord.display_name}, que sale en su ficha pública. Puede ser una
+              llave de transferencia, un enlace de recaudación o un número de contacto.{" "}
+              <span className="text-ink">
+                Sin canal propio, su ficha dice que todavía no hay a dónde enviarle
+              </span>
+              : no se usa el del municipio ni el de su fundación, porque el dinero acabaría en un
+              sitio que nadie eligió para ella.
+            </p>
+            <div className="mt-4">
+              <DonationChannelForm
+                action={saveCaseDonationChannel}
+                id={caseRecord.id}
+                row={caseRecord}
+                owner={caseRecord.display_name}
+              />
+            </div>
+          </>
+        ) : (
+          <div className={`${panel} mt-4 p-4`}>
+            <p className="text-sm text-ink">
+              {caseRecord.donation_key ||
+                caseRecord.donation_url ||
+                caseRecord.donation_phone ||
+                "Todavía sin canal"}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              A dónde va el dinero de esta familia lo registra coordinación, porque quien edita
+              ese campo puede desviar donaciones de una persona con nombre y cara publicados.
+              Manda el dato por el grupo. Todo lo demás de esta ficha sí lo puedes guardar tú.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="mt-8">

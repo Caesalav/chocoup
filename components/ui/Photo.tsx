@@ -92,7 +92,7 @@ export function FramedPhoto({
         alt={alt}
         loading={eager ? "eager" : "lazy"}
         decoding="async"
-        className={`${kind === "portrait" ? "photo-portrait" : "photo-crop"} size-full`}
+        className={`${kind === "portrait" ? "photo-portrait" : "photo-crop"} size-full rounded-[inherit]`}
       />
     </div>
   );

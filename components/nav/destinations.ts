@@ -6,6 +6,7 @@ import {
   MapIcon,
   NeedsIcon,
   OfferIcon,
+  PledgeIcon,
   SearchIcon,
   TownIcon,
 } from "@/components/ui/icons";
@@ -61,6 +62,26 @@ export const DONATE: Destination = {
   href: "/donaciones",
   label: "Donar",
   Icon: DonationIcon,
+};
+
+/**
+ * Lo que se ha ofrecido y todavía no ha llegado.
+ *
+ * Hermano del registro de ayudas: son las dos mitades del mismo registro —lo
+ * prometido y lo entregado—, así que van juntos donde aparezca cualquiera de los
+ * dos: emparejados por pestañas dentro de sus pantallas y seguidos en el mapa del
+ * pie, en este orden, que es el orden en que pasan las cosas. Y va fuera de
+ * `SECTIONS` por la misma razón que su hermano, la que está explicada debajo.
+ *
+ * La etiqueta es la larga a propósito. «Ofrecido» a secas queda a una letra de
+ * «Ofrecer», que es la acción de la barra de abajo: serían dos entradas casi
+ * iguales en la misma navegación —una para mirar lo prometido y otra para
+ * prometer algo— sin nada en las palabras que diga cuál es cuál.
+ */
+export const OFFER_LOG: Destination = {
+  href: "/ofrecido",
+  label: "Lo que se ha ofrecido",
+  Icon: PledgeIcon,
 };
 
 /**

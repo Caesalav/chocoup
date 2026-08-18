@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { CaseBigCard } from "@/components/cards/CaseBigCard";
 import { parseCitySection, SectionTabs } from "@/components/city/SectionTabs";
-import { TransferKey } from "@/components/donations/TransferKey";
+import { CityLead } from "@/components/city/CityLead";
+import { DonationChannelCard } from "@/components/donations/DonationChannelCard";
 import { FoundationCard } from "@/components/FoundationCard";
 import { ChocoMap } from "@/components/map/ChocoMap";
 import { NeedsList } from "@/components/NeedsList";
@@ -21,7 +22,8 @@ import {
   screenTitle,
   shell,
 } from "@/components/ui/styles";
-import { getCityPage, getDonationKey } from "@/lib/data";
+import { getCityPage } from "@/lib/data";
+import { donationChannel } from "@/lib/donation-channel";
 import { excerpt, formatDate, plural } from "@/lib/format";
 import { savedFrame } from "@/lib/photo-frame";
 import { absoluteUrl } from "@/lib/site";
@@ -46,17 +48,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const { ver } = await searchParams;
-  const [data, donationKey] = await Promise.all([getCityPage(slug), getDonationKey()]);
+  const data = await getCityPage(slug);
   if (!data) notFound();
 
   const { city, foundation, photos, zoneNeeds, caseNeeds, cases } = data;
+  const channel = donationChannel(city);
   const openNeeds = zoneNeeds.filter((need) => need.status !== "cubierta").length;
   const listedNeeds = [...zoneNeeds, ...caseNeeds];
   const section = parseCitySection(ver);
 
   const cover = photos[0]?.storage_path ?? null;
   const shareUrl = await absoluteUrl(`/ciudades/${city.slug}`);
-  const summaryParagraphs = city.summary ? city.summary.split(/\n\s*\n/) : [];
 
   return (
     <div className="relative">
@@ -101,13 +103,12 @@ export default async function CityPage({ params, searchParams }: Props) {
                   <span className={pillOnPhoto}>Sin publicar</span>
                 </p>
               )}
-              {summaryParagraphs.length > 0 && (
-                <div className="mt-5 max-w-[68ch] space-y-3 text-[15px] leading-relaxed text-paper">
-                  {summaryParagraphs.map((paragraph, index) => (
-                    <p key={index}>{paragraph}</p>
-                  ))}
-                </div>
-              )}
+              <CityLead
+                summary={city.summary}
+                cityName={city.name}
+                foundation={foundation}
+                onPhoto
+              />
               <p className="mt-4 text-[12px] text-paper/70">
                 Actualizado el {formatDate(city.updated_at)}
               </p>
@@ -153,13 +154,11 @@ export default async function CityPage({ params, searchParams }: Props) {
                 <DraftChip label="Sin publicar" />
               </p>
             )}
-            {summaryParagraphs.length > 0 && (
-              <div className="mt-6 max-w-[68ch] space-y-4 text-[15px] leading-relaxed text-body">
-                {summaryParagraphs.map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
-                ))}
-              </div>
-            )}
+            <CityLead
+              summary={city.summary}
+              cityName={city.name}
+              foundation={foundation}
+            />
             <p className="mt-4 text-[12px] text-faint">
               Actualizado el {formatDate(city.updated_at)}
             </p>
@@ -270,25 +269,46 @@ export default async function CityPage({ params, searchParams }: Props) {
               </section>
             )}
 
-            {/* La llave va debajo de la fundación cuando hay fundación, y ocupa su
-                sitio cuando no. No compite con ella: la fundación es de este
-                municipio y recauda para él, y la llave es del portal entero. El
-                orden dice eso —primero lo de aquí, luego lo de todos— y cuando no
-                hay fundación registrada, que es como está hoy la base real, la
-                llave es lo único que evita que esta columna no ofrezca ninguna
-                forma de dar dinero. */}
-            {donationKey && (
+            {/* El canal del municipio va debajo de la fundación cuando la hay, y
+                ocupa su sitio cuando no. Son dos destinos distintos y los dos
+                legítimos: el de la fundación es suyo y sale dentro de su tarjeta
+                bajo su nombre; este lo abrió coordinación para el pueblo y no
+                pertenece a ninguna organización. Cada uno va rotulado con de quién
+                es, que es lo que faltaba cuando dos tarjetas con botón de donar
+                convivían sin decir cuál recibía.
+
+                Vive en la fila del municipio y no en la de su fundación, y el
+                motivo se ve aquí mismo: Quibdó no tiene fundación y es el único
+                municipio real publicado. Ver 0011_canal_de_donacion.sql. */}
+            {channel && (
               <section
                 className={foundation ? "mt-6" : ""}
-                aria-label="Llave de transferencia"
+                aria-label={`Canal de donación de ${city.name}`}
               >
-                <TransferKey donationKey={donationKey} featured={!foundation} />
+                <DonationChannelCard channel={channel} featured={!foundation} />
                 <p className="mt-3 text-[13px] leading-relaxed text-muted">
-                  Es la llave del portal y sirve para cualquier municipio del Chocó.
+                  Es el canal de {city.name} y lo que entre por ahí se reparte aquí.
                   {foundation
                     ? ` Si prefieres que entre por ${foundation.name}, usa su enlace de arriba.`
                     : ` ${city.name} todavía no tiene fundación registrada, así que por ahora es la única vía.`}
                 </p>
+              </section>
+            )}
+
+            {/* Sin ninguna de las dos se dice, en vez de dejar la columna muda.
+                Un municipio recién documentado no tiene a dónde recibir dinero y
+                eso es un estado normal; lo que no puede es parecer que la
+                pantalla se quedó a medias. */}
+            {!channel && !foundation && (
+              <section aria-label={`Canal de donación de ${city.name}`}>
+                <div className={`${card} p-5`}>
+                  <p className="text-[12px] text-accent-strong">Enviar dinero</p>
+                  <p className="mt-2 text-[14px] leading-relaxed text-muted">
+                    {city.name} todavía no tiene canal de donación propio ni fundación
+                    registrada, así que aquí no hay a dónde transferir. Lo que sí se puede hacer
+                    hoy es ofrecer un recurso concreto.
+                  </p>
+                </div>
               </section>
             )}
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createCase, deleteCity, updateCity } from "@/app/admin/actions";
+import { createCase, deleteCity, saveCityDonationChannel, updateCity } from "@/app/admin/actions";
+import { DonationChannelForm } from "@/components/admin/DonationChannelForm";
 import { FoundationForm } from "@/components/admin/FoundationForm";
 import { NeedsManager } from "@/components/admin/NeedsManager";
 import { PhotoManager } from "@/components/admin/PhotoManager";
@@ -154,6 +155,45 @@ export default async function AdminCityPage({ params }: Props) {
         </div>
       </section>
 
+      {/* El canal del municipio, aparte de la fundación y aparte de la ficha.
+          Son tres cosas distintas: el canal es del pueblo, el enlace de abajo es
+          de la fundación, y el resto de esta pantalla lo escribe también quien
+          documenta. Vive en el municipio y no en su fundación porque un municipio
+          existe siempre y una fundación es opcional —Quibdó no tiene—, y porque
+          inventar una fundación para colgar de ella una llave sería publicar el
+          nombre de una organización que no existe. */}
+      <section className="mt-10">
+        <h2 className="font-display text-2xl text-ink">A dónde va el dinero de {city.name}</h2>
+        {isCoordination ? (
+          <>
+            <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted">
+              El canal del municipio, que sale en su ficha pública. Puede ser una llave de
+              transferencia, un enlace de recaudación o un número de contacto. No lo heredan
+              sus casos: cada familia tiene el suyo o no tiene ninguno.
+            </p>
+            <div className="mt-4">
+              <DonationChannelForm
+                action={saveCityDonationChannel}
+                id={city.id}
+                row={city}
+                owner={city.name}
+              />
+            </div>
+          </>
+        ) : (
+          <div className={`${panel} mt-4 p-4`}>
+            <p className="text-sm text-ink">
+              {city.donation_key || city.donation_url || city.donation_phone || "Todavía sin canal"}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              A dónde va el dinero de este municipio lo registra coordinación, porque quien
+              edita ese campo puede desviar las donaciones del pueblo entero. Manda el dato por
+              el grupo. Todo lo demás de esta pantalla sí lo puedes guardar tú.
+            </p>
+          </div>
+        )}
+      </section>
+
       <section className="mt-10">
         <h2 className="font-display text-2xl text-ink">Fundación madre</h2>
         <p className="mt-1 text-sm text-muted">
@@ -269,21 +309,6 @@ export default async function AdminCityPage({ params }: Props) {
             />
           </label>
 
-          <label className="block">
-            <span className={field.label}>A dónde donarle dinero</span>
-            <input
-              name="donation_url"
-              type="url"
-              inputMode="url"
-              className={field.input}
-              placeholder="https://…  (opcional)"
-            />
-            <span className={field.hint}>
-              Si lo dejas vacío, se usa el canal de la fundación del municipio. El retrato y las
-              fotos de la situación se suben después, en la ficha del caso.
-            </span>
-          </label>
-
           <label className={field.checkboxRow}>
             <input type="checkbox" name="consent_to_publish" className={field.checkbox} />
             <span>
@@ -293,6 +318,10 @@ export default async function AdminCityPage({ params }: Props) {
               </span>
             </span>
           </label>
+
+          {/* Aquí iba «A dónde donarle dinero». Se fue a la ficha del caso y solo
+              para coordinación: un caso nace sin canal, y el retrato y las fotos
+              también se suben después. */}
 
           <SubmitButton pendingLabel="Creando…">Crear caso</SubmitButton>
         </form>

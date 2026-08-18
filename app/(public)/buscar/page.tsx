@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { CaseRow } from "@/components/cards/CaseRow";
 import { CityRow } from "@/components/cards/CityRow";
+import { OfferRow } from "@/components/cards/OfferRow";
 import { ScreenHeader } from "@/components/nav/ScreenHeader";
 import { NeedsList } from "@/components/NeedsList";
 import { SearchIcon } from "@/components/ui/icons";
@@ -34,7 +35,7 @@ export default async function SearchPage({ searchParams }: Props) {
   const query = (q ?? "").trim();
   const results = query ? await searchPortal(query) : null;
   const total = results
-    ? results.cities.length + results.cases.length + results.needs.length
+    ? results.cities.length + results.cases.length + results.needs.length + results.offers.length
     : 0;
 
   return (
@@ -126,6 +127,42 @@ export default async function SearchPage({ searchParams }: Props) {
               <div className="mt-4">
                 <NeedsList needs={results.needs} showOrigin />
               </div>
+            </section>
+          )}
+
+          {/* Va último de los cuatro, que es el único sitio donde no engaña. Quien
+              busca «tejas» encuentra la necesidad de un techo y una promesa de 600
+              tejas, y mezcladas en la misma tira las dos parecen lo mismo: aquí
+              abajo y con el rótulo delante se lee que son otra cosa.
+
+              Y aun así lleva su renglón de aviso, porque los otros tres grupos no
+              lo necesitan. Un municipio y un caso son sitios y personas, una
+              necesidad dice sola que falta; una oferta suelta entre resultados es
+              la única que se puede leer como un hecho cumplido. La pastilla de
+              cada fila remata lo que este renglón empieza.
+
+              La lista se queda en la columna de lectura en vez de ir a la rejilla
+              de arriba: la fila de una oferta está dibujada para eso —lo que se
+              ofrece es una frase entera, no un nombre— y en tres columnas se parte
+              por donde no debe. */}
+          {results.offers.length > 0 && (
+            <section className="mt-7">
+              <h2 className={screenTitle}>Lo que se ha ofrecido</h2>
+              <p className="mt-2 max-w-[68ch] text-[13px] leading-relaxed text-muted">
+                Prometido y todavía sin llegar. Que alguien lo haya ofrecido no cierra la necesidad
+                que va arriba:{" "}
+                <Link href="/ofrecido" className="text-accent hover:underline">
+                  el registro entero
+                </Link>{" "}
+                lo explica.
+              </p>
+              <ul className="mt-4 max-w-[68ch] space-y-3">
+                {results.offers.map((offer) => (
+                  <li key={offer.id}>
+                    <OfferRow record={offer} />
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
         </div>

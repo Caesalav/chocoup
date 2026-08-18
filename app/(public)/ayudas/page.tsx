@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ScreenHeader } from "@/components/nav/ScreenHeader";
+import { RegistryTabs } from "@/components/registry/RegistryTabs";
 import { SiteFooter } from "@/components/SiteFooter";
+import { FilterRow, type FilterOption } from "@/components/ui/FilterRow";
 import { card, shell } from "@/components/ui/styles";
 import { needCategoryLabel } from "@/lib/constants";
 import { getAidRecords } from "@/lib/data";
@@ -74,6 +76,16 @@ export default async function AidLogPage({ searchParams }: Props) {
           backHref="/"
           backLabel="Volver al inicio"
         />
+
+        {/* Las pestañas van pegadas al titular y no debajo del texto que viene
+            ahora, que en el móvil es una pantalla entera de párrafos: quien llega
+            aquí desde un WhatsApp tiene que ver que hay otra mitad —lo prometido—
+            antes de leerse todo eso, o se irá creyendo que el portal solo anota lo
+            que ya llegó. Entran con la cabecera y sin retardo propio porque se leen
+            como parte de ella, y así el escalonado de abajo no hay que renumerarlo. */}
+        <div className="enters mt-5">
+          <RegistryTabs active="ayudas" />
+        </div>
 
         <div className={`${card} enters enters-1 mt-5 max-w-[68ch] p-4`}>
           <p className="text-[14px] leading-relaxed text-body">
@@ -269,7 +281,7 @@ const SIN_MUNICIPIO = "sin-municipio";
 
 const cityValueOf = (record: AidRecord) => record.city_slug ?? SIN_MUNICIPIO;
 
-function cityOptions(records: AidRecord[]): { value: string; label: string }[] {
+function cityOptions(records: AidRecord[]): FilterOption[] {
   const seen = new Map<string, string>();
   for (const record of records) {
     seen.set(cityValueOf(record), record.city_name ?? "Sin municipio");
@@ -279,7 +291,7 @@ function cityOptions(records: AidRecord[]): { value: string; label: string }[] {
     .sort((a, b) => a.label.localeCompare(b.label, "es"));
 }
 
-function categoryOptions(records: AidRecord[]): { value: string; label: string }[] {
+function categoryOptions(records: AidRecord[]): FilterOption[] {
   return [...new Set(records.map((record) => record.category))]
     .map((value) => ({ value, label: needCategoryLabel(value) }))
     .sort((a, b) => a.label.localeCompare(b.label, "es"));
@@ -292,54 +304,4 @@ function aidHref(next: { municipio?: string; tipo?: string }): string {
   if (next.tipo) params.set("tipo", next.tipo);
   const query = params.toString();
   return query ? `/ayudas?${query}` : "/ayudas";
-}
-
-/**
- * Una fila de filtro.
- *
- * Son enlaces y no un desplegable, por lo mismo que las pestañas del mapa: sin
- * JavaScript funcionan igual, y «las medicinas que llegaron a Quibdó» es una
- * dirección que se puede pegar en un WhatsApp. La pastilla maciza marca lo
- * elegido, que es como se señala lo abierto en el resto del portal.
- */
-function FilterRow({
-  label,
-  allLabel,
-  options,
-  active,
-  hrefFor,
-}: {
-  label: string;
-  allLabel: string;
-  options: { value: string; label: string }[];
-  active: string | undefined;
-  hrefFor: (value: string | undefined) => string;
-}) {
-  const all = { value: undefined as string | undefined, label: allLabel };
-
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
-      <span className="w-16 shrink-0 text-[12px] text-faint">{label}</span>
-      <nav aria-label={label} className="flex flex-wrap gap-1.5">
-        {[all, ...options].map((option) => {
-          const selected = option.value === active;
-
-          return (
-            <Link
-              key={option.value ?? "todos"}
-              href={hrefFor(option.value)}
-              aria-current={selected ? "page" : undefined}
-              className={`inline-flex min-h-8 items-center rounded-full px-3 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                selected
-                  ? "bg-ink text-paper"
-                  : "border border-line text-muted hover:border-line-strong hover:text-ink"
-              }`}
-            >
-              {option.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
-  );
 }

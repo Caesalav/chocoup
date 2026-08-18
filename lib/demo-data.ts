@@ -8,6 +8,11 @@
  * como documentación de nada. El banner del portal lo deja claro en pantalla.
  */
 import { situationPhotos, withUpdatePhotos } from "./case-photos";
+import {
+  donationChannel,
+  moneyDestinationsOf,
+  type MoneyDestination,
+} from "./donation-channel";
 import { savedFrame } from "./photo-frame";
 import { NEED_CATEGORIES } from "./constants";
 import type {
@@ -20,17 +25,18 @@ import type {
   CaseUpdate,
   CaseWithPhotos,
   CityCardData,
+  CityDonationEntry,
   CityPage,
   City,
-  DonationKey,
+  DonationColumns,
   Foundation,
-  FoundationEntry,
   Need,
   NeedCard,
   NeedCategory,
   NeedOption,
   NeedStatus,
   Offer,
+  OfferRecord,
   OfferStatus,
   OfferTarget,
   OfferWithContext,
@@ -98,15 +104,6 @@ const citySeeds: CitySeed[] = [
     published: true,
   },
   {
-    name: "Bojayá",
-    slug: "bojaya",
-    lat: 6.5581,
-    lng: -76.8869,
-    summary:
-      "En Bellavista se agrietaron el centro de salud y catorce viviendas del sector alto. No hubo heridos graves.\n\nEl comité local ya tiene censo de familias afectadas y está pidiendo materiales antes de que empiece la temporada de lluvias fuertes.",
-    published: true,
-  },
-  {
     name: "Nuquí",
     slug: "nuqui",
     lat: 5.7089,
@@ -124,9 +121,47 @@ const citySeeds: CitySeed[] = [
   },
 ];
 
+/**
+ * Los canales de donación de muestra, y son inventados a propósito.
+ *
+ * El canal de verdad de un municipio o de una familia vive en su fila y lo
+ * escribe coordinación desde el panel. Copiar aquí uno real lo convertiría en dos
+ * sitios, y el segundo no se cambia desde ningún panel: el día que cambiara, este
+ * archivo seguiría enseñando el viejo a cualquiera que abriera el portal sin
+ * claves. Un destino caducado enseñado como bueno es dinero perdido, así que los
+ * de muestra se ven de lejos que lo son.
+ *
+ * Están repartidos para que se puedan ver los estados sin tocar nada:
+ * Quibdó con llave y además fundación con enlace —las dos vías a la vez, cada una
+ * rotulada con de quién es—, Istmina con enlace propio, y Bahía Solano solo con
+ * el de su fundación. Nuquí y Condoto sin nada, que es como nace un municipio.
+ */
+const NO_CHANNEL: DonationColumns = {
+  donation_key: "",
+  donation_url: "",
+  donation_phone: "",
+  donation_app: "",
+  donation_holder: "",
+};
+
+const keyChannel = (value: string, app: string, holder: string): DonationColumns => ({
+  ...NO_CHANNEL,
+  donation_key: value,
+  donation_app: app,
+  donation_holder: holder,
+});
+
+const linkChannel = (url: string): DonationColumns => ({ ...NO_CHANNEL, donation_url: url });
+
+const cityChannels: Record<string, DonationColumns> = {
+  quibdo: keyChannel("@quibdo-muestra", "Bre-B", "Alcaldía de Quibdó (muestra)"),
+  istmina: linkChannel("https://ejemplo.org/istmina"),
+};
+
 export const demoCities: City[] = citySeeds.map((seed, index) => ({
   id: demoId(CITY, index),
   ...seed,
+  ...(cityChannels[seed.slug] ?? NO_CHANNEL),
   created_at: day(4),
   updated_at: day(11 + index),
 }));
@@ -144,8 +179,7 @@ const cityBySlug = (slug: string) => demoCities.find((city) => city.slug === slu
 //
 // Condoto y Nuquí se quedan sin ninguna a propósito: es como nace un municipio
 // —creado antes de la visita, con la fundación por levantar— y así se puede ver
-// que la ficha se sostiene sin canal de donación. Bojayá tiene fundación pero sin
-// enlace, que es el otro caso frecuente: se coordina por WhatsApp.
+// que la ficha se sostiene sin canal de donación.
 // ---------------------------------------------------------------------------
 
 type FoundationSeed = Omit<Foundation, "id" | "city_id" | "created_at"> & { citySlug: string };
@@ -188,18 +222,6 @@ const foundationSeeds: FoundationSeed[] = [
     website: "",
     donation_url: "https://vaki.co/vaki/mar-y-selva",
     address: "Calle principal, al lado de la Capitanía",
-  },
-  {
-    citySlug: "bojaya",
-    name: "Comité de Víctimas de Bojayá",
-    description: "Organización histórica del municipio. Llevan el censo y la priorización de casos.",
-    contact_name: "Leonel Cuesta",
-    phone: "",
-    whatsapp: "3159992211",
-    email: "comitebojaya@correo.com",
-    website: "",
-    donation_url: "",
-    address: "Bellavista, casa comunal",
   },
 ];
 
@@ -305,26 +327,6 @@ const caseSeeds: CaseSeed[] = [
     consent_to_publish: true,
     published: true,
   },
-  {
-    citySlug: "bojaya",
-    display_name: "Familia Cuesta Bautista",
-    household: "6 personas, 3 niños y una señora con movilidad reducida",
-    story:
-      "La casa está en el sector alto de Bellavista y se agrietó el muro que da a la ladera. Con lluvia fuerte les preocupa que ceda.\n\nDoña Emérita se mueve en silla y la rampa de la entrada quedó partida. El comité los tiene priorizados en el censo.",
-    consent_to_publish: true,
-    published: true,
-  },
-  // Este caso no tenía fotos; ahora lleva un retrato de archivo para que la
-  // tarjeta no quede en iniciales. El borrador sin imagen es Familia Ibargüen.
-  {
-    citySlug: "bojaya",
-    display_name: "Don Aristides Mena",
-    household: "Vive con su hija y dos nietos",
-    story:
-      "La cocina y el baño quedaron separados de la casa por una grieta que atraviesa el piso. Siguen durmiendo dentro porque el resto de la vivienda aguantó.\n\nLo que pide es que alguien mire la grieta antes de que empiecen las lluvias fuertes.",
-    consent_to_publish: true,
-    published: true,
-  },
 ];
 
 /**
@@ -334,7 +336,7 @@ const caseSeeds: CaseSeed[] = [
  * `caseByName`, así que no pueden ir antes—, de modo que `demoCases` se termina
  * de armar en la sección de fotos. Aquí no falta nada más.
  */
-const caseRows: Omit<Case, "portrait_photo_id" | "donation_url">[] = caseSeeds.map((seed, index) => {
+const caseRows: Omit<Case, "portrait_photo_id" | keyof DonationColumns>[] = caseSeeds.map((seed, index) => {
   const { citySlug, created_at, updated_at, ...rest } = seed;
   return {
     id: demoId(CASE, index),
@@ -445,21 +447,6 @@ const needSeeds: NeedSeed[] = [
     quantity: "6 motores",
     status: "parcial",
   },
-  // Bojayá, zona
-  {
-    citySlug: "bojaya",
-    category: "techo",
-    title: "Cemento y varilla para muros de contención",
-    quantity: "80 bultos y 40 varillas",
-    urgent: true,
-  },
-  {
-    citySlug: "bojaya",
-    category: "ropa",
-    title: "Ropa de niño empacada por tallas",
-    details: "Solo si viene clasificada y empacada. No hay quien la organice aquí.",
-    status: "cubierta",
-  },
   // Casos
   {
     citySlug: "quibdo",
@@ -536,21 +523,6 @@ const needSeeds: NeedSeed[] = [
     title: "Madera para tres pilotes y reparación del motor de la lancha",
     urgent: true,
   },
-  {
-    citySlug: "bojaya",
-    caseName: "Familia Cuesta Bautista",
-    category: "techo",
-    title: "Rampa de acceso y refuerzo del muro de la ladera",
-    details: "Doña Emérita se desplaza en silla de ruedas.",
-    urgent: true,
-  },
-  {
-    citySlug: "bojaya",
-    caseName: "Don Aristides Mena",
-    category: "techo",
-    title: "Revisión técnica de la grieta que atraviesa el piso",
-    details: "Antes de que empiecen las lluvias fuertes. Un maestro de obra del pueblo sirve.",
-  },
 ];
 
 export const demoNeeds: Need[] = needSeeds.map((seed, index) => ({
@@ -594,8 +566,6 @@ const photoSeeds: PhotoSeed[] = [
   { citySlug: "bahia-solano", image: "choco-costa", caption: "La playa de El Valle." },
   { citySlug: "bahia-solano", image: "choco-palafitos", caption: "Palafitos sobre el estero." },
   { citySlug: "bahia-solano", image: "choco-canoas", caption: "Las lanchas de los pescadores." },
-  { citySlug: "bojaya", image: "choco-pueblo", caption: "Bellavista vista desde el río." },
-  { citySlug: "bojaya", image: "choco-selva", caption: "La selva que rodea el casco urbano." },
 
   { citySlug: "quibdo", caseName: DANIELA, image: "choco-pueblo", caption: "La cuadra donde estaba la casa de Daniela." },
   { citySlug: "quibdo", caseName: DANIELA, image: "choco-edificio", caption: "El coliseo del barrio, cerca de donde duermen ahora." },
@@ -656,12 +626,6 @@ const photoSeeds: PhotoSeed[] = [
     image: "choco-canoas",
     caption: "Las lanchas del pueblo, cuando el mecánico revisó el motor.",
   },
-  {
-    citySlug: "bojaya",
-    caseName: "Don Aristides Mena",
-    image: "choco-camino",
-    caption: "La subida a la casa, el día que se midió la grieta.",
-  },
   { citySlug: "quibdo", caseName: "Doña Bernarda Rentería", image: "choco-pueblo", caption: "La cuadra de doña Bernarda." },
   { citySlug: "quibdo", caseName: "Doña Bernarda Rentería", image: "choco-camino", caption: "El camino hasta su casa." },
   { citySlug: "quibdo", caseName: "Doña Bernarda Rentería", image: "persona-bernarda", caption: "Retrato de archivo, para la demostración." },
@@ -676,10 +640,6 @@ const photoSeeds: PhotoSeed[] = [
   { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "choco-palafitos", caption: "Su palafito, sobre el estero." },
   { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "choco-canoas", caption: "La lancha con la que pescan." },
   { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "persona-wilmar", caption: "Retrato de archivo, para la demostración." },
-  { citySlug: "bojaya", caseName: "Familia Cuesta Bautista", image: "choco-pueblo", caption: "Bellavista, donde viven." },
-  { citySlug: "bojaya", caseName: "Familia Cuesta Bautista", image: "choco-camino", caption: "La subida hasta la casa." },
-  { citySlug: "bojaya", caseName: "Familia Cuesta Bautista", image: "persona-cuesta", caption: "Retrato de archivo, para la demostración." },
-  { citySlug: "bojaya", caseName: "Don Aristides Mena", image: "persona-aristides", caption: "Retrato de archivo, para la demostración." },
 ];
 
 export const demoPhotos: Photo[] = photoSeeds.map((seed, index) => ({
@@ -712,18 +672,29 @@ const portraitSeeds: Record<string, string> = {
   "Familia Perea Córdoba": "persona-perea",
   "Yeison Córdoba y su hermana": "persona-tia",
   "Familia Klinger Valencia": "persona-wilmar",
-  "Familia Cuesta Bautista": "persona-cuesta",
-  "Don Aristides Mena": "persona-aristides",
 };
 
-const donationSeeds: Record<string, string> = {
-  "Familia Mosquera Palacios": "https://vaki.co/vaki/mosquera-palacios",
-  "Familia Klinger Valencia": "https://vaki.co/vaki/klinger-valle",
+/**
+ * Dos familias con canal propio y cinco sin ninguno, que es la proporción real:
+ * lo normal es no tener a dónde recibir todavía, y la ficha tiene que sostenerse
+ * diciéndolo. Una con llave y otra con enlace, para poder ver los dos formatos.
+ *
+ * El dominio es `ejemplo.org` y no una plataforma de recaudación de verdad. Ya
+ * hubo que vaciar enlaces de muestra que apuntaban a campañas vivas de terceros:
+ * un enlace inventado que existe manda dinero a alguien que no lo pidió.
+ */
+const caseChannels: Record<string, DonationColumns> = {
+  "Familia Mosquera Palacios": keyChannel(
+    "@mosquera-muestra",
+    "Nequi",
+    "Yeimy Palacios (muestra)",
+  ),
+  "Familia Klinger Valencia": linkChannel("https://ejemplo.org/klinger-valle"),
 };
 
 export const demoCases: Case[] = caseRows.map((row) => ({
   ...row,
-  donation_url: donationSeeds[row.display_name] ?? "",
+  ...(caseChannels[row.display_name] ?? NO_CHANNEL),
   portrait_photo_id:
     demoPhotos.find(
       (photo) =>
@@ -835,13 +806,6 @@ const updateSeeds: UpdateSeed[] = [
     title: "El motor se puede recuperar",
     body: "Lo revisó el mecánico del pueblo. Piden madera para los pilotes y el arreglo.",
     photoCaption: "Las lanchas del pueblo, cuando el mecánico revisó el motor.",
-  },
-  {
-    caseName: "Don Aristides Mena",
-    happenedOn: "2026-08-11",
-    title: "Se midió la grieta",
-    body: "Atraviesa cocina y baño. Se espera un maestro de obra antes de las lluvias fuertes.",
-    photoCaption: "La subida a la casa, el día que se midió la grieta.",
   },
 ];
 
@@ -1003,6 +967,58 @@ const offerSeeds: OfferSeed[] = [
       "No hay bodega ni gente para clasificar. Se le explicó y quedó en mandar solo ropa de niño empacada por tallas.",
     citySlug: "quibdo",
   },
+  // Las dos siguientes existen para que el registro de lo prometido se pueda ver
+  // lleno en el portal de muestra. Sin ellas todo lo que sale allí es una promesa
+  // sin confirmar y con el nombre oculto, así que ni la distinción entre las dos
+  // fiabilidades ni el recorte del texto se verían nunca en pantalla.
+
+  // Aceptada y sin fecha de entrega: es la única combinación que sale como
+  // «confirmada», y con autorización, la única que además va con nombre.
+  {
+    offerer_name: "Transportes del Atrato",
+    offerer_contact: "3172224455",
+    resource: "Camión de 5 toneladas, un viaje al mes",
+    category: "transporte",
+    message: "Ya hablamos con Yeimy. Reservamos un viaje al mes hasta diciembre.",
+    status: "aceptada",
+    team_notes: "Acordado por teléfono el lunes. El primer viaje se coordina la semana entrante.",
+    citySlug: "quibdo",
+    publishName: true,
+  },
+  // Y el atajo que el registro tiene que tapar: el teléfono metido dentro de la
+  // descripción, que es lo que hace la gente cuando el formulario no publica su
+  // contacto. En el portal de muestra sale como «[número oculto]».
+  {
+    offerer_name: "Vidrios y Aluminios Chocó",
+    offerer_contact: "3141119988",
+    resource: "80 láminas de policarbonato, llámame al 314 111 9988",
+    category: "techo",
+    message: "Prefiero que me llamen directo, no manejo correo.",
+    citySlug: "istmina",
+  },
+  // Y la que enseña el recorte nuevo: una oferta dirigida a una familia, todavía
+  // esperando, que en el portal de muestra sale SIN su descripción.
+  //
+  // El texto está escrito a propósito como lo escribiría alguien que acaba de leer
+  // la ficha: nombra el albergue y cuenta a quién hay en la casa. Eso es lo que la
+  // vista no publica y lo que hace falta ver aquí para entender por qué —con «300
+  // bloques y 15 bultos de cemento» el recorte parecería una exageración—. La fila
+  // sigue saliendo, porque «Techo, en Quibdó, sin confirmar» es lo que permite que
+  // alguien ponga el transporte que le falta.
+  //
+  // Pendiente y no aceptada para no mover la proporción de la muestra: el registro
+  // tiene que leerse como lo que es, un muro donde casi nada está confirmado
+  // todavía, y una sola fila confirmada es lo que hace visible la diferencia sin
+  // sugerir que el equipo va al día.
+  {
+    offerer_name: "Aserradero San Pacho",
+    offerer_contact: "3196663322",
+    resource: "Madera y láminas para la casa de la señora que duerme en el coliseo con las tres niñas",
+    category: "techo",
+    message:
+      "Leímos la ficha de la familia en el portal. Ponemos la madera y las láminas, pero no tenemos con qué llevarlas hasta allá.",
+    caseName: "Familia Mosquera Palacios",
+  },
 ];
 
 export const demoOffers: Offer[] = offerSeeds.map((seed, index) => {
@@ -1131,6 +1147,9 @@ function summarizeCase(row: Case): CaseSummary {
   return {
     ...row,
     coverPath: coverOf(photos),
+    coverFrame: savedFrame(
+      [...photos].sort((a, b) => a.sort_order - b.sort_order)[0] ?? null,
+    ),
     // La misma regla que en la capa de datos de verdad: el retrato se busca entre
     // las fotos de este caso y no por identificador contra todas, así que ningún
     // puntero descolocado puede acabar enseñando la cara de otra familia.
@@ -1272,38 +1291,33 @@ export function demoNeedCards(): NeedCard[] {
   );
 }
 
-export function demoFoundationEntries(): FoundationEntry[] {
-  return publishedCities()
-    .flatMap((city) =>
-      demoFoundations
-        .filter((foundation) => foundation.city_id === city.id)
-        .map((foundation) => ({ ...foundation, cityName: city.name, citySlug: city.slug })),
-    )
-    .sort((a, b) => a.cityName.localeCompare(b.cityName, "es"));
+/** Los municipios publicados, con foto, canal y fundación. Igual que en
+ *  producción: salen todos, tengan o no canal. */
+export function demoCityDonationEntries(): CityDonationEntry[] {
+  return publishedCities().map((city) => {
+    const covers = demoPhotos.filter((photo) => photo.city_id === city.id && photo.case_id === null);
+    const first = [...covers].sort((a, b) => a.sort_order - b.sort_order)[0];
+    return {
+      city,
+      channel: donationChannel(city),
+      foundation: demoFoundations.find((row) => row.city_id === city.id) ?? null,
+      coverPath: first?.storage_path ?? null,
+      coverFrame: savedFrame(first ?? null),
+    };
+  });
 }
 
-/**
- * La llave de transferencia del portal de muestra, y es inventada a propósito.
- *
- * La llave de verdad vive en un solo sitio: la fila de `public.donation_key`, que
- * escribe la migración 0010 y que cambia coordinación desde el panel. Copiarla
- * aquí la convertiría en dos sitios, y el segundo no se cambia desde ningún
- * panel: el día que la llave cambiara, este archivo se quedaría enseñando la
- * vieja a cualquiera que abriera el portal sin claves. Una llave caducada
- * enseñada como buena es dinero perdido, así que la de muestra se ve de lejos que
- * lo es.
- *
- * Lleva el nombre y la app puestos porque es también la pantalla de referencia:
- * es donde se comprueba cómo queda el bloque con los tres datos escritos.
- */
-export function demoDonationKey(): DonationKey {
-  return {
-    value: "@ejemplo",
-    app: "Nequi",
-    holder: "Fundación Atrato Vive (muestra)",
-    updatedAt: day(14),
-    updatedBy: teamSeeds[0].email,
-  };
+/** El repaso de dinero del panel, con la misma regla que en producción: se
+ *  arman con `moneyDestinationsOf`, así que la lista de muestra no puede contar
+ *  una cosa distinta de la de verdad. */
+export function demoMoneyDestinations(): MoneyDestination[] {
+  return demoCities.flatMap((city) =>
+    moneyDestinationsOf(
+      city,
+      demoFoundations.find((row) => row.city_id === city.id) ?? null,
+      demoCases.filter((row) => row.city_id === city.id),
+    ),
+  );
 }
 
 export function demoAdminCities(): AdminCityRow[] {
@@ -1413,6 +1427,106 @@ export function demoAidRecords(): AidRecord[] {
 }
 
 // ---------------------------------------------------------------------------
+// Registro público de lo prometido
+//
+// Reproduce lo que hace la vista `public.offer_log`: solo lo pendiente y lo
+// aceptado que todavía no ha llegado, solo de municipios publicados, el texto sin
+// publicar cuando la oferta iba dirigida a una familia y con los teléfonos y los
+// correos tapados cuando sí sale, la categoría contra el vocabulario
+// cerrado, el municipio y no el caso, el nombre únicamente con la oferta aceptada
+// y autorización, y nunca el contacto ni el mensaje —que aquí ni se copian—. Si
+// esa vista cambia, esto cambia con ella.
+// ---------------------------------------------------------------------------
+
+/**
+ * El texto con los contactos tapados, igual que hacen los dos `regexp_replace`
+ * de la vista y en el mismo orden: primero las palabras con arroba —el correo
+ * entero, y también el «@usuario» de una red social— y después las tiradas de
+ * siete dígitos o más, contando los separados por espacios o guiones.
+ *
+ * Esto NO es la garantía: la garantía está en 0012, porque la vista es la API y
+ * aquí no hay ninguna. Es la copia que hace que el portal de muestra se comporte
+ * como el de verdad, incluido lo que NO se tapa: «600 tejas de zinc de 2,44 m»
+ * sale entero, que es la mitad del recorte que se rompe sin que se note.
+ */
+function publicResource(resource: string): string {
+  return resource
+    .replace(/\S*@\S*/g, "[contacto oculto]")
+    .replace(/\+?\d(?:[- ]?\d){6,}/g, "[número oculto]");
+}
+
+/**
+ * El día en Colombia del instante en que se ofreció algo, que es el que publica
+ * la vista. Restar cinco horas y leer la fecha en UTC vale porque Colombia no
+ * cambia de hora: no hay verano que corrija.
+ */
+function bogotaDay(iso: string): string {
+  return new Date(Date.parse(iso) - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/**
+ * Las ocho semanas de caducidad, medidas desde la oferta más reciente de la
+ * muestra y no desde hoy.
+ *
+ * Los datos de muestra son una foto fija de agosto de 2026. Medidos contra el
+ * reloj de verdad, la sección se vaciaría entera en cuanto pasara octubre y quien
+ * abriera el portal sin claves configuradas lo leería como una avería —que es
+ * justo lo que el modo de muestra existe para no provocar—. El corte es el mismo
+ * y sigue estando; lo que cambia es desde dónde se mide.
+ */
+const demoOfferCutoff = () =>
+  Math.max(...demoOffers.map((offer) => Date.parse(offer.created_at))) -
+  8 * 7 * 24 * 60 * 60 * 1000;
+
+export function demoOfferRecords(): OfferRecord[] {
+  const openCityIds = new Set(publishedCities().map((city) => city.id));
+  const cutoff = demoOfferCutoff();
+
+  return demoOffers
+    .filter(
+      (offer) =>
+        (offer.status === "pendiente" || offer.status === "aceptada") &&
+        // Lo que llegó sale de aquí y aparece en `demoAidRecords`. Las dos listas
+        // se reparten las ofertas por esta misma línea y no se solapan nunca.
+        offer.delivered_on === null &&
+        (offer.city_id === null || openCityIds.has(offer.city_id)) &&
+        Date.parse(offer.created_at) > cutoff,
+    )
+    .map((offer) => {
+      const city = demoCities.find((row) => row.id === offer.city_id && row.published) ?? null;
+      const need = publicNeed(offer.need_id);
+
+      return {
+        id: offer.id,
+        category: publicCategory(offer.category),
+        // El texto solo si la oferta no iba dirigida a una familia, igual que el
+        // `case` de la vista y por lo que allí está escrito: la frase la escribió
+        // alguien que tenía la ficha delante, así que puede describirla. La fila se
+        // queda, que es lo que permite completarla; la frase, no.
+        //
+        // La vista mira además la necesidad, por si algún día se guarda solo ésa.
+        // Aquí no hace falta: `demoOffers` copia el caso de la necesidad al armar
+        // la oferta, así que una oferta contra la necesidad de un caso ya llega con
+        // `case_id` puesto y esta línea la coge igual.
+        resource: offer.case_id === null ? publicResource(offer.resource) : null,
+        offered_on: bogotaDay(offer.created_at),
+        state: offer.status === "aceptada" ? ("confirmada" as const) : ("sin_confirmar" as const),
+        // La condición que `demoAidRecords` no tiene: con la oferta pendiente no
+        // hay nombre aunque esté autorizado, porque nadie del equipo ha hablado
+        // todavía con esa persona.
+        offerer_name: offer.status === "aceptada" ? publishableName(offer) : null,
+        city_name: city?.name ?? null,
+        city_slug: city?.slug ?? null,
+        need_title: need?.title ?? null,
+      };
+    })
+    // Lo más reciente arriba, que es la promesa que más probablemente siga en
+    // pie, y el identificador para desempatar: el mismo orden que pide la
+    // consulta de verdad.
+    .sort((a, b) => b.offered_on.localeCompare(a.offered_on) || a.id.localeCompare(b.id));
+}
+
+// ---------------------------------------------------------------------------
 // El equipo
 //
 // La sesión de muestra es de coordinación para que el panel se pueda recorrer
@@ -1428,7 +1542,7 @@ const teamSeeds: TeamSeed[] = [
     email: "yeimy@chocoup.org",
     nombre: "Yeimy Palacios",
     role: "documentacion",
-    cities: ["quibdo", "bojaya"],
+    cities: ["quibdo"],
   },
   {
     email: "alberto@chocoup.org",

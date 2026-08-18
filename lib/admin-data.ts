@@ -2,15 +2,18 @@ import { createSupabaseServerClient } from "./supabase/server";
 import { isDemoMode } from "./supabase/env";
 import {
   demoAdminCities,
-  demoDonationKey,
+  demoMoneyDestinations,
   demoNeedOptions,
   demoOffersFor,
   demoTeamDirectory,
 } from "./demo-data";
+import { embeddedFoundation } from "./data";
+import { moneyDestinationsOf, type MoneyDestination } from "./donation-channel";
 import type {
   AdminCityRow,
+  Case,
   City,
-  DonationKey,
+  Foundation,
   NeedOption,
   OfferStatus,
   OfferWithContext,
@@ -53,44 +56,45 @@ export async function getAdminCities(): Promise<AdminCityRow[]> {
 }
 
 /**
- * La llave de transferencia tal y como la edita coordinación.
+ * Todos los destinos de dinero que publica el portal, en una lista.
  *
- * Es la misma fila que lee `getDonationKey()` y se lee aparte por una diferencia
- * que importa: ahí una llave vacía se devuelve como nulo, para que ninguna página
- * pública pueda pintar el bloque de la llave sin llave dentro. Aquí la vacía hay
- * que verla, porque es el estado desde el que se escribe la primera y el que queda
- * después de retirar una comprometida.
+ * Existe por lo que se perdió al quitar la llave global: antes había un solo
+ * sitio donde mirar a dónde iba el dinero, y ahora hay uno por municipio, uno por
+ * caso y el de cada fundación. Eso es correcto —cada uno pertenece a alguien—
+ * pero deja de haber una pantalla que conteste «¿qué destinos estamos
+ * publicando?», y esa pregunta hay que poder hacerla de un vistazo: es la que
+ * detecta el canal que no debería estar ahí.
  *
- * Nulo aquí significa otra cosa: no hay fila, o sea que falta la migración 0010.
- * La pantalla lo dice con esas palabras en vez de ofrecer un formulario que no
- * puede guardar en ningún sitio.
+ * No se edita desde aquí. Cada destino se cambia en la ficha de quien lo recibe,
+ * que es donde está su nombre, su historia y su municipio delante; esta pantalla
+ * solo enseña y enlaza. Un formulario aquí sería un sitio más donde cambiar lo
+ * mismo, que es cómo se cambia el que no se quería cambiar.
+ *
+ * Se listan también los que no se ven todavía —un municipio sin publicar, un caso
+ * en borrador—, marcados como tales: un destino escrito en una ficha que aún no
+ * sale es justo lo que conviene revisar antes de que salga.
  */
-export async function getDonationKeyRow(): Promise<DonationKey | null> {
-  if (isDemoMode()) return demoDonationKey();
+export async function getMoneyDestinations(): Promise<MoneyDestination[]> {
+  if (isDemoMode()) return demoMoneyDestinations();
   const supabase = await createSupabaseServerClient();
 
-  type Row = {
-    key_value: string;
-    app_label: string;
-    holder: string;
-    updated_at: string;
-    updated_by: string;
-  };
-
   const { data } = await supabase
-    .from("donation_key")
-    .select("key_value, app_label, holder, updated_at, updated_by")
-    .maybeSingle<Row>();
+    .from("cities")
+    .select("*, foundations(name, donation_url), cases(*)")
+    .order("name");
 
-  if (!data) return null;
-
-  return {
-    value: data.key_value,
-    app: data.app_label,
-    holder: data.holder,
-    updatedAt: data.updated_at,
-    updatedBy: data.updated_by,
+  type EmbeddedFoundation = Pick<Foundation, "name" | "donation_url">;
+  type Row = City & {
+    foundations: EmbeddedFoundation | EmbeddedFoundation[] | null;
+    cases: Case[];
   };
+
+  // `foundations` llega como objeto y no como lista: la restricción de una
+  // fundación por municipio hace que PostgREST lea la relación como de uno a uno.
+  // Ver `embeddedFoundation`, que acepta las dos formas.
+  return ((data ?? []) as Row[]).flatMap((city) =>
+    moneyDestinationsOf(city, embeddedFoundation(city.foundations), city.cases),
+  );
 }
 
 export async function getOffers(status?: OfferStatus): Promise<OfferWithContext[]> {

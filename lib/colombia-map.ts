@@ -5,18 +5,73 @@
  * prácticamente cualquiera fuera de Colombia. Va antes del esquema detallado del
  * departamento, como el recuadro de situación de un mapa impreso.
  *
- * Contorno de Colombia continental (100 puntos, sin San Andrés) y del Chocó
- * (Marco Geoestadístico Nacional del DANE, simplificado a 70 puntos): entre los
- * dos, unos 2 KB de SVG.
+ * Está dibujado en las coordenadas del mapa del Chocó (lib/choco-map.ts) y no en
+ * un marco propio. Tenía uno, y dentro una segunda silueta del departamento
+ * simplificada a 70 puntos: esa copia era el problema. Dos simplificaciones
+ * distintas del mismo borde no encajan por bien que se ajuste el acercamiento,
+ * así que el relevo entre los dos mapas se veía por más que se afinara el zoom.
+ * Ahora la silueta del Chocó es una sola —CHOCO_PATH, la que dibuja el mapa de
+ * verdad— y lo que cambió de marco fue el país.
+ *
+ * De regalo, el borde compartido dejó de ser dos líneas. El límite oeste y norte
+ * del departamento ES el borde de Colombia, y aquí el contorno del país sigue
+ * punto por punto al del Chocó en ese tramo: el verde llega exactamente hasta la
+ * costa en vez de desbordarla unas unidades y tener que recortarlo contra el
+ * país, que era lo que le daba el filo picado.
+ *
+ * Contorno de Colombia continental (sin San Andrés), del Marco Geoestadístico
+ * Nacional del DANE. La traducción de marco y el empalme los hizo
+ * scripts/build-colombia-outline.mjs, que también deja escrito cómo se dedujo la
+ * correspondencia entre los dos sistemas de coordenadas.
  */
 
-export const COLOMBIA_FRAME = { width: 433.2, height: 600 };
+import { VIEW_BOX } from "./choco-map";
 
 export const COLOMBIA_PATH =
-  "M132.7 445.5L118.0 437.4L101.1 425.9L91.4 431.4L62.2 426.6L53.8 411.8L47.4 412.4L13.0 392.7L8.3 382.0L21.2 379.4L19.6 362.1L27.7 349.6L44.8 347.3L59.2 325.7L72.4 307.6L59.7 299.4L66.2 279.4L58.5 247.8L65.8 238.8L60.4 209.6L46.5 191.3L50.9 174.5L62.0 177.0L68.5 166.7L60.5 146.4L64.6 141.4L82.4 142.5L108.2 118.4L122.4 114.8L122.7 103.4L129.0 74.2L148.8 58.2L170.4 57.6L173.2 50.4L200.1 53.3L227.1 35.9L240.5 28.1L257.2 11.5L269.4 13.7L278.4 22.7L271.7 34.3L249.6 40.1L240.9 57.3L227.6 67.2L217.6 80.0L213.4 104.6L203.9 124.8L221.6 127.1L226.0 143.0L233.6 150.5L236.3 164.4L232.2 177.2L233.4 184.4L241.9 187.2L250.1 199.3L294.3 196.0L314.3 200.3L338.5 230.0L352.4 226.3L377.2 228.2L396.8 224.2L408.9 230.2L402.7 248.7L395.0 260.3L392.4 285.0L399.3 307.9L409.0 318.2L410.2 325.9L392.8 343.1L405.3 350.7L414.4 362.7L424.9 397.1L418.4 401.3L411.7 381.0L402.2 370.1L390.8 381.9L323.8 381.2L324.2 402.7L344.4 406.3L343.2 419.5L336.3 415.9L317.0 421.6L316.8 446.7L332.0 459.2L337.4 479.0L336.6 493.9L321.2 588.5L303.9 570.1L293.7 569.3L315.9 534.2L289.5 518.1L268.9 521.1L256.5 515.1L237.5 524.2L211.9 519.9L191.7 483.7L175.7 474.9L164.8 458.6L141.9 442.3L132.7 445.5Z";
+  "M524.1 1802.3L438.6 1755.0L340.3 1687.7L283.9 1719.9L114.0 1691.8L65.2 1605.3L28.0 1608.8L-172.1 1493.6L-199.4 1431.1L-124.4 1415.9L-133.7 1314.7L-86.6 1241.6L12.8 1228.2L96.6 1101.9L173.4 996.0L109.4 954.5L109.1 956.9L94.0 939.2L96.1 908.6L102.4 905.7L102.0 912.7L114.4 907.0L110.3 902.0L130.4 878.5L133.4 816.9L139.1 814.4L129.6 807.5L133.1 804.3L124.1 771.9L116.4 682.5L121.1 674.3L113.1 674.9L109.1 665.8L91.2 665.3L101.2 641.3L131.4 638.8L148.1 613.3L132.0 562.1L102.6 523.6L107.7 507.7L119.3 516.3L125.1 490.9L117.0 485.7L127.0 481.0L124.4 475.8L134.0 451.9L119.6 437.5L118.2 424.5L107.4 420.3L96.0 430.3L81.9 397.9L66.5 386.5L59.0 391.5L57.7 380.3L67.9 367.8L66.7 361.3L22.5 317.2L40.6 268.5L50.8 267.6L58.6 258.8L49.7 239.4L53.3 221.3L69.7 229.9L77.7 252.4L85.4 259.0L94.3 246.2L100.6 247.1L105.7 229.4L109.8 229.4L120.8 208.4L130.1 207.9L126.3 195.2L134.2 181.0L167.3 173.7L153.1 149.2L153.7 132.6L137.9 103.1L129.2 100.4L127.3 79.4L118.7 64.2L109.8 63.4L111.0 48.1L120.9 42.0L117.3 30.6L124.0 29.2L128.0 24.3L231.5 30.7L381.6 -110.2L464.2 -131.2L465.9 -197.9L502.5 -368.6L617.7 -462.2L743.3 -465.7L759.6 -507.8L916.1 -490.8L1073.1 -592.6L1151.0 -638.2L1248.1 -735.2L1319.1 -722.4L1371.4 -669.8L1332.5 -601.9L1203.9 -568.0L1153.3 -467.4L1076.0 -409.6L1017.8 -334.7L993.4 -190.9L938.2 -72.8L1041.1 -59.3L1066.7 33.6L1110.9 77.5L1126.6 158.8L1102.7 233.6L1109.7 275.7L1159.2 292.1L1206.8 362.8L1463.9 343.5L1580.2 368.7L1721.0 542.3L1801.8 520.7L1946.1 531.8L2060.0 508.4L2130.4 543.5L2094.4 651.7L2049.6 719.5L2034.5 863.9L2074.6 997.8L2131.0 1058.0L2138.0 1103.0L2036.8 1203.6L2109.5 1248.0L2162.4 1318.2L2223.5 1519.3L2185.7 1543.9L2146.7 1425.2L2091.4 1361.5L2025.1 1430.5L1635.5 1426.4L1637.8 1552.1L1755.3 1573.1L1748.3 1650.3L1708.2 1629.3L1595.9 1662.6L1594.8 1809.4L1683.2 1882.4L1714.6 1998.2L1709.9 2085.3L1620.4 2638.4L1519.7 2530.9L1460.4 2526.2L1589.5 2321.0L1436.0 2226.8L1316.2 2244.4L1244.1 2209.3L1133.6 2262.5L984.7 2237.3L867.2 2025.7L774.1 1974.2L710.7 1878.9L577.6 1783.6L524.1 1802.3Z";
 
-export const CHOCO_IN_COLOMBIA_PATH =
-  "M77.5 155.7L78.9 162.2L72.6 171.8L79.0 178.9L83.6 179.3L88.4 183.5L94.2 194.4L91.6 199.6L82.5 199.0L84.2 203.2L78.1 205.3L78.1 209.8L84.8 217.2L84.2 223.4L86.4 227.3L104.0 227.1L105.2 232.9L109.4 235.1L108.2 244.2L111.0 246.4L104.1 255.9L109.1 263.9L108.1 269.8L100.6 276.6L100.1 281.6L97.3 283.9L98.5 285.5L92.2 288.6L95.6 297.4L91.8 302.8L87.7 303.6L78.4 298.3L69.2 297.0L67.7 294.4L61.8 297.4L61.3 301.1L58.7 298.0L59.1 292.8L62.2 292.5L65.0 287.6L66.5 276.6L63.9 269.4L63.4 252.6L58.2 251.1L60.0 247.0L65.2 246.6L68.0 242.2L60.2 226.8L61.1 224.1L63.1 225.6L62.7 220.3L65.6 214.5L62.9 209.8L59.1 210.8L56.6 205.3L52.7 204.2L54.0 199.0L46.4 191.4L49.5 183.1L52.6 181.4L51.7 175.0L57.2 181.5L64.9 172.7L65.6 168.1L71.3 166.8L61.4 147.9L62.7 142.3L64.6 141.9L68.3 148.3L77.5 155.7Z";
+/**
+ * Encuadre del país. Enorme comparado con el del departamento —Colombia mide
+ * unas 2.400 unidades de ancho donde el Chocó mide 375— porque las unidades son
+ * ahora las del mapa detallado y no las de un marco propio normalizado.
+ *
+ * El aire alrededor del dibujo es el mismo que tenía en su marco viejo, un
+ * 1,92 % a cada lado, para que /mapa?ver=colombia se siga viendo igual que
+ * antes de mudarse de coordenadas.
+ */
+export const COLOMBIA_VIEW = { minX: -247.7, minY: -802.5, width: 2519.5, height: 3508.2 };
+
+export const colombiaViewBoxAttr = `${COLOMBIA_VIEW.minX} ${COLOMBIA_VIEW.minY} ${COLOMBIA_VIEW.width} ${COLOMBIA_VIEW.height}`;
 
 /** Centro visual del Chocó en este marco, para colocar la etiqueta. */
-export const CHOCO_LABEL_ANCHOR = { x: 75.5, y: 227.8 };
+export const CHOCO_LABEL_ANCHOR = { x: 191.4, y: 529.5 };
+
+/**
+ * De dónde arranca el acercamiento de la apertura.
+ *
+ * La apertura dibuja el localizador dentro del encuadre del mapa del Chocó —el
+ * mismo viewBox, el mismo tamaño en pantalla— y lo lleva de este estado a no
+ * transformar nada. Ese final no es una escala afinada a ojo: es la identidad,
+ * así que el departamento de la apertura acaba exactamente sobre el del mapa,
+ * salga la pantalla que salga, sin depender de la proporción de la ventana.
+ *
+ * El estado inicial es el que mete el país entero en ese encuadre con el mismo
+ * aire que tiene en su propia vista, centrado. Se calcula a partir de los dos
+ * encuadres en vez de dejar un par de números en el CSS: el día que cambie el
+ * margen del mapa del Chocó, esto se mueve solo.
+ */
+const zoomScale = Math.min(VIEW_BOX.width / COLOMBIA_VIEW.width, VIEW_BOX.height / COLOMBIA_VIEW.height);
+
+/** Lo que hay que desplazar para que, a esa escala, el centro del país caiga
+ *  donde el encuadre del mapa tiene el suyo. El del Chocó ya está ahí: su caja
+ *  está centrada en el viewBox del mapa, y por eso al terminar no hace falta
+ *  corregir nada. */
+const zoomShift = {
+  x: -zoomScale * (COLOMBIA_VIEW.minX + COLOMBIA_VIEW.width / 2 - (VIEW_BOX.minX + VIEW_BOX.width / 2)),
+  y: -zoomScale * (COLOMBIA_VIEW.minY + COLOMBIA_VIEW.height / 2 - (VIEW_BOX.minY + VIEW_BOX.height / 2)),
+};
+
+export const INTRO_ZOOM_FROM = {
+  scale: zoomScale.toFixed(4),
+  shift: `${zoomShift.x.toFixed(1)}px ${zoomShift.y.toFixed(1)}px`,
+};

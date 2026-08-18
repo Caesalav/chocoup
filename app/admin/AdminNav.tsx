@@ -15,10 +15,11 @@ import type { TeamRole } from "@/lib/types";
  * datos lo vuelve a comprobar—, pero ofrecer una puerta que solo puede devolver un
  * error tampoco ayuda.
  *
- * "Dinero" y no "Donaciones": en el portal público «Donaciones» es la pantalla de
- * las fundaciones y sus enlaces, y aquí detrás hay una cosa distinta —la llave a la
- * que transfiere quien dona, una para todo—. Dos entradas con el mismo rótulo y
- * distinto contenido es cómo se cambia la que no se quería cambiar.
+ * "Dinero" y no "Donaciones": en el portal público «Donaciones» es la pantalla
+ * desde la que se dona, y aquí detrás hay una cosa distinta —el repaso de todos
+ * los destinos que el portal publica, que no se editan ahí sino en la ficha de
+ * quien los recibe—. Dos entradas con el mismo rótulo y distinto contenido es cómo
+ * se cambia la que no se quería cambiar.
  *
  * Es cliente por `usePathname`, y por lo mismo que las dos barras del portal
  * público: Next la pinta también en el servidor, así que el HTML ya llega con la

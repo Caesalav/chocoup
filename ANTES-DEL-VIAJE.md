@@ -15,15 +15,14 @@ después, vuelve a preguntarle a la base**: al final hay dos consultas para eso.
 
 Comprobado, no supuesto:
 
-- [ ] **Pegar `0010`**, que es lo que publica la llave `@soschoco` y lo único que
-      hoy permite enviar dinero a algo. Ver
-      [La llave de transferencia](#la-llave-de-transferencia).
-- [ ] **Poner la app y el titular de la llave** en `/admin/donaciones`. La llave
-      sola funciona; sin esos dos campos, quien dona no sabe en qué app pegarla ni
-      qué nombre tiene que ver antes de confirmar.
-- [ ] **Ninguna fundación en ninguna parte.** Ya no es lo único que impide que el
-      dinero tenga a dónde ir —la llave no depende de ella—, pero sigue faltando
-      para que cada municipio tenga su propio canal.
+- [ ] **El titular del canal de Daniela.** Su canal es `@soschoco` y está
+      publicado, pero sin app y sin titular: no constan y no se han inventado.
+      Quien dona no sabe en qué app pegarlo ni qué nombre tiene que ver antes de
+      confirmar, que es su única defensa. Se rellena en su ficha del panel. Ver
+      [Los canales de donación](#los-canales-de-donación).
+- [ ] **Quibdó no tiene canal propio de municipio ni fundación.** Su ficha lo dice
+      con esas palabras. Lo que sí tiene es el canal del caso de Daniela, que es de
+      ella y solo sale en su ficha.
       Ver [Que el portal se vea](#que-el-portal-se-vea).
 - [ ] **Una sola cuenta del equipo**, la de coordinación. Nadie ha entrado nunca con
       el rol de documentación contra esta base de datos. Ver
@@ -36,81 +35,121 @@ Comprobado, no supuesto:
 - [ ] **El circuito de ofertas nunca se ha recorrido aquí**: cero ofertas, cero
       entregas, `/ayudas` vacío.
 
-Lo que sí está: las nueve migraciones aplicadas, un municipio publicado (Quibdó) y
+Lo que sí está: las once migraciones aplicadas, un municipio publicado (Quibdó) y
 un caso real publicado y con consentimiento, con retrato, doce fotos con sus
-miniaturas en Storage, cinco avances con foto y dos necesidades.
+miniaturas en Storage, cinco avances con foto, dos necesidades y su canal de
+donación propio.
 
 ---
 
-## La llave de transferencia
+## Los canales de donación
 
-`@soschoco`. Es a dónde transfiere quien quiere dar dinero, y es **una para todo el
-portal**: la misma en `/donaciones`, en la ficha de cada municipio y en la de cada
-caso.
+**No hay ningún canal común.** Cada municipio tiene el suyo y cada caso el suyo, y
+quien no tiene ninguno lo dice con esas palabras en su ficha. Un canal puede ser
+una **llave de transferencia** (`@soschoco`, que se copia y se pega en la app del
+banco) o un **enlace de recaudación** (una Vaki, que se pulsa), nunca las dos cosas
+a la vez.
 
-### Cómo se cambia
+Aquí hubo una llave global del portal, `@soschoco` para todo el Chocó, y **se
+retiró**: `@soschoco` es el canal del caso de Daniela y de nadie más. Una llave
+global no era un dato de más, era un dato que mentía sobre a dónde iba el dinero.
 
-**Entra en `/admin/donaciones` y guárdala. Eso es todo.**
+### Dónde está cada uno
+
+| Canal | Dónde se edita | Dónde sale |
+| --- | --- | --- |
+| **De un municipio** | `/admin/ciudades/<slug>` | Su ficha pública y `/donaciones` |
+| **De un caso** | `/admin/ciudades/<slug>/casos/<id>` | Solo la ficha de esa familia |
+| **De una fundación** | `/admin/ciudades/<slug>`, en su formulario | Dentro de su tarjeta, bajo su nombre |
+
+Para verlos todos juntos, **`/admin/donaciones`**. Ya no edita nada: es el repaso de
+todos los destinos que el portal publica ahora mismo, con un enlace a la ficha
+donde se cambia cada uno. Es la pantalla que hay que abrir el día que el dinero
+aparezca donde no debe.
+
+### Cómo se cambia uno
+
+**Entra en la ficha de quien lo recibe, escribe el canal y guárdalo. Eso es todo.**
 
 No hay que editar ningún archivo, ni hacer commit, ni desplegar, ni volver al SQL
-Editor. Se cambia desde el móvil y el cambio sale en la siguiente carga de las tres
-pantallas. Está pensado así justo porque la llave va a cambiar con el equipo de
-viaje: **no está en el código a propósito**, porque una constante habría exigido un
+Editor. Se cambia desde el móvil y el cambio sale en la siguiente carga. Está
+pensado así justo porque estos destinos van a cambiar con el equipo de viaje:
+**no están en el código a propósito**, porque una constante habría exigido un
 despliegue y en el Chocó no va a haber quien lo haga.
 
-La pantalla es de coordinación y tiene tres campos:
+El formulario está aparte del resto de la ficha y tiene su propio botón, y eso es
+deliberado: cambiar a dónde va el dinero de alguien no puede ser un efecto de
+guardar su historia. Cuatro campos:
 
 | Campo | Qué hace si está | Qué pasa si falta |
 | --- | --- | --- |
-| **La llave** | Sale escrita entera y en grande | Sin ella el portal no ofrece la sección en ninguna pantalla |
-| **En qué app se usa** | «Bre-B», «Nequi»… al lado de la llave y en los pasos | El portal dice «tu app de banco o billetera»: es cierto, pero hace dudar |
+| **La llave** | Sale escrita entera y en grande, para copiarla | Sin ella ni enlace, la ficha dice que todavía no hay a dónde enviar |
+| **…o el enlace** | Sale como botón «Donar dinero», con el destino escrito debajo | Lo mismo |
+| **En qué app se usa la llave** | «Bre-B», «Nequi»… al lado de la llave y en los pasos | El portal dice «tu app de banco o billetera»: es cierto, pero hace dudar |
 | **A nombre de quién aparece** | El portal pide comprobar ese nombre antes de confirmar | Se le pide mirarlo igual, sin decirle cuál es la respuesta correcta |
 
-Ese tercer campo es la única defensa de quien dona: `@soschoco` no dice nada por sí
+Los dos primeros son excluyentes. **Rellena uno**: con los dos escritos el
+formulario se niega a guardar, y con razón, porque no habría forma de saber cuál
+recibe. La base de datos lo rechaza igual.
+
+Ese último campo es la única defensa de quien dona: `@soschoco` no dice nada por sí
 mismo, y el nombre que le sale en la app antes de confirmar sí. **Escríbelo
 exactamente como lo muestra la app**, y si no lo sabes con seguridad, déjalo vacío
 antes que poner uno aproximado —un nombre que no coincide enseña a ignorar la
 comprobación—.
 
-### Si la llave se compromete
+### Si un canal se compromete
 
-**Vacía el campo de la llave y guarda.** En la misma petición las tres pantallas
-dejan de ofrecerla. No hace falta tener a mano la siguiente ni esperar a nadie: eso
-es lo primero, y se hace en veinte segundos.
+**Vacía los dos campos y guarda.** En la misma petición esa ficha deja de ofrecerlo
+y pasa a decir que todavía no hay a dónde enviar. No hace falta tener a mano el
+siguiente ni esperar a nadie: eso es lo primero, y se hace en veinte segundos.
 
-### Quién puede tocarla, y qué queda escrito
+### Quién puede tocarlos
 
-Solo coordinación, comprobado en tres capas independientes: la pantalla, la Server
-Action y la política `donation_key_coordination`, que rechaza el cambio aunque la
-llamada llegue desde fuera de la web con una sesión de documentación. **Nadie
-—tampoco coordinación— puede crear una segunda llave ni borrar la fila**: no hay
-política que lo permita ni permiso de tabla que lo conceda.
+Solo coordinación, comprobado en tres capas independientes: la ficha no ofrece el
+campo, la Server Action lo rechaza, y el disparador `guard_donation_channel` para el
+cambio aunque la llamada llegue desde fuera de la web con una sesión de
+documentación.
 
-Y la fila guarda **desde qué sesión se cambió**, con la fecha. Lo escribe un
-disparador desde el correo del token, así que no se puede firmar con el correo de
-otra persona ni dejar en blanco desde el formulario. Se lee al pie de
-`/admin/donaciones`, y es lo único que va a haber el día que el dinero aparezca en
-una cuenta que no es.
+**La tercera capa es la que importa aquí, y es distinta de la de las fundaciones.**
+Quien documenta un municipio *sí* puede editar sus casos —es su trabajo, y lo hace
+desde el móvil delante de la familia—, así que las políticas de fila dejan pasar la
+escritura entera y sin el disparador cambiar el canal sería una edición más de la
+ficha. El disparador mira el cambio y no el valor, de modo que esa misma persona
+sigue guardando la ficha completa con el canal ya puesto sin tropezar con él.
 
 ```sql
--- Qué llave está publicada ahora mismo, y quién la puso.
-select key_value, app_label, holder, updated_at, updated_by
-from public.donation_key;
+-- Todos los destinos de dinero que publica el portal ahora mismo.
+-- Es lo mismo que enseña /admin/donaciones.
+select 'municipio' as nivel, name as quien, donation_key, donation_url,
+       donation_app, donation_holder
+from public.cities where donation_key <> '' or donation_url <> ''
+union all
+select 'caso', display_name, donation_key, donation_url,
+       donation_app, donation_holder
+from public.cases where donation_key <> '' or donation_url <> ''
+union all
+select 'fundacion', name, '', donation_url, '', ''
+from public.foundations where donation_url <> '';
 ```
 
-### Lo que la llave no hace
+### Lo que un canal no hace
 
-Una transferencia a la llave **no va marcada a ninguna familia**. La ficha de un
-caso lo dice con esas palabras cuando la llave es lo único que hay, y no promete lo
-contrario: prometer que un aporte llega a una persona concreta sería lo único de
-esa pantalla que no podríamos sostener. Para que el dinero entre señalando a una
-familia hace falta la fundación de su municipio, o un destino propio del caso.
+**Nada se hereda.** Un caso sin canal propio no usa el de su municipio, ni el de su
+fundación, ni ninguno del portal: su ficha dice que todavía no hay a dónde enviarle.
+Puede parecer un hueco y es lo contrario: heredarlo mandaría el dinero a un sitio
+que nadie eligió para esa persona, y en silencio, porque quien lee su historia y
+transfiere cree estar dándole a ella.
+
+Si hace falta que un aporte llegue a una familia que no tiene canal, hay dos
+caminos y los dos pasan por una persona: escribirle por WhatsApp a la fundación del
+municipio —la ficha ofrece ese botón cuando la hay— o registrarle un canal propio.
 
 ---
 
 ## Migraciones
 
-Se pegan en el **SQL Editor** de Supabase, en este orden, y **son diez**:
+Se pegan en el **SQL Editor** de Supabase, en este orden, y **son once**:
 
 ```
 0001_init                        tablas, RLS y el bucket fotos
@@ -118,43 +157,46 @@ Se pegan en el **SQL Editor** de Supabase, en este orden, y **son diez**:
 0003_retrato_del_caso            qué foto de la persona es su retrato
 0004_una_fundacion_por_municipio una sola fundación por municipio
 0005_registro_sin_texto_libre    el registro publica la categoría, no el texto
-0006_seguimiento_del_caso        el diario fechado y el destino de donación del caso
+0006_seguimiento_del_caso        el diario fechado y el enlace de donación del caso
 0007_foto_del_avance             cada avance lleva una foto del propio caso
 0008_permiso_de_tabla_del_publico recorta el permiso de tabla de anon
 0009_encuadre_de_fotos           encuadre y zoom por foto
-0010_llave_de_transferencia      la llave del portal, con @soschoco dentro
+0010_llave_de_transferencia      SUPERADA: la llave global, que 0011 retira
+0011_canal_de_donacion           el canal de cada municipio y de cada caso
 seed.sql                         los 10 municipios, sin publicar
 ```
 
-`0010` es la que hace que hoy se pueda donar. Trae `@soschoco` escrita dentro, así
-que en cuanto se pegue la llave sale publicada en las tres pantallas sin tener que
-tocar nada más. **Volver a pegarla no devuelve la llave vieja**: el insert inicial
-lleva `on conflict do nothing` a propósito, porque un mantenimiento rutinario que
-reescribiera la llave mandaría las donaciones a una cuenta que ya no es y no daría
-ningún error. Ver [La llave de transferencia](#la-llave-de-transferencia).
+`0011` es la que hace que hoy se pueda donar. Añade a cada municipio y a cada caso
+su canal propio —llave o enlace—, deja que solo lo escriba coordinación y borra la
+llave global que había creado `0010`. Ver
+[Los canales de donación](#los-canales-de-donación).
 
 `0009` llegó después que las demás y **no es opcional**: `lib/data.ts` pide
 `focus_x`, `focus_y` y `zoom` por su nombre en los `select` de la ficha del
 municipio y de las listas de casos, así que una base con `0001`–`0008` deja esas
 pantallas sin casos y sin que se vea nada: el error viaja aparte y esas funciones
 solo leen los datos. Por eso está en la lista del arnés y tiene sus propias
-comprobaciones, y por eso el README la nombra con las otras ocho.
+comprobaciones, y por eso el README la nombra con las otras.
 
-`0010` falla de otra manera, más callada: sin ella la tabla no existe, la consulta
-devuelve nulo y las tres pantallas simplemente no pintan la sección de la llave.
-No hay error en ningún sitio. **Si la llave no aparece en ninguna pantalla, lo
-primero que hay que mirar es si `0010` está aplicada**; y en `/admin/donaciones` se
-ve de una vez, porque en ese caso la pantalla dice qué archivo falta en vez de
-ofrecer un formulario.
+`0011` falla de otra manera, más callada: sin ella las columnas no existen, la
+consulta devuelve nulo y las fichas dicen que nadie tiene canal. No hay error en
+ningún sitio. **Si ninguna ficha ofrece a dónde enviar dinero, lo primero que hay
+que mirar es si `0011` está aplicada.**
 
 Todas se pueden volver a pegar sin romper nada. Lo que importa es el orden, y solo
-en tres sitios. Están escritos en la cabecera de los propios archivos:
+en cuatro sitios. Están escritos en la cabecera de los propios archivos:
 
 | Si vuelves a pegar | Pega detrás | Porque si no |
 | --- | --- | --- |
 | `0001` | `0002` | El equipo se queda otra vez con permiso para todo |
 | `0002` | `0005` **y luego** `0008` | El registro público vuelve a publicar el texto libre de quien ofreció la ayuda |
 | `0005` | `0008` | La vista `aid_log` nace de nuevo con el juego completo de permisos concedido al público |
+| `0010` | `0011` | Vuelve al portal una llave global que dice que el dinero de todo el Chocó va al mismo sitio |
+
+La última fila es la trampa nueva y es fácil de pisar, porque `0010` sigue en la
+carpeta y su nombre suena a lo que uno busca. **`0010` está superada**: se queda
+solo para que el histórico se pueda reconstruir en orden, y su propio archivo lo
+dice en la primera línea. Pegada suelta, deshace la corrección de `0011`.
 
 La segunda fila es una cadena de tres archivos y es la que se hace a medias:
 `0002` crea `aid_log` con el texto dentro, `0005` la rehace sin él, y ese
@@ -182,9 +224,10 @@ orden en que entraron:
 0005_registro_sin_texto_libre · 0004_una_fundacion_por_municipio
 0006_seguimiento_del_caso · 0007_foto_del_avance
 0008_permiso_de_tabla_del_publico · encuadre_de_fotos
+0010_llave_de_transferencia · 0011_canal_de_donacion
 ```
 
-Dos rarezas, ninguna de las dos hay que arreglar:
+Tres rarezas, ninguna de las tres hay que arreglar:
 
 - **`0004` entró detrás de `0005`.** No importa: `0004` solo toca la tabla de
   fundaciones —una restricción y una columna que se va— y no roza la vista ni los
@@ -192,14 +235,18 @@ Dos rarezas, ninguna de las dos hay que arreglar:
 - **`0002b_revoke_anon_team_functions` no existe como archivo.** Fue un parche
   suelto —retirar `execute` de las cuatro funciones `team_*` a `public` y a
   `anon`— que hoy está dentro de `0002`. No hay nada que volver a pegar.
+- **`0010` figura como aplicada y su tabla ya no existe.** Es correcto: `0011`
+  entró detrás y la borró. El registro cuenta lo que pasó, no lo que hay.
 
-Y tres comprobaciones de que lo delicado está donde debe:
+Y cuatro comprobaciones de que lo delicado está donde debe:
 
 - La vista real publica `category` y no el texto de quien ofreció la ayuda:
   `0005` está puesto.
 - `anon` tiene `select` en las seis tablas y en `aid_log`, e `insert` y nada más en
   `offers`: `0008` está puesto.
 - `photos` tiene `focus_x`, `focus_y` y `zoom`: `0009` está puesto.
+- `cities` y `cases` tienen las cuatro columnas del canal, están sus dos
+  disparadores y `public.donation_key` ya no existe: `0011` está puesto.
 
 ---
 
@@ -241,16 +288,20 @@ mismo, y las Server Actions y la base de datos lo rechazan igual.
 
 Hoy hay **una sola cuenta** en la base real —`chocoup26@gmail.com`, coordinación,
 confirmada y con sesión ya iniciada—, así que el rol de documentación no se ha
-ejercido nunca aquí. Las 183 comprobaciones locales lo prueban a fondo, pero
+ejercido nunca aquí. Las 187 comprobaciones locales lo prueban a fondo, pero
 contra una base en memoria: lo que no se ha visto es una persona con su teléfono,
 su contraseña y esta base de datos.
 
 Da de alta **dos cuentas de verdad, una de cada rol**, y con la de documentación
-comprueba las cuatro cosas que la separan de coordinación:
+comprueba las cinco cosas que la separan de coordinación:
 
 - Escribe en el municipio que le asignaste.
 - Ve **«Solo lectura»** en un municipio que no es suyo.
 - No puede publicar un municipio.
+- **En un caso suyo ve el canal de donación pero no el formulario**, y guardar el
+  resto de la ficha —nombre, historia, consentimiento— sigue funcionando con el
+  canal puesto. Esa última parte es la que hay que mirar de verdad: es lo que se va
+  a hacer cuarenta veces en el viaje.
 - En `/admin/equipo` le dice que esa pantalla es de coordinación.
 
 Que cada persona entre una vez desde su propio teléfono, con datos y no con WiFi.
@@ -260,42 +311,35 @@ Descubrir en Quibdó que una contraseña no se copió bien es una tarde perdida.
 
 ## Que el portal se vea
 
-Hasta que se pegue `0010`, el público ve un municipio con un caso y **no tiene a
-dónde enviar dinero**. Hay dos caminos para arreglarlo y no son alternativos: la
-llave es de todo el portal y la fundación es de su municipio.
-
-**El camino corto, y el que hay hoy: pegar `0010`.** La llave sale publicada al
-momento, sin depender de ninguna fundación, y las tres pantallas pasan a ofrecer a
-dónde transferir. Ver [La llave de transferencia](#la-llave-de-transferencia).
-
-**El camino largo, el del canal propio de cada municipio**, en este orden:
+Para que un municipio se vea entero y se le pueda enviar dinero hacen falta cuatro
+cosas, en este orden:
 
 1. **El municipio publicado.** Solo coordinación; lo impone el disparador
    `cities_guard_publication`. Hasta entonces nada de ese municipio existe para el
    público: ni fotos, ni necesidades, ni casos, aunque estén publicados uno a uno.
-2. **La fundación del municipio, con su enlace de donación.** Solo coordinación.
-   Una por municipio, garantizada por `foundations_one_per_city`. Es lo que hace
-   falta para que un aporte pueda entrar señalando a una familia concreta, que es
-   lo que la llave sola no puede hacer.
-3. **El caso con su consentimiento**, y publicado. La casilla se marca **solo si la
+2. **El caso con su consentimiento**, y publicado. La casilla se marca **solo si la
    persona lo autorizó**: sin ella el caso se guarda y no se puede publicar, y no
    es cosa del formulario sino de la restricción `cases_publish_requires_consent`.
+3. **El canal del caso**, si se quiere que se le pueda dar a esa familia. Solo
+   coordinación, en la ficha del caso.
+4. **El canal del municipio y su fundación**, si se quiere que se le pueda dar al
+   pueblo. Los dos son de coordinación y son cosas distintas: el canal es del
+   municipio y el enlace es de la fundación, que rinde cuentas por su cuenta.
 
-Quibdó tiene el 1 y el 3 y le falta el 2. Lo que eso produce, comprobado:
+Quibdó tiene el 1, el 2 y el 3, y le falta el 4. Lo que eso produce, comprobado:
 
-- `/donaciones`, pestaña de fundaciones: «Todavía no hay fundaciones publicadas».
-- `/donaciones`, pestaña de familias: sale la familia de Quibdó.
-- En la ficha del caso **la sección «Enviar dinero» aparece solo con la llave**, sin
-  botón de donar y sin WhatsApp con quien coordinar, y diciendo que la
-  transferencia no va marcada a esa familia. Sin `0010` la sección no aparece: se
-  puede leer el caso y no se le puede dar nada.
-- La ficha del municipio enseña la llave en el sitio de la fundación, con la línea
-  de que Quibdó todavía no tiene ninguna registrada.
+- **La ficha de Daniela ofrece su llave `@soschoco`**, escrita entera para
+  copiarla, sin app ni titular porque no constan. Es lo único que hoy recibe dinero
+  de verdad en este portal.
+- La ficha de Quibdó dice que **el municipio todavía no tiene canal propio ni
+  fundación registrada**, y ofrece ofrecer un recurso. No enseña la llave de
+  Daniela: es de ella y sale solo en su ficha.
+- `/donaciones`, pestaña de municipios: no sale Quibdó, porque no tiene ninguna de
+  las dos vías. Salen los municipios de prueba, con sus canales de muestra.
+- `/donaciones`, pestaña de causas: sale Daniela, y se entra a su ficha para dar.
 
-Un caso puede llevar su propio destino de donación —una Vaki o una cuenta de la
-familia— y entonces manda sobre el de la fundación. Vacío significa «usa el de la
-fundación»; y si no hay ninguna de las dos cosas, lo que queda es la llave del
-portal.
+Ese reparto es la regla y no una carencia: **un caso sin canal propio no hereda
+ninguno y un municipio tampoco toma el de sus casos.**
 
 Falta también el resumen de Quibdó y sus necesidades **de zona**: las dos que hay
 son del caso. La lista de necesidades sí las muestra, con el nombre de la familia
@@ -365,7 +409,7 @@ usan el recorte por omisión de cada caja.
 Esto costó descubrirlo, así que va aparte.
 
 `npm run verify:sql` levanta un Postgres en memoria, le pasa los archivos de
-migración y comprueba 183 reglas de acceso. Hoy da **183/183**. Es una prueba
+migración y comprueba 187 reglas de acceso. Hoy da **187/187**. Es una prueba
 buena y no prueba lo que parece.
 
 **Su verde dice que los archivos son coherentes entre sí. No dice nada de lo que
@@ -376,13 +420,15 @@ sobre la tabla de ofertas. Las pruebas no podían verlo porque no la miran.
 
 Hubo un segundo hueco de la misma familia, y este sí está cerrado: la lista
 `MIGRATIONS` de `supabase/verify.mjs` se quedó en `0008`, así que el informe daba
-verde sin haber mirado nunca el encuadre. Ahora la lista llega a `0010`, el
+verde sin haber mirado nunca el encuadre. Ahora la lista llega a `0011`, el
 encuadre tiene sus propias comprobaciones —las columnas, sus rangos, que los tres
-números vayan juntos, y que solo pueda moverlos quien documenta ese municipio—, la
-llave de transferencia tiene diecinueve —que sea una sola, que solo la cambie
-coordinación, que nadie pueda crear otra ni borrar la única, que el rastro no se
-pueda firmar con el correo de otra persona y que volver a pegar la migración no
-devuelva la llave vieja— y el arnés se mira la carpeta de migraciones él solo: un
+números vayan juntos, y que solo pueda moverlos quien documenta ese municipio—, los
+canales de donación tienen diecinueve —que solo los escriba coordinación, probado
+también desde la sesión de quien documenta ese mismo municipio y comprobando que
+esa persona sigue pudiendo guardar el resto de la ficha; que un canal sea una llave
+o un enlace y nunca los dos; que un caso sin canal no herede el de nadie; que el
+público los lea y no los toque; y que la llave global no vuelva al volver a pegar
+las migraciones en orden— y el arnés se mira la carpeta de migraciones él solo: un
 archivo que no esté en la lista detiene las pruebas y sale nombrado. Editar dos
 sitios y acordarse de los dos ya no es la garantía.
 
@@ -403,13 +449,26 @@ select
   exists (select 1 from information_schema.columns
           where table_schema='public' and table_name='photos' and column_name='focus_x')
     as encuadre_0009,
+  exists (select 1 from information_schema.columns
+          where table_schema='public' and table_name='cities' and column_name='donation_key')
+    as canales_0011,
+  -- Tiene que dar FALSO. Verdadero significa que alguien volvió a pegar 0010 sin
+  -- 0011 detrás y el portal tiene otra vez una llave global.
   exists (select 1 from information_schema.tables
-          where table_schema='public' and table_name='donation_key') as llave_0010;
+          where table_schema='public' and table_name='donation_key') as llave_global_de_vuelta;
 
--- ¿Y qué llave está publicada ahora mismo? Vacía significa que el portal no
--- ofrece a dónde transferir en ninguna pantalla.
-select key_value, app_label, holder, updated_at, updated_by
-from public.donation_key;
+-- ¿Y qué destinos de dinero están publicados ahora mismo? Es lo mismo que enseña
+-- /admin/donaciones. Una fila que nadie reconozca es lo que hay que mirar primero.
+select 'municipio' as nivel, name as quien, donation_key, donation_url,
+       donation_app, donation_holder
+from public.cities where donation_key <> '' or donation_url <> ''
+union all
+select 'caso', display_name, donation_key, donation_url,
+       donation_app, donation_holder
+from public.cases where donation_key <> '' or donation_url <> ''
+union all
+select 'fundacion', name, '', donation_url, '', ''
+from public.foundations where donation_url <> '';
 
 -- ¿Está el permiso recortado de 0008? Tiene que salir una sola fila,
 -- `offers` con INSERT, y ninguna otra con nada que no sea SELECT.
@@ -481,22 +540,24 @@ pasa al dar de alta una cuenta y eso es una decisión, no un arreglo.
   Lo verificado es lo que el script hace con lo que se le dé, y que se niega a
   entregar un archivo con metadatos dentro.
 - **El rol de documentación contra esta base de datos.** No existe ninguna cuenta
-  con ese rol. Lo que está probado son las 183 comprobaciones locales.
+  con ese rol. Que no pueda tocar un canal está probado a fondo, pero contra un
+  Postgres en memoria: con una cuenta real y su teléfono no se ha visto.
 - **El despliegue.** Si Vercel tiene las dos variables de entorno y si la URL de
   retorno definitiva está en Supabase queda fuera del repositorio. Hay una carpeta
   `.vercel`, así que un proyecto sí está vinculado.
 - **El circuito de una oferta hasta `/ayudas`.** Cero ofertas en la base real, así
   que el recorrido de ofrecer, aceptar, marcar la entrega y verla salir sin nombre
   no se ha hecho aquí. `/ayudas` contesta con una lista vacía, no con un error.
-- **`0010` contra la base real.** La migración está escrita y probada contra un
-  Postgres en memoria, y **no la he aplicado**: la aplica quien despliega. Hasta
-  entonces la llave no existe y ninguna pantalla la enseña.
 - **Que `@soschoco` funcione de verdad.** No he hecho ninguna transferencia. Lo que
   está comprobado es que el portal la publica tal cual, sin tocarla; que la llave
   sea la buena y que la cuenta exista solo lo puede decir alguien enviando un peso
   desde otro teléfono.
-- **En qué app se usa y a nombre de quién sale.** Los dos campos van vacíos porque
-  no me consta, y no los he adivinado: en el portal eso se ve como «tu app de banco
-  o billetera» y como un paso que pide mirar el nombre sin decir cuál. **Rellenarlos
-  en `/admin/donaciones` es tarea de coordinación antes de compartir el enlace**, y
-  el segundo es la única defensa de quien dona.
+- **En qué app se usa el canal de Daniela y a nombre de quién sale.** Los dos campos
+  van vacíos porque no me consta, y no los he adivinado: en el portal eso se ve como
+  «tu app de banco o billetera» y como un paso que pide mirar el nombre sin decir
+  cuál. **Rellenarlos en la ficha de su caso es tarea de coordinación antes de
+  compartir el enlace**, y el segundo es la única defensa de quien dona.
+- **A quién pertenece de verdad `@soschoco`.** El portal lo publica como el canal de
+  Daniela porque así se indicó. Si esa llave fuera de una organización que recauda
+  para varias personas, la ficha estaría diciendo algo más concreto de lo que es, y
+  eso solo lo puede confirmar quien la consiguió.

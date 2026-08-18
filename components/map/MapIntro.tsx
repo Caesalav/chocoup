@@ -2,17 +2,27 @@
 
 import { useEffect, useState } from "react";
 import { ColombiaLocator } from "@/components/map/ColombiaLocator";
-import { CHOCO_LABEL_ANCHOR, COLOMBIA_FRAME } from "@/lib/colombia-map";
 
 /**
  * Apertura de /mapa: Colombia, el Chocó encendido dentro, y un acercamiento que
- * se disuelve sobre el mapa.
+ * termina justo encima del mapa y se disuelve sobre él.
  *
  * Casi nadie de fuera sabe dónde queda el Chocó, y el mapa del departamento a
  * secas no lo cuenta. Es una capa que se pone encima y se va: el mapa de debajo
  * está quieto todo el rato, así que no hay cámara, ni encuadres, ni marcadores
- * que contra-escalar. El movimiento vive entero en CSS (.intro-veil e
- * .intro-zoom); este componente solo decide si la capa llega a montarse.
+ * que contra-escalar. El movimiento vive entero en CSS (.intro-zoom,
+ * .intro-country e .intro-handoff); este componente solo decide si la capa llega
+ * a montarse.
+ *
+ * El localizador se importa aquí, y con él los trazados del país y del
+ * departamento: 3,2 kB comprimidos en un fragmento que solo carga esta pantalla.
+ * La otra opción era que se los pasara el servidor ya dibujados —entonces no
+ * habría JavaScript que descargar, pero los mismos trazados viajarían dentro del
+ * HTML en cada visita, porque /mapa se sirve en caliente, y se pagarían aunque
+ * la apertura no fuera a verse, que es lo normal: solo sale una vez por sesión y
+ * nunca con prefers-reduced-motion. Importándolo se pagan una vez y se quedan en
+ * la caché: a la tercera vez que se abre el mapa ya sale a cuenta, y aquí se
+ * abre muchas veces al día y con mala señal.
  *
  * Una vez por sesión: en una visita que entra y sale del mapa para abrir
  * municipios, volver a verla en cada vuelta sería un peaje, no una explicación.
@@ -51,28 +61,18 @@ export function MapIntro() {
 
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
-      <div className="intro-veil absolute inset-0 bg-paper" />
+      {/* El papel tapa el mapa hasta que el departamento ya ha aterrizado. Antes
+          se iba abriendo durante todo el acercamiento, y eso enseñaba el mosaico
+          debajo de un Chocó que todavía venía de camino: dos veces la misma
+          forma a dos tamaños, que es justo la superposición que no encajaba. */}
+      <div className="intro-handoff absolute inset-0 bg-paper" />
 
-      <div className="absolute inset-0 flex items-center justify-center">
-        {/* El acercamiento tiene que ir hacia el Chocó, y su sitio dentro del
-            marco de Colombia es dato del mapa: se calcula en vez de dejar dos
-            porcentajes a ojo en el CSS. La proporción del marco la pone este
-            envoltorio para que ese origen caiga sobre el dibujo y no sobre la
-            caja vacía que lo rodea. */}
-        <div
-          className="intro-zoom h-[82%]"
-          style={{
-            aspectRatio: `${COLOMBIA_FRAME.width} / ${COLOMBIA_FRAME.height}`,
-            transformOrigin: `${(CHOCO_LABEL_ANCHOR.x / COLOMBIA_FRAME.width) * 100}% ${
-              (CHOCO_LABEL_ANCHOR.y / COLOMBIA_FRAME.height) * 100
-            }%`,
-          }}
-        >
-          <ColombiaLocator className="h-full w-full" />
-        </div>
-      </div>
+      {/* Con el encuadre del mapa del Chocó (`zooms`): el mismo viewBox y el
+          mismo tamaño en pantalla que el mapa de debajo, que es lo que permite
+          que el acercamiento termine exactamente encima de él. */}
+      <ColombiaLocator zooms className="absolute inset-0 size-full" />
 
-      <p className="intro-veil absolute inset-x-0 bottom-3 text-center text-[10px] uppercase tracking-[0.3em] text-faint">
+      <p className="intro-handoff absolute inset-x-0 bottom-3 text-center text-[10px] uppercase tracking-[0.3em] text-faint">
         Chocó · Colombia
       </p>
     </div>

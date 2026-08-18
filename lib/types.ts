@@ -1,3 +1,4 @@
+import type { DonationChannel } from "./donation-channel";
 import type { PhotoFrame } from "./photo-frame";
 
 export type NeedCategory =
@@ -13,7 +14,35 @@ export type NeedCategory =
 
 export type NeedStatus = "abierta" | "parcial" | "cubierta";
 
-export type OfferStatus = "pendiente" | "aceptada" | "rechazada";
+/**
+ * El estado de una oferta dentro de la bandeja del equipo.
+ *
+ * `retirada` no es un sinónimo de `rechazada` y por eso son dos palabras.
+ * `rechazada` es un juicio sobre lo que se ofrecía: alguien del equipo lo miró y
+ * dijo que no. `retirada` es una baja, y sirve para lo contrario: quitar del muro
+ * público —spam, un duplicado, algo que ya no está disponible— sin dictaminar
+ * nada sobre ello. Desde que `/ofrecido` publica lo pendiente, un muro sin
+ * moderación previa necesita esa salida rápida, y obligar a rechazar para limpiar
+ * dejaría en el registro del equipo un veredicto que nadie emitió.
+ *
+ * Ninguna de las dos se publica: la vista `public.offer_log` solo deja pasar
+ * `pendiente` y `aceptada`. Ver supabase/migrations/0012_registro_de_lo_ofrecido.sql.
+ */
+export type OfferStatus = "pendiente" | "aceptada" | "rechazada" | "retirada";
+
+/**
+ * El estado de una oferta como lo lee cualquiera en el registro público.
+ *
+ * Son dos palabras y no cuatro, y ninguna es la del equipo. «Pendiente» describe
+ * la bandeja —hay algo esperando a que alguien lo mire— y en público se leería
+ * como que el portal va lento; «sin confirmar» describe lo que el lector
+ * necesita saber, que es qué fiabilidad tiene lo que está viendo. Lo rechazado y
+ * lo retirado no tienen palabra porque no se publican.
+ *
+ * Lo decide la vista `public.offer_log` y no esta capa: ver
+ * supabase/migrations/0012_registro_de_lo_ofrecido.sql.
+ */
+export type OfferRecordState = "sin_confirmar" | "confirmada";
 
 /**
  * Los dos roles del equipo. Coordinación decide y reparte; documentación
@@ -38,7 +67,26 @@ export type TeamMemberEntry = TeamSession & {
   createdAt: string;
 };
 
-export type City = {
+/**
+ * Las columnas del canal de donación, iguales en el municipio y en el caso.
+ * Se escriben una vez aquí porque los dos niveles tienen que admitir los
+ * mismos formatos: si uno solo aceptara enlaces, el pueblo o la familia que
+ * tenga una llave o un teléfono se quedaría sin poder recibir.
+ *
+ * Nunca se leen sueltas: `donationChannel()` (lib/donation-channel.ts) las
+ * convierte en un canal o en nulo, y es quien sabe que llave, enlace y
+ * teléfono se excluyen. Ver supabase/migrations/0011_canal_de_donacion.sql
+ * y 0013_canal_de_telefono.sql.
+ */
+export type DonationColumns = {
+  donation_key: string;
+  donation_url: string;
+  donation_phone: string;
+  donation_app: string;
+  donation_holder: string;
+};
+
+export type City = DonationColumns & {
   id: string;
   name: string;
   slug: string;
@@ -75,41 +123,7 @@ export type Foundation = {
   created_at: string;
 };
 
-/**
- * La llave de transferencia del portal: una, y la misma para todo.
- *
- * No cuelga de ningún municipio, y eso es deliberado: el enlace de una fundación
- * es de esa fundación y para ese pueblo, mientras la llave es del portal entero.
- * Por qué no es una columna más de `Foundation`, y por qué vive en la base de
- * datos y no en una constante que habría que desplegar, está escrito en
- * supabase/migrations/0010_llave_de_transferencia.sql.
- *
- * Va en camello y sin `singleton` porque es una forma compuesta y no la fila tal
- * cual: la capa de datos ya la traduce, igual que hace con `TeamSession`.
- */
-export type DonationKey = {
-  /**
-   * La llave tal cual se pega en la app, `@soschoco`.
-   *
-   * Vacía solo en el panel, que es donde se escribe la primera y donde se retira
-   * una comprometida. La lectura pública (`getDonationKey`) devuelve nulo en ese
-   * caso, de modo que ninguna pantalla del portal puede pintar el bloque de la
-   * llave con la llave en blanco por olvidar una comprobación.
-   */
-  value: string;
-  /** En qué app se usa. Vacío es normal: entonces se dice la versión general, sin
-   *  inventarse una marca. */
-  app: string;
-  /** A nombre de quién tiene que aparecer en la app al confirmar. Es lo único con
-   *  lo que quien dona puede comprobar que la llave no es otra. */
-  holder: string;
-  updatedAt: string;
-  /** Correo de la sesión que la cambió, según la base de datos. Vacío si se tocó
-   *  sin sesión —el SQL Editor— o si nadie la ha cambiado desde la migración. */
-  updatedBy: string;
-};
-
-export type Case = {
+export type Case = DonationColumns & {
   id: string;
   city_id: string;
   display_name: string;
@@ -127,8 +141,6 @@ export type Case = {
    * supabase/migrations/0003_retrato_del_caso.sql.
    */
   portrait_photo_id: string | null;
-  /** Canal de donación de esta familia. Vacío: se usa el de la fundación. */
-  donation_url: string;
   created_at: string;
   updated_at: string;
 };
@@ -243,6 +255,70 @@ export type AidRecord = {
   need_title: string | null;
 };
 
+/**
+ * Una oferta prometida y todavía sin llegar, como la ve cualquiera desde
+ * /ofrecido.
+ *
+ * Es lo que devuelve la vista `public.offer_log`, y de ahí viene todo lo que no
+ * está aquí: ni contacto, ni el mensaje largo, ni las notas del equipo, ni el
+ * caso al que apunta, ni la fecha de entrega. Esas columnas no existen en la
+ * vista, así que este tipo no puede tenerlas ni por descuido.
+ *
+ * Es hermano de `AidRecord` y las dos listas son disjuntas: en cuanto una ayuda
+ * llega, sale de aquí y aparece allí.
+ */
+export type OfferRecord = {
+  id: string;
+  /**
+   * Una de las nueve categorías, siempre, por lo mismo que en `AidRecord`:
+   * `offers.category` es texto libre y la vista publica «otro» para todo lo que
+   * no esté en la lista.
+   */
+  category: NeedCategory;
+  /**
+   * Qué se ofrece, con los teléfonos y los correos que hubiera dentro
+   * sustituidos por «[número oculto]» y «[contacto oculto]».
+   *
+   * Este texto lo escribe quien ofrece y nadie lo revisa antes, así que llega
+   * recortado y no crudo. Que se publique —y que en `AidRecord` no exista— es
+   * deliberado: aquí es lo único que permite cruzar unas tejas sin transporte con
+   * un camión que sube vacío, mientras que allí describiría lo que recibió una
+   * familia. El recorte está en la vista y no en la plantilla, así que ninguna
+   * pantalla puede deshacerlo.
+   *
+   * NULO SIGNIFICA QUE LA OFERTA IBA DIRIGIDA A UNA FAMILIA, y conviene saber lo
+   * que eso implica antes de escribirlo en una pantalla. La frase la escribió
+   * alguien que tenía delante la ficha de esa familia, así que puede describirla;
+   * la vista la anula por eso, y no porque falte el dato. Es la misma razón por la
+   * que `AidRecord` no tiene esta columna en absoluto.
+   *
+   * De ahí lo que este nulo autoriza y lo que no. Se puede decir que la fila es
+   * para una familia —la fila entera existe para que alguien pueda completarla, y
+   * su categoría y su municipio ya están publicados—, pero no se puede pedir el
+   * texto por otra vía ni deducirlo, porque no hay otra vía: `offers.resource` no
+   * es legible por el público, ni por política ni por permiso de tabla. Ver
+   * supabase/migrations/0012_registro_de_lo_ofrecido.sql.
+   */
+  resource: string | null;
+  /**
+   * El día en que se ofreció, en 'YYYY-MM-DD' y en hora de Colombia.
+   *
+   * De una entrega no se publica la fecha —sería un calendario de reparto— y de
+   * una oferta sí: no dice cuándo llega algo a un sitio, dice desde cuándo
+   * alguien está esperando respuesta, y hace falta para atenuar lo que lleva
+   * semanas sin confirmar.
+   */
+  offered_on: string;
+  state: OfferRecordState;
+  /** Solo con la oferta aceptada y autorización expresa. Nulo en todo lo demás,
+   *  que va a ser la mayoría. */
+  offerer_name: string | null;
+  city_name: string | null;
+  city_slug: string | null;
+  /** Solo si la necesidad es del municipio, igual que en `AidRecord`. */
+  need_title: string | null;
+};
+
 /** Oferta con el contexto al que apunta, para la bandeja del equipo. */
 export type OfferWithContext = Offer & {
   cities: Pick<City, "name" | "slug"> | null;
@@ -275,6 +351,7 @@ export type CityCardData = City & {
 
 export type CaseSummary = Case & {
   coverPath: string | null;
+  coverFrame: PhotoFrame | null;
   /**
    * El retrato ya resuelto a una ruta de imagen, o nulo si no hay: ni elegido, ni
    * la foto elegida sigue existiendo, ni es de este caso. Quien pinta la tarjeta
@@ -315,12 +392,6 @@ export type NeedCard = Need & {
   caseName: string | null;
 };
 
-/** Una fundación en la lista de donaciones, con el municipio en el que trabaja. */
-export type FoundationEntry = Foundation & {
-  cityName: string;
-  citySlug: string;
-};
-
 /**
  * Los cuatro números del inicio. Salen todos de la misma consulta para que no
  * puedan contradecirse entre sí en la misma pantalla.
@@ -335,10 +406,16 @@ export type PortalTotals = {
   updatedAt: string | null;
 };
 
+/**
+ * Los cuatro grupos del buscador, que son las cuatro formas en que algo puede
+ * estar en el portal: un municipio, una familia, algo que falta y algo que
+ * alguien ya prometió.
+ */
 export type SearchResults = {
   cities: CityCardData[];
   cases: CaseCard[];
   needs: NeedCard[];
+  offers: OfferRecord[];
 };
 
 /**
@@ -369,8 +446,29 @@ export type CasePage = {
   photos: Photo[];
   needs: Need[];
   updates: CaseUpdate[];
-  /** Fundación del municipio: recaudo por omisión si el caso no trae el suyo. */
+  /**
+   * La fundación del municipio, que aquí ya no es el recaudo por omisión de esta
+   * familia: si el caso no trae canal propio, no hay canal. Sigue haciendo falta
+   * para decir quién responde por el caso en terreno y para escribirle por
+   * WhatsApp, que es una conversación y no un destino de dinero.
+   */
   foundation: Foundation | null;
+};
+
+/**
+ * Un municipio en /donaciones: su foto de portada, su canal y su fundación.
+ *
+ * Sale aunque todavía no tenga canal. El pop-up de «Donar» lo dice, y no listarlo
+ * dejaría un pueblo documentado fuera de la única pantalla que existe para darle
+ * dinero. La fundación va dentro porque es de ese municipio, y la pestaña de
+ * fundaciones se arma filtrando las que hay.
+ */
+export type CityDonationEntry = {
+  city: City;
+  channel: DonationChannel | null;
+  foundation: Foundation | null;
+  coverPath: string | null;
+  coverFrame: PhotoFrame | null;
 };
 
 /** Contexto de una necesidad, caso o ciudad para el formulario de oferta. */

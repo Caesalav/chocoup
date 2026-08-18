@@ -106,12 +106,6 @@ export function FoundationCard({ foundation, cityName, cityHint, featured = fals
           </p>
         )}
 
-        {foundation.description && (
-          <p className="mt-3 text-center text-[14px] leading-relaxed text-muted">
-            {foundation.description}
-          </p>
-        )}
-
         <div className="mt-5 flex flex-col gap-2.5">
           {donate && (
             <a

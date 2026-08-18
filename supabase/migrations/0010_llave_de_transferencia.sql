@@ -1,3 +1,16 @@
+-- ===========================================================================
+-- SUPERADA POR 0011. Esta migración crea una llave de transferencia global y
+-- 0011 la retira, porque el modelo estaba mal entendido: `@soschoco` no es un
+-- canal general del portal, es el canal del caso de Quibdó y de nadie más. Cada
+-- municipio tiene el suyo y cada caso el suyo.
+--
+-- El archivo se queda porque está aplicada en la base real y porque el histórico
+-- tiene que poder reconstruirse pegando las migraciones en orden. **Nunca se
+-- pega suelta**: sin 0011 detrás, devuelve al portal una llave global que vuelve
+-- a decir que el dinero de todo el Chocó va al mismo sitio. Lo que sigue leído
+-- de aquí abajo describe una decisión que ya no está en pie.
+-- ===========================================================================
+
 -- Chocó-up: la llave de transferencia del portal, en un solo sitio.
 --
 -- Va detrás de 0009 y no toca nada de lo que ya hay: ni una política, ni un

@@ -37,7 +37,14 @@ const onServer = () => false;
  * dice y manda a seleccionar a mano. Callarse dejaría a alguien pegando en su app
  * lo último que tuviera copiado, y esto es un destino de dinero.
  */
-export function CopyKeyButton({ value }: { value: string }) {
+export function CopyKeyButton({
+  value,
+  noun = "llave",
+}: {
+  value: string;
+  /** Qué se está copiando, en minúscula: «llave» o «número». */
+  noun?: string;
+}) {
   const ready = useSyncExternalStore(NEVER_CHANGES, hasClipboard, onServer);
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -50,10 +57,10 @@ export function CopyKeyButton({ value }: { value: string }) {
 
   const label =
     state === "copied"
-      ? "Llave copiada"
+      ? `${noun === "número" ? "Número copiado" : "Llave copiada"}`
       : state === "failed"
-        ? "No se pudo copiar: selecciónala arriba"
-        : "Copiar la llave";
+        ? "No se pudo copiar: selecciónalo arriba"
+        : `Copiar ${noun === "número" ? "el número" : "la llave"}`;
 
   return (
     <button

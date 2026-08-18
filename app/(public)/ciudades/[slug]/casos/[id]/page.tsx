@@ -6,7 +6,7 @@ import { CasePortrait } from "@/components/case/CasePortrait";
 import { CaseProgressBar } from "@/components/case/CaseProgressBar";
 import { CaseViewTabs, parseCaseView } from "@/components/case/CaseViewTabs";
 import { PersonBadge } from "@/components/case/PersonBadge";
-import { TransferKey } from "@/components/donations/TransferKey";
+import { DonationChannelCard } from "@/components/donations/DonationChannelCard";
 import { PhotoGallery } from "@/components/case/PhotoGallery";
 import { ProgressTimeline } from "@/components/case/ProgressTimeline";
 import { NeedsList } from "@/components/NeedsList";
@@ -24,9 +24,10 @@ import {
   screenTitle,
   shell,
 } from "@/components/ui/styles";
-import { getCasePage, getDonationKey } from "@/lib/data";
+import { getCasePage } from "@/lib/data";
 import { situationPhotos } from "@/lib/case-photos";
-import { excerpt, externalUrl, formatDate, whatsappLink } from "@/lib/format";
+import { donationChannel } from "@/lib/donation-channel";
+import { excerpt, formatDate, whatsappLink } from "@/lib/format";
 import { savedFrame } from "@/lib/photo-frame";
 import { absoluteUrl } from "@/lib/site";
 
@@ -50,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CasePage({ params, searchParams }: Props) {
   const { slug, id } = await params;
   const { ver } = await searchParams;
-  const [data, donationKey] = await Promise.all([getCasePage(slug, id), getDonationKey()]);
+  const data = await getCasePage(slug, id);
   if (!data) notFound();
 
   const { city, caseRecord, photos, needs, updates, foundation } = data;
@@ -61,30 +62,36 @@ export default async function CasePage({ params, searchParams }: Props) {
   const view = parseCaseView(ver);
   const caseHref = `/ciudades/${city.slug}/casos/${caseRecord.id}`;
 
-  const ownDonate = externalUrl(caseRecord.donation_url);
-  const foundationDonate = foundation ? externalUrl(foundation.donation_url) : "";
-  const donate = ownDonate || foundationDonate;
+  /**
+   * El canal de esta familia, y solo el suyo.
+   *
+   * Aquí caía antes el enlace de la fundación del municipio cuando el caso no
+   * traía el suyo, y después la llave del portal cuando no había ni fundación.
+   * Las dos herencias se han ido. El dinero que alguien manda leyendo esta
+   * pantalla lo manda para esta persona: hacerlo caer en un destino que nadie
+   * eligió para ella —y sin decirlo— es el daño más grande que puede hacer esta
+   * ficha, y no se nota mirándola.
+   *
+   * Sin canal propio no hay canal, y la sección lo dice con palabras en vez de
+   * desaparecer. Que no se pinte nada dejaría a quien llega desde un WhatsApp
+   * pensando que no ha buscado bien.
+   */
+  const channel = donationChannel(caseRecord);
+
+  /**
+   * Escribirle a la fundación del municipio no es un canal: es una conversación.
+   * Nadie transfiere nada al abrir un WhatsApp, así que ofrecerlo no manda dinero
+   * a ningún sitio en silencio —que es lo que se acaba de quitar—, y con una
+   * persona al otro lado es lo único que hoy puede resolver el caso de una
+   * familia sin canal. Va rotulado como lo que es y nunca dentro del bloque del
+   * canal.
+   */
   const moneyWhatsapp = foundation
     ? whatsappLink(
         foundation.whatsapp,
         `Hola, quiero enviar un aporte económico para ${caseRecord.display_name} en ${city.name}.`,
       )
     : "";
-
-  /**
-   * Qué se dice arriba de los botones, y hay que decir la verdad de los tres
-   * casos. La última rama era hasta ahora inalcanzable —sin fundación no había
-   * WhatsApp, y sin destino propio no había botón, así que la sección no se
-   * pintaba— y con la llave sí se alcanza: es exactamente la situación del caso
-   * real. No promete que el aporte vaya marcado a esta familia, porque una
-   * transferencia a la llave del portal no lleva ninguna marca y decir lo
-   * contrario sería lo único de esta pantalla que no podríamos sostener.
-   */
-  const moneyIntro = ownDonate
-    ? `Canal indicado por el equipo para ${caseRecord.display_name}. Nada de lo que dones pasa por este portal.`
-    : foundation
-      ? `Se entrega a través de ${foundation.name}, que lo hace llegar a ${caseRecord.display_name}. Al escribir por WhatsApp ya va dicho que es para esta familia.`
-      : `Todavía no hay un canal propio de ${caseRecord.display_name} ni fundación registrada en ${city.name}. Lo que hay es la llave del portal, común a todo el Chocó: la transferencia no va marcada a una familia.`;
 
   const shareUrl = await absoluteUrl(`/ciudades/${city.slug}/casos/${caseRecord.id}`);
   const shareTitle = `${caseRecord.display_name} · ${city.name}, Chocó`;
@@ -281,48 +288,57 @@ export default async function CasePage({ params, searchParams }: Props) {
 
             {/* ----------------------------- Dinero ---------------------------
 
-                La sección entera desaparecía cuando no había ni destino propio ni
-                fundación, y eso es justo lo que le pasaba al único caso real
-                publicado: se leía su situación y no había a dónde mandar un peso.
-                Ahora basta con que exista la llave del portal, que no depende de
-                que nadie haya registrado una fundación en su municipio. */}
-            {(donate || moneyWhatsapp || donationKey) && (
-              <section className="lg:mt-8">
-                <h2 className={screenTitle}>Enviar dinero</h2>
-                <p className="mt-2 text-[14px] leading-relaxed text-muted">{moneyIntro}</p>
+                La sección se pinta siempre, tenga canal o no. Sin canal decía
+                antes el silencio: la sección entera desaparecía y la ficha se leía
+                como si el dinero no fuera parte de esto. Decirlo con palabras es
+                más honesto y además es accionable —quien lea que todavía no hay a
+                dónde enviarle puede ofrecer un recurso, que sí funciona hoy—. */}
+            <section className="lg:mt-8">
+              <h2 className={screenTitle}>Enviar dinero</h2>
 
-                {(donate || moneyWhatsapp) && (
-                  <div className="mt-5 flex flex-col gap-2.5">
-                    {donate && (
-                      <a
-                        href={donate}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className={`${button.primary} w-full`}
-                      >
-                        Donar dinero
-                      </a>
-                    )}
-                    {moneyWhatsapp && (
-                      <a
-                        href={moneyWhatsapp}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className={`${donate ? button.secondary : button.primary} w-full`}
-                      >
-                        Coordinar por WhatsApp
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                {donationKey && (
+              {channel ? (
+                <>
+                  <p className="mt-2 text-[14px] leading-relaxed text-muted">
+                    {channel.kind === "telefono"
+                      ? `El número de contacto para ${caseRecord.display_name}. Nada de lo que dones pasa por este portal.`
+                      : `El canal que el equipo registró para ${caseRecord.display_name}. Nada de lo que dones pasa por este portal.`}
+                  </p>
                   <div className="mt-5">
-                    <TransferKey donationKey={donationKey} featured={!donate && !moneyWhatsapp} />
+                    <DonationChannelCard channel={channel} featured={!moneyWhatsapp} />
                   </div>
-                )}
-              </section>
-            )}
+                </>
+              ) : (
+                /* «para {nombre}» y no «{nombre} no tiene»: los nombres de los
+                   casos son frases enteras —«Yeison Córdoba y su hermana»— y con
+                   el verbo detrás la concordancia se rompe en la mitad. */
+                <p className="mt-2 text-[14px] leading-relaxed text-muted">
+                  Todavía no hay un canal de donación propio para {caseRecord.display_name}, así
+                  que aquí no hay a dónde transferir.{" "}
+                  {foundation
+                    ? `Se puede coordinar un aporte con ${foundation.name}, que trabaja en ${city.name}.`
+                    : `Tampoco hay una fundación registrada en ${city.name} con la que coordinarlo.`}{" "}
+                  No enseñamos el canal de otro: el dinero acabaría en un sitio que nadie eligió
+                  para esta familia.
+                </p>
+              )}
+
+              {moneyWhatsapp && (
+                <a
+                  href={moneyWhatsapp}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className={`${channel ? button.secondary : button.primary} mt-5 w-full`}
+                >
+                  Coordinar por WhatsApp con {foundation!.name}
+                </a>
+              )}
+
+              {!channel && !moneyWhatsapp && (
+                <Link href={`/ofrecer?case=${caseRecord.id}`} className={`${button.secondary} mt-5 w-full`}>
+                  Ofrecer un recurso en su lugar
+                </Link>
+              )}
+            </section>
           </div>
         </div>
       </div>

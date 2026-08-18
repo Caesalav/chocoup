@@ -154,6 +154,15 @@ export function ChatIcon(props: IconProps) {
   );
 }
 
+/** Llamar. El auricular a secas, sin globo: ChatIcon ya es escribir. */
+export function PhoneIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M7.4 3.6h3.2l1.4 3.4-2.2 1.2a12.4 12.4 0 0 0 5.8 5.8l1.2-2.2 3.4 1.4v3.2A2 2 0 0 1 18 18.4 15.2 15.2 0 0 1 5.6 6a2 2 0 0 1 1.8-2.4z" />
+    </Glyph>
+  );
+}
+
 export function BackIcon(props: IconProps) {
   return (
     <Glyph {...props}>
@@ -188,6 +197,34 @@ export function CheckIcon(props: IconProps) {
   return (
     <Glyph {...props}>
       <path d="M5 13l4.5 4.5L19 7" />
+    </Glyph>
+  );
+}
+
+/**
+ * Lo que se ha ofrecido: un marcador, algo apartado y todavía sin usar.
+ *
+ * Hacía falta un dibujo nuevo porque los dos que le quedaban cerca ya significan
+ * otra cosa aquí, y significan justo las dos que hay que distinguir de esta:
+ * `OfferIcon` es el gesto de ofrecer —la acción, el formulario— y `CheckIcon` es
+ * lo que ya llegó. Esto es el tiempo de en medio: material con el nombre de un
+ * municipio puesto encima que nadie ha movido todavía. Con la mano se leería
+ * «ofrecer aquí» y con el visto, «hecho», que es exactamente lo que no es.
+ *
+ * Tampoco es un paquete, por lo que ya está escrito arriba en `OfferIcon`: un
+ * bulto con su flecha estrecha esto a mandar cajas —y lo que hay ofrecido son
+ * unas tejas que nadie puede bajar y un camión que sube vacío— y encima queda de
+ * gemelo logístico del botón «Donar».
+ *
+ * Va estrecho, vacío por dentro y con la muesca profunda a propósito. Hoy no lo
+ * pinta nadie, igual que el visto del registro de ayudas, pero el día que entre
+ * en una barra va a caer al lado de `NeedsIcon`, que es un portapapeles, y a
+ * 22 px dos rectángulos altos con rayas dentro son el mismo icono.
+ */
+export function PledgeIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M8.2 3.6h7.6a1.4 1.4 0 0 1 1.4 1.4v15.4L12 15.8l-5.2 4.6V5a1.4 1.4 0 0 1 1.4-1.4z" />
     </Glyph>
   );
 }

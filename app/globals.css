@@ -403,13 +403,6 @@ body {
 .enters-3 {
   animation-delay: 0.19s;
 }
-/* El cuarto lo pidió /donaciones al ganar la llave de transferencia arriba: la
-   pantalla pasó de tres bloques a cuatro y sin este escalón los dos últimos
-   entraban juntos. */
-.enters-4 {
-  animation-delay: 0.26s;
-}
-
 /* Aro que late tres veces sobre la acción principal y se queda quieto. */
 .pulse-ring::after {
   content: "";
@@ -453,23 +446,51 @@ body {
  * el mapa de debajo está quieto y no se entera, así que no hace falta cámara ni
  * contra-escalar nada. El componente decide si se monta (una vez por sesión, y
  * nunca con prefers-reduced-motion); aquí solo vive el movimiento.
+ *
+ * Tres tiempos, los tres sobre los mismos 2,1 s para que los porcentajes se
+ * puedan leer juntos:
+ *
+ *   0 – 26 %   quieto. Sin ese respiro no hay tiempo de reconocer el país.
+ *  26 – 80 %   el acercamiento, de `--intro-scale` a no transformar nada.
+ *  36 – 72 %   Colombia se va, mientras el departamento sigue viniendo.
+ *  80 – 100 %  relevo: el papel y el verde se disuelven sobre el mapa de debajo.
+ *
+ * Que el acercamiento acabe en el 80 % y no en el 100 % es a propósito: los
+ * últimos 400 ms el departamento ya está parado en su sitio definitivo, así que
+ * lo que se cruza son dos dibujos idénticos y quietos. Cruzarlos en movimiento
+ * es lo que dejaba ver que eran dos.
  * ------------------------------------------------------------------------- */
 
-@keyframes intro-hold-then-zoom {
+@keyframes intro-zoom {
   0%,
   26% {
-    opacity: 1;
-    transform: scale(1);
+    translate: var(--intro-shift);
+    scale: var(--intro-scale);
   }
+  80%,
   100% {
-    opacity: 0;
-    transform: scale(3.6);
+    translate: 0 0;
+    scale: 1;
   }
 }
 
-@keyframes intro-hold-then-fade {
+/* El país se retira antes de llegar: a mitad del acercamiento ya está casi todo
+   fuera del encuadre y lo que queda de él es un trazo grueso pegado a la costa
+   del departamento. Irse a tiempo es lo que pedía la vista. */
+@keyframes intro-country-leaves {
   0%,
-  26% {
+  36% {
+    opacity: 1;
+  }
+  72%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes intro-handoff {
+  0%,
+  80% {
     opacity: 1;
   }
   100% {
@@ -477,15 +498,21 @@ body {
   }
 }
 
-/* El primer cuarto de la animación está quieto a propósito: sin ese respiro no
-   hay tiempo de reconocer el país antes de que empiece el acercamiento. */
-.intro-veil {
-  animation: intro-hold-then-fade 2.1s cubic-bezier(0.6, 0, 0.2, 1) both;
-}
 .intro-zoom {
-  /* El Chocó dentro del marco de Colombia: el zoom tiene que ir hacia él. */
-  transform-origin: 17% 38%;
-  animation: intro-hold-then-zoom 2.1s cubic-bezier(0.6, 0, 0.2, 1) both;
+  /* El grupo se escala respecto al centro del viewBox, que es exactamente donde
+     el mapa del Chocó tiene el centro de la caja del departamento: por eso al
+     terminar —sin escala y sin desplazamiento— cae encima de él sin corregir
+     nada. `view-box` es el valor inicial; se escribe porque de él depende que
+     ese centro sea ese y no otro. */
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: intro-zoom 2.1s cubic-bezier(0.6, 0, 0.2, 1) both;
+}
+.intro-country {
+  animation: intro-country-leaves 2.1s cubic-bezier(0.6, 0, 0.2, 1) both;
+}
+.intro-handoff {
+  animation: intro-handoff 2.1s cubic-bezier(0.6, 0, 0.2, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

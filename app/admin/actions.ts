@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { PHOTO_BUCKET, TEAM_ROLES } from "@/lib/constants";
+import { OFFER_STATUSES, PHOTO_BUCKET, TEAM_ROLES } from "@/lib/constants";
+import { externalUrl, normalizePhone } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/env";
 import { canWriteCity, currentTeam } from "@/lib/team";
@@ -250,64 +251,162 @@ export async function deleteFoundation(formData: FormData) {
 }
 
 // ---------------------------------------------------------------------------
-// La llave de transferencia del portal
+// El canal de donación de un municipio y el de un caso
+//
+// Es la escritura más peligrosa del panel, y no por lo que borra: no borra nada.
+// Quien la toque cambia a dónde va el dinero de un pueblo o de una persona con
+// nombre y cara publicados, y el cambio no se nota mirando la pantalla porque un
+// canal nuevo se ve igual de bien que el bueno.
+//
+// Por eso es de coordinación, igual que las fundaciones y su `donation_url`, y en
+// tres capas que no dependen entre sí: la ficha no ofrece el campo, esto lo
+// rechaza, y el disparador `guard_donation_channel` de 0011 lo para aunque la
+// llamada llegue desde fuera de la web. La tercera no es redundante: quien
+// documenta un municipio SÍ puede escribir el resto del caso, así que las
+// políticas de fila dejan pasar la escritura entera y el canal necesita su propia
+// comprobación dentro de ella.
+//
+// Los dos niveles pasan por la misma función porque el dato es el mismo y las
+// trampas también. Escribir dos versiones sería dejar que una se quedara sin la
+// validación que la otra aprendió.
 // ---------------------------------------------------------------------------
 
 /**
- * Cambiar la llave a la que transfiere quien dona.
+ * Las columnas del canal, leídas del formulario y comprobadas.
  *
- * Es la escritura más peligrosa del panel, y no por lo que borra: no borra nada.
- * Quien la toque redirige el dinero de TODO el portal a la vez —no el de un
- * municipio, como el enlace de una fundación—, y el cambio no se nota mirando
- * ninguna pantalla, porque una llave nueva se ve igual de bien que la buena. Por
- * eso es de coordinación aquí, en la política de `donation_key` y en el permiso de
- * tabla, y por eso la base de datos apunta en la propia fila desde qué sesión se
- * cambió (`donation_key_stamp`, 0010).
+ * Las validaciones no son de forma: son la confusión concreta que hace falta
+ * evitar, que es una llave escrita donde va un enlace o un teléfono, o al
+ * revés. Una llave metida en el campo del enlace sale como `https://@soschoco`
+ * —eso hace `externalUrl()` con lo que no trae esquema—, y eso es un enlace
+ * válido que no lleva a ninguna parte: se pulsa, no da error y el dinero no
+ * sale. Por eso se rechaza aquí, que es el único sitio donde todavía se puede
+ * decir qué pasó.
  *
- * Las validaciones no son de forma sino de la confusión concreta que hizo falta
- * este campo: una llave metida donde va un enlace, o un enlace metido donde va la
- * llave. Un `https://` aquí no es un dato raro, es el error que estamos evitando.
+ * Vaciar el canal tiene que ser tan fácil como ponerlo: si un destino se
+ * compromete, lo primero es que el portal deje de enseñarlo, y eso no puede
+ * depender de tener a mano el siguiente. Los tres campos en blanco dejan la
+ * ficha sin canal en la misma petición, y la pantalla pública pasa a decir que
+ * todavía no hay a dónde enviar.
  */
-export async function saveDonationKey(formData: FormData) {
+function donationChannelValues(formData: FormData) {
+  const key = text(formData, "donation_key");
+  const url = text(formData, "donation_url");
+  const phoneRaw = text(formData, "donation_phone");
+  const app = text(formData, "donation_app");
+  const holder = text(formData, "donation_holder");
+
+  const filled = [key, url, phoneRaw].filter(Boolean).length;
+  if (filled > 1) {
+    throw new Error(
+      "Un canal es una llave, un enlace o un número, no dos a la vez. Deja solo el que se vaya a usar: con dos puestos no habría forma de saber cuál recibe.",
+    );
+  }
+
+  if (key) {
+    if (/^https?:\/\//i.test(key) || key.includes("/")) {
+      throw new Error(
+        "Eso parece un enlace y no una llave. Pégalo en el campo del enlace de recaudación.",
+      );
+    }
+    if (/^\+?\d[\d\s.-]*$/.test(key) && key.replace(/\D/g, "").length >= 10) {
+      throw new Error(
+        "Eso parece un teléfono. Pégalo en el campo del número de contacto.",
+      );
+    }
+    if (/\s/.test(key)) {
+      throw new Error("Una llave no lleva espacios. Revisa lo que pegaste antes de guardar.");
+    }
+    if (key.length > 64) {
+      throw new Error(
+        "Esa llave es demasiado larga para ser una llave. Comprueba que no sobra nada.",
+      );
+    }
+  }
+
+  // Un enlace tiene que tener dominio. `externalUrl()` acepta lo que sea y le
+  // pone `https://` delante, así que sin esto una llave pegada aquí pasaría por
+  // enlace y el botón «Donar dinero» apuntaría a ninguna parte.
+  if (url) {
+    const href = externalUrl(url);
+    const host = href ? new URL(href).hostname : "";
+    if (!host.includes(".")) {
+      throw new Error(
+        "Eso no parece un enlace: le falta el dominio. Si es una llave de transferencia, va en el campo de la llave.",
+      );
+    }
+  }
+
+  let phone = "";
+  if (phoneRaw) {
+    if (/^https?:\/\//i.test(phoneRaw) || phoneRaw.includes("@")) {
+      throw new Error(
+        "Eso no es un teléfono. Si es una llave o un enlace, va en su propio campo.",
+      );
+    }
+    const international = normalizePhone(phoneRaw);
+    const local =
+      international.length === 12 && international.startsWith("57")
+        ? international.slice(2)
+        : international;
+    if (!(local.length === 10 && local.startsWith("3"))) {
+      throw new Error(
+        "Eso no parece un móvil colombiano. Van diez dígitos que empiezan por 3.",
+      );
+    }
+    phone = local;
+  }
+
+  return {
+    donation_key: key,
+    donation_url: url,
+    donation_phone: phone,
+    donation_app: app,
+    donation_holder: holder,
+  };
+}
+
+/**
+ * Ninguna fila tocada con la llamada aceptada significa que la rechazó la RLS. Un
+ * update que no encuentra fila no da error, así que sin esto guardar sin permiso
+ * se leería como guardar bien: la pantalla volvería con el canal viejo y sin decir
+ * por qué.
+ */
+function assertChannelSaved(rows: unknown[] | null) {
+  if (!rows || rows.length === 0) {
+    throw new Error(
+      "La base de datos no dejó cambiar el canal. Comprueba que tu cuenta sigue siendo de coordinación.",
+    );
+  }
+}
+
+export async function saveCityDonationChannel(formData: FormData) {
   const { supabase } = await requireCoordination();
+  const id = optionalId(formData, "id");
+  if (!id) throw new Error("Falta el municipio.");
 
-  const value = text(formData, "key_value");
-  const app = text(formData, "app_label");
-  const holder = text(formData, "holder");
-
-  if (/^https?:\/\//i.test(value) || value.includes("/")) {
-    throw new Error(
-      "Eso parece un enlace y no una llave. El enlace de donación de una fundación va en su ficha, dentro del municipio.",
-    );
-  }
-  if (/\s/.test(value)) {
-    throw new Error("Una llave no lleva espacios. Revisa lo que pegaste antes de guardar.");
-  }
-  if (value.length > 64) {
-    throw new Error("Esa llave es demasiado larga para ser una llave. Comprueba que no sobra nada.");
-  }
-
-  // Vaciarla tiene que ser tan fácil como ponerla: si la llave se compromete, lo
-  // primero es que el portal deje de enseñarla, y eso no puede depender de tener a
-  // mano la siguiente. Con la llave vacía las tres pantallas públicas dejan de
-  // pintar la sección en la misma petición.
   const { data, error } = await supabase
-    .from("donation_key")
-    .update({ key_value: value, app_label: app, holder })
-    .eq("singleton", true)
-    .select("key_value");
+    .from("cities")
+    .update(donationChannelValues(formData))
+    .eq("id", id)
+    .select("id");
 
-  if (error) fail("No se pudo guardar la llave", error);
+  if (error) fail("No se pudo guardar el canal del municipio", error);
+  assertChannelSaved(data);
+}
 
-  // Ninguna fila tocada con la llamada aceptada significa que la rechazó la RLS.
-  // Un update que no encuentra fila no da error, así que sin esto guardar sin
-  // permiso se leería como guardar bien: la pantalla volvería con la llave vieja y
-  // sin decir por qué.
-  if (!data || data.length === 0) {
-    throw new Error(
-      "La base de datos no dejó cambiar la llave. Comprueba que tu cuenta sigue siendo de coordinación.",
-    );
-  }
+export async function saveCaseDonationChannel(formData: FormData) {
+  const { supabase } = await requireCoordination();
+  const id = optionalId(formData, "id");
+  if (!id) throw new Error("Falta el caso.");
+
+  const { data, error } = await supabase
+    .from("cases")
+    .update(donationChannelValues(formData))
+    .eq("id", id)
+    .select("id");
+
+  if (error) fail("No se pudo guardar el canal del caso", error);
+  assertChannelSaved(data);
 }
 
 // ---------------------------------------------------------------------------
@@ -369,6 +468,10 @@ export async function createCase(formData: FormData) {
 
   const { supabase } = await requireCity(cityId);
 
+  // Sin canal de donación, y no es un olvido: un caso nace sin él y lo pone
+  // coordinación después, desde la ficha. Mandarlo aquí lo rechazaría el
+  // disparador `guard_donation_channel` para quien documenta, que es quien crea
+  // casi todos los casos.
   const { data, error } = await supabase
     .from("cases")
     .insert({
@@ -376,7 +479,6 @@ export async function createCase(formData: FormData) {
       display_name: text(formData, "display_name"),
       household: text(formData, "household"),
       story: text(formData, "story"),
-      donation_url: text(formData, "donation_url"),
       consent_to_publish: bool(formData, "consent_to_publish"),
     })
     .select("id")
@@ -400,13 +502,17 @@ export async function updateCase(formData: FormData) {
     throw new Error("Un caso no se puede publicar sin el consentimiento de la persona.");
   }
 
+  // El canal de donación no va en este update, y quitarlo de aquí no fue una
+  // limpieza: mandarlo rompía el formulario. Quien documenta no ve ese campo, así
+  // que llegaría vacío, y un vacío distinto de lo guardado es un cambio de canal
+  // que el disparador rechaza —con la ficha entera detrás—. Se guarda aparte, en
+  // `saveCaseDonationChannel`.
   const { error } = await supabase
     .from("cases")
     .update({
       display_name: text(formData, "display_name"),
       household: text(formData, "household"),
       story: text(formData, "story"),
-      donation_url: text(formData, "donation_url"),
       consent_to_publish: consent,
       published,
     })
@@ -658,15 +764,31 @@ export async function updateOffer(formData: FormData) {
   const status = text(formData, "status");
   const delivered = text(formData, "delivered_on");
 
+  // El estado se comprueba contra la lista del desplegable y no se pasa tal cual.
+  // Llega de un formulario, así que puede llegar cualquier cosa —o nada, si el
+  // campo se queda fuera del envío—, y `offers_status_valid` (0012) lo rechazaría
+  // con un error que habla de una restricción y no de lo que hay que arreglar.
+  if (!OFFER_STATUSES.some((option) => option.value === status)) {
+    throw new Error("Ese estado no existe para una oferta.");
+  }
+
   if (delivered && !/^\d{4}-\d{2}-\d{2}$/.test(delivered)) {
     throw new Error("La fecha de entrega no tiene el formato de una fecha.");
   }
   if (delivered && delivered > new Date().toISOString().slice(0, 10)) {
     throw new Error("Esa entrega está en el futuro. El registro es de lo que ya llegó.");
   }
-  if (delivered && status === "rechazada") {
+  // Una fecha de entrega dice que aquello llegó, y hay dos estados que dicen que
+  // no va a llegar. Se avisa en vez de arreglarlo por dentro: la línea de abajo
+  // convierte en aceptada cualquier oferta con fecha —lo que llegó, se acepta—, y
+  // aplicar eso aquí reescribiría en silencio una decisión del equipo. Con
+  // `retirada` sería además la peor de las dos: devolvería al muro público, y
+  // encima como entregada, justo la oferta que alguien acababa de quitar de ahí.
+  // La base de datos también lo rechaza (`offers_delivery_requires_acceptance`,
+  // 0002); esto es para que se lea qué hacer.
+  if (delivered && (status === "rechazada" || status === "retirada")) {
     throw new Error(
-      "Una oferta rechazada no puede figurar como entregada: quita la fecha o cambia el estado.",
+      `Una oferta ${status} no puede figurar como entregada: quita la fecha o cambia el estado.`,
     );
   }
 
@@ -715,6 +837,53 @@ export async function updateOffer(formData: FormData) {
 
   const { error } = await supabase.from("offers").update(values).eq("id", id);
   if (error) fail("No se pudo actualizar la oferta", error);
+}
+
+/**
+ * Quita una oferta del muro público, de un clic.
+ *
+ * Es la salida rápida que necesita un muro que no está moderado: desde 0012 una
+ * oferta se publica en /ofrecido en cuanto entra —sin contacto y con los
+ * teléfonos del texto tapados, pero sin que nadie la haya leído—, así que la
+ * bandeja tiene que poder sacarla en un gesto y no en tres. `retirada` y no
+ * `rechazada`: rechazar dice que el equipo habló con esa persona y decidió, y es
+ * el campo con el que después se le responde.
+ *
+ * Escribe UNA columna y ninguna más, y ahí está el cuidado que justifica una
+ * acción aparte. Mandar un formulario de un solo campo a `updateOffer` habría
+ * borrado las notas del equipo, la fecha y el vínculo con la necesidad, porque
+ * esa acción escribe todo lo que le llega y lo que no le llega, le llega vacío.
+ * Un clic no puede tener ese alcance.
+ *
+ * Y no pide confirmación, al contrario que borrar, porque no se pierde nada: la
+ * fila se queda en la bandeja con su contacto y sus notas, se lista en el filtro
+ * de retiradas, y para reponerla basta el desplegable de estado. La asimetría es
+ * deliberada —un clic para quitar, dos para volver a publicar—: quitar de más se
+ * arregla en veinte segundos y publicar de más ya lo ha leído alguien.
+ */
+export async function withdrawOffer(formData: FormData) {
+  const id = optionalId(formData, "id");
+  if (!id) throw new Error("Falta la oferta.");
+
+  // Igual que en `updateOffer`: el municipio se lee de la fila y no del
+  // formulario, así que quien documenta solo puede retirar las de los municipios
+  // que atiende y las que llegaron sin municipio son de coordinación. Las RLS
+  // (`offers_scoped_update`, 0002) lo rechazarían igual.
+  const { supabase } = await requireRowCity("offers", id);
+
+  // Una entrega ya registrada no se retira. `offers_delivery_requires_acceptance`
+  // (0002) lo rechaza, y con razón: retirarla sería borrar que aquello llegó. Si
+  // esto salta, la fila no es la que creía quien pulsó —lo entregado no está en
+  // el muro, está en el registro de ayudas—, así que el mensaje lo dice.
+  const { data } = await supabase.from("offers").select("delivered_on").eq("id", id).maybeSingle();
+  if ((data as { delivered_on: string | null } | null)?.delivered_on) {
+    throw new Error(
+      "Esa ayuda ya está registrada como entregada, así que no está en el muro. Si de verdad quieres retirarla, quita antes la fecha de entrega.",
+    );
+  }
+
+  const { error } = await supabase.from("offers").update({ status: "retirada" }).eq("id", id);
+  if (error) fail("No se pudo quitar la oferta del muro", error);
 }
 
 // ---------------------------------------------------------------------------

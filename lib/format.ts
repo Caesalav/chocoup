@@ -51,6 +51,21 @@ export function telLink(value: string): string {
 }
 
 /**
+ * El número como se lee, no como se guarda. Un móvil colombiano de diez
+ * dígitos se parte en grupos de tres: es como se dicta y como cabe en un
+ * titular. Cualquier otra forma se deja tal cual.
+ */
+export function formatPhone(value: string): string {
+  const digits = digitsOnly(value);
+  const local =
+    digits.length === 12 && digits.startsWith("57") ? digits.slice(2) : digits;
+  if (local.length === 10 && local.startsWith("3")) {
+    return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
+  }
+  return value.trim();
+}
+
+/**
  * Convierte lo que el equipo escribe en un enlace seguro para un href. Acepta
  * "atratovive.org/donar" y le añade https://; descarta cualquier esquema que no
  * sea http/https, así un campo mal usado nunca acaba en un javascript: en un botón.

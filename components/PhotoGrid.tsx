@@ -79,10 +79,10 @@ export function PhotoGrid({ photos, overlay = false }: Props) {
             <button
               type="button"
               onClick={() => setOpenIndex(index)}
-              className={`group relative block w-full overflow-hidden bg-land transition-colors ${
+              className={`group relative block w-full overflow-hidden ${
                 overlay
-                  ? "rounded-2xl ring-1 ring-paper/40 hover:ring-paper/70"
-                  : "rounded-lg border border-line hover:border-line-strong"
+                  ? "rounded-2xl"
+                  : "rounded-lg border border-line bg-land hover:border-line-strong"
               }`}
             >
               <FramedPhoto
@@ -90,7 +90,7 @@ export function PhotoGrid({ photos, overlay = false }: Props) {
                 alt={photo.caption || "Situación documentada"}
                 frame={savedFrame(photo)}
                 eager={index < 3}
-                className="aspect-[3/2] w-full"
+                className={`aspect-[3/2] w-full ${overlay ? "rounded-2xl !bg-transparent" : ""}`}
               />
             </button>
           </li>

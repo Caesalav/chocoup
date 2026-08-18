@@ -28,8 +28,8 @@
 --
 -- Lo que este archivo NO toca, y conviene saberlo antes de ejecutarlo con prisa:
 -- el caso real de Quibdó —publicado, con consentimiento, retrato, doce fotos en
--- Storage, cinco avances y dos necesidades—, el propio Quibdó, y la llave de
--- transferencia de public.donation_key, que es la de verdad.
+-- Storage, cinco avances, dos necesidades y su canal de donación `@soschoco`—, y
+-- el propio Quibdó.
 
 begin;
 
@@ -56,10 +56,19 @@ where storage_path like 'demo/%';
 delete from public.foundations
 where name like '%(prueba)%';
 
+-- Los municipios de prueba llevan además un canal de donación de muestra, y se
+-- vacía aquí con lo demás. Es lo único de este archivo que, si se olvidara,
+-- dejaría un destino de dinero inventado colgando de un municipio del Chocó de
+-- verdad, ya sin la marca «(prueba)» que lo delataba.
 update public.cities
 set name = replace(name, ' (prueba)', ''),
     summary = '',
-    published = false
+    published = false,
+    donation_key = '',
+    donation_url = '',
+    donation_phone = '',
+    donation_app = '',
+    donation_holder = ''
 where name like '%(prueba)%';
 
 commit;
@@ -86,6 +95,19 @@ select (select count(*) from public.cases where story like 'CASO DE PRUEBA%')
        (select count(*) from public.photos) as fotos_que_quedan,
        (select count(*) from public.cities) as municipios,
        (select count(*) from public.cities where published) as publicados;
+
+-- Y los destinos de dinero que quedan publicados, uno por línea. Tiene que salir
+-- solo el del caso real. Cualquier otra fila aquí es un canal de muestra que
+-- sobrevivió al borrado, y eso es lo peor que puede quedarse: un destino
+-- inventado en una ficha que ya no dice «prueba» en ninguna parte.
+select 'municipio' as nivel, name as quien, donation_key, donation_url, donation_phone
+from public.cities where donation_key <> '' or donation_url <> '' or donation_phone <> ''
+union all
+select 'caso', display_name, donation_key, donation_url, donation_phone
+from public.cases where donation_key <> '' or donation_url <> '' or donation_phone <> ''
+union all
+select 'fundacion', name, '', donation_url, ''
+from public.foundations where donation_url <> '';
 
 -- Y si algún día vuelve a haber contenido de prueba que este archivo no cubra,
 -- lo delata su identificador: todo lo que carga supabase/datos-de-prueba.sql

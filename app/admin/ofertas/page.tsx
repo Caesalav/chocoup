@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { updateOffer } from "@/app/admin/actions";
+import { updateOffer, withdrawOffer } from "@/app/admin/actions";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { CategoryChip, OfferStatusChip } from "@/components/ui/Chip";
 import { eyebrow, field, panel } from "@/components/ui/styles";
@@ -11,10 +11,18 @@ import type { OfferStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * «Retiradas» tiene bandeja propia y no se queda dentro de «Todas», porque una
+ * baja de un clic tiene que poder deshacerse: sin este filtro, lo que se quita
+ * del muro solo se vuelve a encontrar rebuscando en la lista entera, y un botón
+ * que esconde lo que toca se usa con miedo. Va detrás de «Rechazadas» y delante
+ * de «Todas», en el mismo orden que el desplegable de estado.
+ */
 const FILTERS = [
   { value: "pendiente", label: "Pendientes" },
   { value: "aceptada", label: "Aceptadas" },
   { value: "rechazada", label: "Rechazadas" },
+  { value: "retirada", label: "Retiradas" },
   { value: "todas", label: "Todas" },
 ] as const;
 
@@ -40,6 +48,19 @@ export default async function OffersPage({ searchParams }: Props) {
       <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
         Cada oferta trae un contacto que solo ve el equipo. Al aceptarla, escríbele y ponla en
         contacto con la fundación del municipio o con la familia.
+      </p>
+      {/* Lo que cambió con el muro de lo prometido, y que el equipo tiene que
+          saber antes de nada: una oferta ya no espera invisible en esta bandeja.
+          Se publica al entrar. */}
+      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
+        En cuanto una oferta entra, sale publicada en{" "}
+        <Link href="/ofrecido" className="text-accent hover:underline">
+          lo que se ha ofrecido
+        </Link>
+        : el texto del recurso, su tipo, el municipio y el día. No el contacto, no el mensaje, no el
+        caso al que apunta, y el nombre solo si la persona lo autorizó y además tú ya aceptaste la
+        oferta. Nadie la lee antes de que se publique, así que si algo no debería estar ahí, quítalo
+        con el botón de su ficha.
       </p>
       <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
         Cuando la ayuda llegue de verdad, anota el día. Eso —y solo eso— es lo que la publica en el{" "}
@@ -241,6 +262,41 @@ export default async function OffersPage({ searchParams }: Props) {
 
                   <SubmitButton variant="secondary">Guardar</SubmitButton>
                 </form>
+
+                {/* Quitar del muro va en su propio formulario, y no es una
+                    cuestión de estilo: son dos envíos distintos y un <form> no
+                    puede vivir dentro de otro. Que esté aparte es además lo que
+                    lo hace de un clic —no arrastra el resto de los campos, así
+                    que no puede borrar unas notas al pasar—.
+
+                    Solo en las pendientes. Son las que se publican sin que nadie
+                    las haya leído, que es el problema que este botón ataja. Una
+                    aceptada también se puede retirar, pero por el desplegable:
+                    detrás hay una conversación, y perderla de un clic cuesta más
+                    que el clic que se ahorra.
+
+                    Que la oferta esté de verdad en el muro depende también de la
+                    caducidad de ocho semanas y de que su municipio siga
+                    publicado (0012). Eso no se recalcula aquí: una copia de ese
+                    filtro en esta página se separaría de la vista sin avisar, y
+                    lo que este botón decide es lo único que decide el equipo, que
+                    es el estado. */}
+                {offer.status === "pendiente" && (
+                  <form
+                    action={withdrawOffer}
+                    className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3"
+                  >
+                    <input type="hidden" name="id" value={offer.id} />
+                    <SubmitButton variant="ghost" pendingLabel="Quitando…">
+                      Quitar del muro
+                    </SubmitButton>
+                    <p className="max-w-prose text-xs leading-relaxed text-muted">
+                      Sale de «Lo que se ha ofrecido» al momento y queda como retirada. No se borra
+                      nada: sigue aquí, con su contacto y sus notas, y para reponerla basta con
+                      volver a ponerla en «Pendiente» arriba.
+                    </p>
+                  </form>
+                )}
               </li>
             );
           })}

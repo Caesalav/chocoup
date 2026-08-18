@@ -20,12 +20,26 @@
  * donación, que la migración que impone esa regla se niegue a aplicarse en vez de
  * borrar una de las dos, que el retrato de una persona no pueda ser la foto de
  * otra, que la foto de un avance no pueda ser la de otra familia, que el encuadre
- * de una foto solo lo pueda mover quien documenta ese municipio, que la llave de
- * transferencia del portal sea una sola y solo la pueda cambiar coordinación —ni
- * quien documenta, ni el público, y nadie en absoluto crear una segunda o borrar la
- * única—, que el rastro de quién la cambió lo escriba la base de datos y no quien
- * llama, que volver a pegar su migración no devuelva la llave vieja, y que
- * despublicar un municipio esconda todo su contenido.
+ * de una foto solo lo pueda mover quien documenta ese municipio, que el canal de
+ * donación de un municipio o de un caso solo lo ponga coordinación —comprobado
+ * también desde la sesión de quien documenta ese mismo municipio, que es la que
+ * llega hasta ahí—, que un canal sea una llave o un enlace y nunca los dos, que un
+ * caso sin canal propio no herede el de nadie, que el público los lea y no los
+ * toque, que la llave global del portal ya no exista ni vuelva al volver a pegar
+ * las migraciones, que del registro de lo que se ha prometido no salgan ni el
+ * contacto ni el mensaje ni el caso, que una oferta dirigida a una familia no
+ * publique la frase que la describiría —ni llegando por su caso ni llegando por
+ * su necesidad— y que las de zona sí la publiquen, que un teléfono o un correo
+ * escritos dentro del texto de una oferta salgan tapados sin que se lleven por
+ * delante las cantidades, que el nombre de quien ofrece no se publique mientras nadie del
+ * equipo haya hablado con esa persona, que lo prometido y lo entregado sean dos
+ * listas sin ninguna fila en común, que una promesa caduque sola a las ocho
+ * semanas, que desde ese registro se pueda llegar al municipio y a la necesidad
+ * de una oferta —para que quien la complete llegue emparejado a la bandeja— sin
+ * pasar por la tabla donde está su contacto, que retirar una oferta la saque del
+ * muro al momento sin borrar nada y solo la pueda retirar quien atiende ese
+ * municipio, y que despublicar un municipio esconda todo su contenido, canales
+ * incluidos.
  *
  * Y una comprobación que no es sobre el esquema sino sobre este archivo: que la
  * lista `MIGRATIONS` no se haya quedado corta. Es el descuido que dejó a `0009`
@@ -139,6 +153,9 @@ const MIGRATIONS = [
   "migrations/0008_permiso_de_tabla_del_publico.sql",
   "migrations/0009_encuadre_de_fotos.sql",
   "migrations/0010_llave_de_transferencia.sql",
+  "migrations/0011_canal_de_donacion.sql",
+  "migrations/0012_registro_de_lo_ofrecido.sql",
+  "migrations/0013_canal_de_telefono.sql",
 ];
 const migration = (file) => readFileSync(join(HERE, file), "utf8");
 
@@ -237,7 +254,7 @@ check("El bucket fotos existe y es público", bucket?.public === true);
 const policyCount = await one(
   "select count(*)::int as n from pg_policies where schemaname in ('public','storage')",
 );
-check("Se crean las 38 políticas RLS", policyCount.n === 38, `n=${policyCount.n}`);
+check("Se crean las 36 políticas RLS", policyCount.n === 36, `n=${policyCount.n}`);
 
 // ===========================================================================
 // El permiso de tabla: la otra mitad de cada regla de acceso
@@ -260,11 +277,9 @@ const PUBLIC_TABLE_PRIVS = {
   case_updates: { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
   cases:        { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
   cities:       { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
-  // La única fila del portal que nadie puede crear ni borrar por la API: la
-  // escribe 0010 y desde entonces solo se actualiza. Ver su sección más abajo.
-  donation_key: { anon: "SELECT", authenticated: "SELECT,UPDATE" },
   foundations:  { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
   needs:        { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
+  offer_log:    { anon: "SELECT", authenticated: "SELECT" },
   offers:       { anon: "INSERT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
   photos:       { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
 };
@@ -1610,16 +1625,22 @@ await sql(
      where offerer_name = 'Marta, 3167778899'`,
 );
 
-// --- Seguimiento y donación de cada caso --------------------------------
+// --- Seguimiento del caso -----------------------------------------------
 await asUser("documenta@test.com");
 await sql(`
 insert into public.case_updates (case_id, city_id, happened_on, title, body)
   select id, city_id, '2026-08-12', 'Llegaron bloques', 'Ochenta, de un vecino.'
   from public.cases where display_name = 'Familia Mosquera';
-update public.cases set donation_url = 'https://vaki.co/vaki/mosquera'
-  where display_name = 'Familia Mosquera';
 `);
-check("Quien documenta anota el seguimiento y el destino de donación de su municipio", true);
+check("Quien documenta anota el seguimiento de su municipio", true);
+
+// El canal de donación del caso no lo pone quien documenta —eso tiene su propia
+// sección, más abajo—, así que aquí lo escribe coordinación para poder
+// comprobar después que el público lo lee.
+await asUser("charlie@test.com");
+await sql(`update public.cases set donation_url = 'https://vaki.co/vaki/mosquera'
+  where display_name = 'Familia Mosquera'`);
+await asUser("documenta@test.com");
 
 await expectError(
   "Quien documenta no anota seguimiento en un municipio ajeno",
@@ -1675,7 +1696,7 @@ const publicFollow = await one(`select
   (select photo_id is not null from public.case_updates limit 1) as con_foto,
   (select donation_url from public.cases where display_name = 'Familia Mosquera') as donar`);
 check(
-  "El público ve el seguimiento, su foto y el destino de donación del caso publicado",
+  "El público ve el seguimiento, su foto y el canal de donación del caso publicado",
   publicFollow.notas === 1 &&
     publicFollow.con_foto === true &&
     publicFollow.donar === "https://vaki.co/vaki/mosquera",
@@ -1941,208 +1962,962 @@ check(
 );
 
 // ===========================================================================
-// La llave de transferencia del portal
+// El canal de donación: uno por municipio y uno por caso
 //
-// `@soschoco` no es una dirección web: es una llave que se copia y se pega en la
-// app del banco, así que tiene su propio campo —0010— y no cabe en el
-// `donation_url` de una fundación. Y es UNA para todo el portal, no una por
-// municipio, de modo que quien la cambia redirige el dinero de todas las
-// pantallas a la vez. Es la escritura más peligrosa que existe aquí y la única
-// que no borra nada: una llave cambiada se ve igual de bien que la buena.
+// Aquí vivía la llave global del portal, que 0011 retira. `@soschoco` nunca fue
+// «la llave del Chocó»: es el canal del caso de Quibdó y de nadie más. Cada
+// municipio va a tener el suyo y cada caso el suyo, y el destino del dinero pasa
+// a ser una columna de la fila de quien lo recibe.
 //
-// De ahí lo que hay que demostrar, y son cuatro cosas distintas:
+// Eso cambia lo que hay que demostrar, y las cuatro cosas son distintas de las
+// de antes:
 //
-//   1. Que solo pueda haber una. Si pudieran haber dos, «la llave» volvería a ser
-//      «la primera que devuelva la consulta», que es el fallo que 0004 tuvo que
-//      arreglar en las fundaciones: el destino del dinero decidido por un orden.
-//   2. Que la cambie solo coordinación, con la misma función que las fundaciones
-//      —`private.is_coordination()`— y comprobado también desde la sesión de quien
-//      documenta, que es la que existe de verdad en cuarenta teléfonos.
-//   3. Que crear una segunda o borrar la única estén cerrados por las dos capas a
-//      la vez: ninguna política los permite y ningún permiso de tabla los
-//      concede. Vaciar esta fila dejaría al portal sin ningún destino.
-//   4. Que el rastro de quién la tocó lo escriba la base de datos desde el token y
-//      no quien llama, porque el día que el dinero aparezca en otra cuenta esa
-//      columna es lo único que va a haber.
-//
-// Y una que no es de acceso pero pesa igual: que volver a pegar la migración no
-// devuelva la llave a `@soschoco`. Todas las migraciones de este proyecto se
-// vuelven a pegar cuando hay que reconstruir algo; un `do update` en el insert
-// inicial haría que un mantenimiento rutinario, sin error a la vista, mandara las
-// donaciones a una cuenta vieja.
+//   1. Que la llave global no exista ya en ninguna forma, ni vuelva pegando otra
+//      vez las migraciones en orden.
+//   2. Que un canal sea una llave O un enlace, nunca los dos. Con los dos
+//      puestos, «el canal» volvería a ser «el que la página mire primero», que es
+//      el destino del dinero decidido por un orden que 0004 tuvo que arreglar en
+//      las fundaciones. Y en terreno el fallo real es cambiar de destino con
+//      prisa y olvidar borrar el anterior.
+//   3. Que solo coordinación lo escriba, y esto es lo que no se parece a nada de
+//      lo de arriba: quien documenta SÍ puede escribir en el caso entero de su
+//      municipio —es su trabajo—, así que la política de la tabla lo deja pasar y
+//      quien lo para es el disparador. Por eso se prueba con la sesión de
+//      documentación DE ESE MISMO MUNICIPIO, que es la única que llega hasta ahí,
+//      y se prueba también que sigue pudiendo guardar el resto de la ficha.
+//   4. Que no haya herencia. Un caso sin canal propio lee vacío aunque su
+//      municipio tenga uno: el dinero no puede acabar en un sitio que nadie
+//      eligió para esa persona.
 // ===========================================================================
 
 await asPostgres();
-const seededKey = await one(`select
-  (select count(*)::int from public.donation_key) as filas,
-  (select key_value from public.donation_key)    as llave,
-  (select updated_by from public.donation_key)   as por`);
+
+// --- La llave global no está, y no vuelve --------------------------------
+const globalKeyGone = await one(`select
+  (select count(*)::int from information_schema.tables
+     where table_schema = 'public' and table_name = 'donation_key')            as tabla,
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'private' and p.proname = 'stamp_donation_key')         as sello`);
 check(
-  "La migración deja una sola fila con la llave del portal escrita",
-  seededKey.filas === 1 && seededKey.llave === "@soschoco",
-  JSON.stringify(seededKey),
+  "La llave global del portal ya no existe, ni la tabla ni su disparador",
+  globalKeyGone.tabla === 0 && globalKeyGone.sello === 0,
+  JSON.stringify(globalKeyGone),
 );
 
-// La migración no corre con sesión, así que el rastro tiene que decir eso y no
-// inventarse un correo. Vacío es la verdad: no hubo nadie.
+const channelColumns = await one(`select
+  (select count(*)::int from information_schema.columns
+     where table_schema = 'public' and table_name = 'cities'
+       and column_name in ('donation_key','donation_url','donation_app','donation_holder')) as municipio,
+  (select count(*)::int from information_schema.columns
+     where table_schema = 'public' and table_name = 'cases'
+       and column_name in ('donation_key','donation_url','donation_app','donation_holder')) as caso`);
 check(
-  "La llave inicial no queda atribuida a ninguna sesión, porque la escribió una migración",
-  seededKey.por === "",
-  `updated_by=${JSON.stringify(seededKey.por)}`,
+  "Los dos niveles tienen las cuatro columnas del canal, así que los dos admiten llave y enlace",
+  channelColumns.municipio === 4 && channelColumns.caso === 4,
+  JSON.stringify(channelColumns),
 );
 
-// --- Una, y ni una más --------------------------------------------------
-await expectError(
-  "No puede haber una segunda llave en el portal, ni escribiéndola como propietario",
-  "insert into public.donation_key (singleton, key_value) values (false, '@otra')",
-  "donation_key_one_row",
-);
-
-// --- El público la lee y no la toca -------------------------------------
-await asAnon();
-const anonKey = await one("select key_value, app_label, holder from public.donation_key");
-check(
-  "El público lee la llave, que es justo para lo que está",
-  anonKey.key_value === "@soschoco",
-  JSON.stringify(anonKey),
-);
-
-// Ni siquiera llega a las políticas: 0010 le deja `select` y nada más, igual que
-// 0008 hizo con las otras siete tablas.
-await expectError(
-  "El público no puede cambiar la llave a la que transfiere todo el mundo",
-  "update public.donation_key set key_value = '@ladron'",
-  "permission denied",
-);
-
-await expectError(
-  "El público no puede borrar la llave del portal",
-  "delete from public.donation_key",
-  "permission denied",
-);
-
-await expectError(
-  "El público no puede colar una llave nueva",
-  "insert into public.donation_key (singleton, key_value) values (false, '@ladron')",
-  "permission denied",
-);
-
-// --- Coordinación sí ----------------------------------------------------
-await asUser("charlie@test.com");
-await sql(`update public.donation_key
-  set key_value = '@soschoco2', app_label = 'Bre-B', holder = 'Colectivo Chocó-up'`);
-
-await asPostgres();
-const changedKey = await one("select key_value, app_label, holder, updated_by from public.donation_key");
-check(
-  "Coordinación cambia la llave, la app donde se usa y a nombre de quién aparece",
-  changedKey.key_value === "@soschoco2" &&
-    changedKey.app_label === "Bre-B" &&
-    changedKey.holder === "Colectivo Chocó-up",
-  JSON.stringify(changedKey),
-);
-
-// El rastro sale del token, así que dice de qué sesión salió el cambio.
-check(
-  "La fila guarda desde qué sesión se cambió la llave",
-  changedKey.updated_by === "charlie@test.com",
-  `updated_by=${changedKey.updated_by}`,
-);
-
-// Y no se puede firmar con el correo de otra persona: el disparador reescribe la
-// columna después de que llegue lo que llegue. Sin esto, el rastro contaría lo que
-// quisiera contar quien hizo el cambio.
-await asUser("charlie@test.com");
-await sql(`update public.donation_key
-  set key_value = '@soschoco3', updated_by = 'otra.persona@test.com'`);
-
-await asPostgres();
-const stamped = await one("select key_value, updated_by from public.donation_key");
-check(
-  "El rastro no se puede firmar con el correo de otra persona",
-  stamped.key_value === "@soschoco3" && stamped.updated_by === "charlie@test.com",
-  JSON.stringify(stamped),
-);
-
-// Vaciarla es una operación legítima y tiene que estar disponible: si la llave se
-// compromete, lo primero es que el portal deje de enseñarla, y eso no puede
-// depender de tener a mano la siguiente. La capa de datos lee la cadena vacía como
-// «no hay llave» y ninguna pantalla pinta el bloque.
-await asUser("charlie@test.com");
-await sql("update public.donation_key set key_value = ''");
-await asPostgres();
-const emptied = await one("select key_value from public.donation_key");
-check(
-  "Coordinación puede retirar la llave, que es lo primero que hay que hacer si se compromete",
-  emptied.key_value === "",
-  JSON.stringify(emptied),
-);
-
-await asUser("charlie@test.com");
-await sql("update public.donation_key set key_value = '@soschoco3'");
-
-// --- Coordinación tampoco crea ni borra ---------------------------------
+// --- Una llave o un enlace, nunca los dos --------------------------------
 //
-// No es desconfianza, es que no hay operación que lo necesite: la fila la escribe
-// la migración y el panel solo la actualiza. Cerrado por permiso Y sin política que
-// lo permita, así que cada barrera aguanta sin la otra.
+// Como propietario, así que el disparador no interviene: lo que se comprueba
+// aquí es la restricción de la tabla, que aguanta venga de donde venga.
+await expectError(
+  "Un municipio no puede tener a la vez una llave y un enlace",
+  `update public.cities set donation_key = '@quibdo', donation_url = 'https://ejemplo.org/donar'
+     where slug = 'quibdo'`,
+  "cities_donation_one_channel",
+);
+
+await expectError(
+  "Un caso no puede tener a la vez una llave y un enlace",
+  `update public.cases set donation_key = '@familia', donation_url = 'https://ejemplo.org/donar'
+     where display_name = 'Familia Rentería'`,
+  "cases_donation_one_channel",
+);
+
+// --- Coordinación pone los canales ---------------------------------------
 await asUser("charlie@test.com");
-await expectError(
-  "Ni coordinación puede borrar la única fila, que dejaría al portal sin destino",
-  "delete from public.donation_key",
-  "permission denied",
+// El caso se publica aquí de paso: hace falta que el público llegue a él para
+// poder comprobar más abajo que lee su canal, y sin consentimiento no se puede
+// publicar (`cases_publish_requires_consent`).
+await sql(`
+update public.cities set donation_key = '@quibdo-alcaldia', donation_app = 'Bre-B',
+  donation_holder = 'Alcaldía de Quibdó' where slug = 'quibdo';
+update public.cases set donation_key = '@soschoco', consent_to_publish = true, published = true
+  where display_name = 'Familia Rentería';
+`);
+
+await asPostgres();
+const written = await one(`select
+  (select donation_key    from public.cities where slug = 'quibdo')                      as ciudad_llave,
+  (select donation_holder from public.cities where slug = 'quibdo')                      as ciudad_titular,
+  (select donation_key    from public.cases  where display_name = 'Familia Rentería')    as caso_llave,
+  (select donation_url    from public.cases  where display_name = 'Familia Mosquera')    as caso_enlace`);
+check(
+  "Coordinación pone el canal del municipio y el del caso, en llave y en enlace",
+  written.ciudad_llave === "@quibdo-alcaldia" &&
+    written.ciudad_titular === "Alcaldía de Quibdó" &&
+    written.caso_llave === "@soschoco" &&
+    written.caso_enlace === "https://vaki.co/vaki/mosquera",
+  JSON.stringify(written),
 );
 
-await expectError(
-  "Ni coordinación puede crear una segunda llave por la API",
-  "insert into public.donation_key (singleton, key_value) values (false, '@paralela')",
-  "permission denied",
-);
-
-// --- Quien documenta, no ------------------------------------------------
+// --- Un municipio sin fundación también puede tener canal ----------------
 //
-// Un UPDATE sin política aplicable no lanza error: no encuentra ninguna fila. Se
-// comprueba que no toque nada Y que la llave siga donde estaba, que es la garantía
-// de verdad. Esta es la sesión que va a existir en los teléfonos del equipo que
-// documenta, así que es la que importa: en terreno, con el móvil delante de una
-// familia, nadie tiene que poder redirigir las donaciones del portal entero.
+// Es el motivo de que el canal del municipio no viva en `foundations`: Quibdó no
+// tiene fundación y es el único municipio real publicado. Si el canal colgara de
+// la fundación, el único pueblo con una persona documentada esperando sería
+// justo el que no puede tener a dónde recibir.
+await sql(`update public.cities set donation_key = '@sin-fundacion' where slug = 'condoto'`);
+const cityWithoutFoundation = await one(`select
+  (select donation_key from public.cities where slug = 'condoto')     as llave,
+  (select count(*)::int from public.foundations f
+     join public.cities c on c.id = f.city_id where c.slug = 'condoto') as fundaciones`);
+check(
+  "Un municipio sin fundación tiene canal propio, que es por lo que el canal no vive en la fundación",
+  cityWithoutFoundation.llave === "@sin-fundacion" && cityWithoutFoundation.fundaciones === 0,
+  JSON.stringify(cityWithoutFoundation),
+);
+
+// --- Quien documenta ese mismo municipio, no ------------------------------
+//
+// Esta es la sesión que importa y la que va a existir en los teléfonos del
+// equipo. Tiene Quibdó asignado, así que `cases_assigned_update` la deja
+// escribir la fila: sin el disparador, cambiar el canal sería una edición más
+// del caso, hecha desde el móvil y delante de la familia.
 await asUser("documenta@test.com");
-const documentaKey = await db.exec("update public.donation_key set key_value = '@desviada'");
-check(
-  "Quien documenta no cambia la llave del portal, aunque escriba en su municipio",
-  documentaKey[0].affectedRows === 0,
-  `filas=${documentaKey[0].affectedRows}`,
+
+await expectError(
+  "Quien documenta ese municipio no cambia la llave del caso, aunque pueda editar el caso entero",
+  "update public.cases set donation_key = '@desviada' where display_name = 'Familia Rentería'",
+  "canal de donación",
 );
 
-await asUser("intrusa@test.com");
-const intruderKey = await db.exec("update public.donation_key set key_value = '@desviada'");
-check(
-  "Un usuario con sesión pero fuera del equipo tampoco la cambia",
-  intruderKey[0].affectedRows === 0,
-  `filas=${intruderKey[0].affectedRows}`,
+await expectError(
+  "Tampoco el enlace, que es la otra forma del mismo canal",
+  `update public.cases set donation_url = 'https://ladron.example/donar'
+     where display_name = 'Familia Mosquera'`,
+  "canal de donación",
 );
+
+// El titular es la única comprobación que le queda a quien dona: si se pudiera
+// cambiar solo, se podría dejar la llave buena y el nombre de otra cuenta, que
+// es la forma silenciosa de este mismo daño.
+await expectError(
+  "Tampoco el titular, que es la única comprobación de quien dona",
+  "update public.cases set donation_holder = 'Otro nombre' where display_name = 'Familia Rentería'",
+  "canal de donación",
+);
+
+await expectError(
+  "Tampoco el canal de su propio municipio",
+  "update public.cities set donation_key = '@desviada' where slug = 'quibdo'",
+  "canal de donación",
+);
+
+await expectError(
+  "Ni puede crear un caso que ya venga con canal dentro",
+  `insert into public.cases (city_id, display_name, donation_key)
+     select id, 'Familia con llave', '@colada' from public.cities where slug = 'quibdo'`,
+  "canal de donación",
+);
+
+// Y lo que no se le puede quitar: seguir documentando. El disparador mira el
+// cambio y no el valor, así que una ficha con canal ya puesto se guarda entera
+// sin tropezar con él.
+await sql(`update public.cases set story = 'Se apuntaló el muro esta semana.'
+  where display_name = 'Familia Rentería'`);
 
 await asPostgres();
-const untouchedKey = await one("select key_value from public.donation_key");
+const stillWorking = await one(`select story, donation_key
+  from public.cases where display_name = 'Familia Rentería'`);
 check(
-  "Después de los dos intentos, la llave sigue siendo la que puso coordinación",
-  untouchedKey.key_value === "@soschoco3",
-  JSON.stringify(untouchedKey),
+  "Quien documenta sigue guardando el resto del caso, con el canal puesto y sin tocarlo",
+  stillWorking.story === "Se apuntaló el muro esta semana." &&
+    stillWorking.donation_key === "@soschoco",
+  JSON.stringify(stillWorking),
 );
 
-// --- Volver a pegar la migración no devuelve la llave vieja -------------
+// Lo mismo en el municipio, que es lo primero que se edita al llegar a un pueblo.
+// El disparador es el mismo, pero la fila no: aquí conviven el canal con el
+// resumen que quien documenta escribe desde el móvil.
+await asUser("documenta@test.com");
+await sql(`update public.cities set summary = 'Se documentó el barrio de la ribera.'
+  where slug = 'quibdo'`);
+
+await asPostgres();
+const cityStillWorking = await one(`select summary, donation_key, donation_holder
+  from public.cities where slug = 'quibdo'`);
+check(
+  "Quien documenta sigue guardando el resumen del municipio con su canal puesto",
+  cityStillWorking.summary === "Se documentó el barrio de la ribera." &&
+    cityStillWorking.donation_key === "@quibdo-alcaldia" &&
+    cityStillWorking.donation_holder === "Alcaldía de Quibdó",
+  JSON.stringify(cityStillWorking),
+);
+
+// --- Con sesión pero fuera del equipo ------------------------------------
+//
+// No llega al disparador: la política no le encuentra ninguna fila. Se comprueba
+// que no toque nada Y que el canal siga donde estaba, que es la garantía de
+// verdad.
+await asUser("intrusa@test.com");
+const intruderChannel = await db.exec(
+  "update public.cases set donation_key = '@desviada' where display_name = 'Familia Rentería'",
+);
+check(
+  "Un usuario con sesión pero fuera del equipo no toca ningún canal",
+  intruderChannel[0].affectedRows === 0,
+  `filas=${intruderChannel[0].affectedRows}`,
+);
+
+// --- El público lo lee y no lo toca --------------------------------------
+await asAnon();
+const publicChannels = await one(`select
+  (select donation_key    from public.cities where slug = 'quibdo')                   as ciudad,
+  (select donation_app    from public.cities where slug = 'quibdo')                   as app,
+  (select donation_holder from public.cities where slug = 'quibdo')                   as titular,
+  (select donation_key    from public.cases  where display_name = 'Familia Rentería') as caso`);
+check(
+  "El público lee los canales enteros, con su app y su titular: es justo para lo que están",
+  publicChannels.ciudad === "@quibdo-alcaldia" &&
+    publicChannels.app === "Bre-B" &&
+    publicChannels.titular === "Alcaldía de Quibdó" &&
+    publicChannels.caso === "@soschoco",
+  JSON.stringify(publicChannels),
+);
+
+// Ni llega a las políticas: `anon` solo tiene `select` en las dos tablas (0008).
+await expectError(
+  "El público no puede cambiar el canal de un municipio",
+  "update public.cities set donation_key = '@ladron' where slug = 'quibdo'",
+  "permission denied",
+);
+
+await expectError(
+  "El público no puede cambiar el canal de un caso",
+  "update public.cases set donation_key = '@ladron'",
+  "permission denied",
+);
+
+// --- Sin canal propio, no hay canal --------------------------------------
+//
+// De la regla entera, aquí se puede demostrar la mitad: que la fila de un caso
+// sin canal lee vacía aunque su municipio tenga uno. La otra mitad —que la ficha
+// no rellene ese hueco con el del municipio y lo diga con palabras— vive en la
+// página y no en el esquema, y es donde estaba el fallo que 0011 viene a
+// arreglar.
+await asUser("documenta@test.com");
+await sql(`insert into public.cases (city_id, display_name, story, consent_to_publish, published)
+  select id, 'Familia sin canal', 'Todavía no hay a dónde enviarle nada.', true, true
+  from public.cities where slug = 'quibdo'`);
+
+await asAnon();
+const noInheritance = await one(`select
+  (select donation_key || donation_url || donation_app || donation_holder
+     from public.cases where display_name = 'Familia sin canal')  as caso,
+  (select donation_key from public.cities where slug = 'quibdo')  as ciudad`);
+check(
+  "Un caso sin canal propio lee vacío aunque su municipio tenga uno: no hay herencia",
+  noInheritance.caso === "" && noInheritance.ciudad === "@quibdo-alcaldia",
+  JSON.stringify(noInheritance),
+);
+
+// El enlace de la fundación es otra cosa y sigue siendo suyo: sale dentro de su
+// tarjeta y bajo su nombre. Que las dos convivan sin mezclarse es lo que permite
+// que el canal del municipio no tuviera que sustituir a nada.
+//
+// Se mira como propietario y no como público porque Istmina está sin publicar:
+// aquí la pregunta es cómo está guardado el dato, no quién lo ve.
+await asPostgres();
+
+// `f.donation_url` va con su tabla delante y no a secas: desde 0011 la columna
+// existe también en `cities`, así que un `donation_url` suelto dentro del join
+// es ambiguo. Escribirlo entero es lo que impide que esta comprobación acabe
+// mirando el canal del municipio y dando por buena la separación que quiere
+// demostrar.
+const foundationApart = await one(`select
+  (select f.donation_url from public.foundations f
+     join public.cities c on c.id = f.city_id where c.slug = 'istmina' limit 1) as fundacion,
+  (select donation_key from public.cities where slug = 'istmina')               as municipio`);
+check(
+  "El enlace de una fundación y el canal de su municipio son dos datos distintos",
+  foundationApart.fundacion === "https://legitima.org/donar" && foundationApart.municipio === "",
+  JSON.stringify(foundationApart),
+);
+
+// --- Volver a pegar las migraciones no devuelve la llave global ----------
+//
+// Todas las migraciones de este proyecto se vuelven a pegar cuando hay que
+// reconstruir algo, y 0010 sigue en la carpeta con `@soschoco` escrita dentro.
+// Pegadas en orden, 0011 la retira otra vez y los canales se quedan donde
+// estaban. Pegar 0010 suelta sí devolvería la llave global: está dicho en su
+// propio archivo.
 await asPostgres();
 await sql(migration("migrations/0010_llave_de_transferencia.sql"));
-const keyAfterRerun = await one(
-  "select count(*)::int as filas, min(key_value) as llave, min(updated_by) as por from public.donation_key",
+await sql(migration("migrations/0011_canal_de_donacion.sql"));
+const afterRerun = await one(`select
+  (select count(*)::int from information_schema.tables
+     where table_schema = 'public' and table_name = 'donation_key')            as llave_global,
+  (select donation_key from public.cities where slug = 'quibdo')               as ciudad,
+  (select donation_key from public.cases where display_name = 'Familia Rentería') as caso`);
+check(
+  "Volver a pegar 0010 y 0011 en orden deja fuera la llave global y los canales donde estaban",
+  afterRerun.llave_global === 0 &&
+    afterRerun.ciudad === "@quibdo-alcaldia" &&
+    afterRerun.caso === "@soschoco",
+  JSON.stringify(afterRerun),
+);
+
+// ===========================================================================
+// El registro público de lo prometido
+//
+// `public.offer_log` (0012) publica lo que la gente ha ofrecido y todavía no ha
+// llegado: el tiempo de en medio que le faltaba al portal entre «lo que falta» y
+// «lo que llegó». Con ella sale al público, por primera vez, un texto que
+// escribe cualquiera desde /ofrecer sin que nadie lo revise antes —`resource`—,
+// y de ahí viene casi todo lo que hay que demostrar aquí.
+//
+// Cinco cosas, y ninguna se puede comprobar mirando la página:
+//
+//   1. Que el contacto, el mensaje y el caso no existan como columna, igual que
+//      en `aid_log`. La vista es la API: lo que no está no se puede pedir.
+//   2. Que un teléfono o un correo escritos DENTRO del texto salgan tapados. Es
+//      el atajo que alguien va a usar precisamente porque el formulario no
+//      publica su contacto, y las tres formas en que se escribe un móvil
+//      colombiano tienen que caer las tres.
+//   3. Que tapar de más no se coma una cantidad. «600 tejas de zinc de 2,44 m»
+//      es el texto real de los datos de muestra: si eso saliera tapado, el
+//      recorte se llevaría la información por la que el registro existe.
+//   4. Que el nombre no salga mientras la oferta esté pendiente. `publish_name`
+//      es permiso para figurar en una lista de cosas hechas, y con la oferta sin
+//      valorar nadie del equipo ha hablado todavía con esa persona.
+//   5. Que los dos registros sean disjuntos y que la lista caduque sola: lo
+//      entregado vive solo en `aid_log`, y una promesa de hace más de ocho
+//      semanas deja de contarse sin que nadie tenga que retirarla.
+// ===========================================================================
+
+await asPostgres();
+
+const offerLogColumns = (
+  await db.query(
+    "select column_name from information_schema.columns where table_schema = 'public' and table_name = 'offer_log'",
+  )
+).rows.map((row) => row.column_name);
+
+check(
+  "El registro de lo ofrecido no tiene contacto, ni el mensaje largo, ni las notas del equipo",
+  !offerLogColumns.includes("offerer_contact") &&
+    !offerLogColumns.includes("message") &&
+    !offerLogColumns.includes("team_notes"),
+  offerLogColumns.join(", "),
+);
+
+// `delivered_on` no está por dos motivos que se suman: es el día exacto de una
+// entrega —lo que 0002 no publica— y aquí además siempre valdría nulo, porque
+// una oferta entregada no entra en esta vista.
+check(
+  "Tampoco el caso al que apunta ni la fecha de entrega",
+  !offerLogColumns.some((name) => name.startsWith("case")) &&
+    !offerLogColumns.includes("delivered_on"),
+  offerLogColumns.join(", "),
+);
+
+// --- El estado nuevo: retirada -------------------------------------------
+const statusVocabulary = await one(
+  "select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'offers_status_valid'",
 );
 check(
-  "Volver a pegar la migración no devuelve la llave a la del primer día",
-  keyAfterRerun.filas === 1 &&
-    keyAfterRerun.llave === "@soschoco3" &&
-    keyAfterRerun.por === "charlie@test.com",
-  JSON.stringify(keyAfterRerun),
+  "«retirada» entra en el vocabulario de estados sin sacar a ninguno de los tres",
+  ["pendiente", "aceptada", "rechazada", "retirada"].every((value) =>
+    statusVocabulary.def.includes(value),
+  ),
+  statusVocabulary.def,
 );
+
+// La regla de 0002 sigue diciendo lo que tiene que decir sin nombrar el estado
+// nuevo: una retirada nunca lleva fecha de entrega.
+await expectError(
+  "Una oferta retirada no puede figurar como entregada",
+  `update public.offers set status = 'retirada', delivered_on = current_date
+     where offerer_name = 'Ferretería El Progreso'`,
+  "offers_delivery_requires_acceptance",
+);
+
+// Retirar es del equipo. Que haya una palabra más en la lista no le da al
+// público una forma nueva de escribir el estado de su propia oferta.
+await asAnon();
+await expectError(
+  "El público no puede enviar una oferta ya retirada",
+  `insert into public.offers (offerer_name, offerer_contact, resource, status)
+     values ('Bot', '3001112222', 'algo', 'retirada')`,
+  "row-level security",
+);
+
+// --- El escenario: una oferta de cada clase ------------------------------
+//
+// Se cargan como propietario para poder fijar el estado y la fecha a mano, que
+// es lo que hace el equipo desde la bandeja y lo que la política de inserción no
+// deja hacer al público.
+await asPostgres();
+await sql(`
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category,
+                           status, publish_name, created_at)
+select q.id, s.nombre, s.contacto, s.recurso, s.categoria, s.estado, s.publicar,
+       now() - s.antiguedad
+from (select id from public.cities where slug = 'quibdo') q
+cross join (values
+  ('Móvil pegado',        '3001110001', '600 tejas, llámame al 3167778899',
+   'techo', 'pendiente', false, interval '0'),
+  ('Móvil con espacios',  '3001110002', '600 tejas, llámame al 316 777 8899',
+   'techo', 'pendiente', false, interval '0'),
+  ('Móvil con guiones',   '3001110003', '600 tejas, llámame al 316-777-8899',
+   'techo', 'pendiente', false, interval '0'),
+  ('Correo dentro del texto', '3001110004',
+   'Camión de 8 toneladas, escríbeme a bodega@transportes.co',
+   'transporte', 'pendiente', false, interval '0'),
+  ('Arroba de red social', '3001110005', 'Diez bultos de ropa por tallas, soy @martaenlaweb',
+   'ropa', 'pendiente', false, interval '0'),
+  ('Cantidades intactas', '3001110006', '600 tejas de zinc de 2,44 m y 300 bloques',
+   'techo', 'pendiente', false, interval '0'),
+  ('Promesa vieja',       '3001110007', '40 colchonetas que ya nadie recuerda',
+   'otro', 'pendiente', false, interval '9 weeks'),
+  ('Rechazada de prueba', '3001110008', 'Ropa usada sin clasificar',
+   'ropa', 'rechazada', false, interval '0'),
+  ('Retirada de prueba',  '3001110009', 'Un lote de tejas que ya se vendió',
+   'techo', 'retirada', false, interval '0'),
+  ('Confirmada con nombre', '3001110010', '25 tanques de 500 litros',
+   'agua', 'aceptada', true, interval '0'),
+  ('Pendiente con permiso', '3001110011', '15 bultos de cemento',
+   'techo', 'pendiente', true, interval '0'),
+  ('Nombre con teléfono dentro, 3167778899', '3001110012', '10 mercados armados',
+   'alimentos', 'aceptada', true, interval '0')
+) as s(nombre, contacto, recurso, categoria, estado, publicar, antiguedad);
+
+-- Las dos que apuntan a una necesidad heredan de ella el municipio y el caso, que
+-- es lo que hace /ofrecer con el destino que trae el enlace.
+insert into public.offers (city_id, need_id, case_id, offerer_name, offerer_contact,
+                           resource, category)
+select n.city_id, n.id, n.case_id, 'Ofrece contra una necesidad de zona', '3001110013',
+       'Tejas para la escuela', 'techo'
+  from public.needs n where n.title = 'Tejas de zinc' and n.case_id is null;
+
+insert into public.offers (city_id, need_id, case_id, offerer_name, offerer_contact,
+                           resource, category)
+select n.city_id, n.id, n.case_id, 'Ofrece contra la necesidad de un caso', '3001110014',
+       'Bidones y filtro de cerámica', 'agua'
+  from public.needs n where n.title = 'Agua potable' and n.case_id is not null;
+
+-- Y la misma sin copiar el caso, que es la que prueba la segunda mitad del
+-- guardián del texto. Hoy /ofrecer no puede escribir esta fila —getOfferTarget
+-- copia el caso de la necesidad—, pero nada en la tabla lo impide: no hay ninguna
+-- restricción que ate need_id con case_id, así que una consulta del panel o un
+-- flujo nuevo puede guardar solo la necesidad y el texto saldría por ahí.
+insert into public.offers (city_id, need_id, offerer_name, offerer_contact,
+                           resource, category)
+select n.city_id, n.id, 'Apunta a la necesidad de un caso sin copiar el caso', '3001110015',
+       'Bidones para la señora que vive sola en la casa del filtro roto', 'agua'
+  from public.needs n where n.title = 'Agua potable' and n.case_id is not null;
+`);
+
+const publishedOffer = (name) =>
+  one(`select * from public.offer_log
+         where id = (select id from public.offers where offerer_name = '${name}')`);
+
+// --- El teléfono escrito dentro del texto -------------------------------
+const masked = {
+  pegado: await publishedOffer("Móvil pegado"),
+  espacios: await publishedOffer("Móvil con espacios"),
+  guiones: await publishedOffer("Móvil con guiones"),
+};
+check(
+  "Un móvil dentro del texto sale tapado, escrito de las tres formas en que se escribe",
+  Object.values(masked).every(
+    (row) => row?.resource === "600 tejas, llámame al [número oculto]",
+  ),
+  Object.entries(masked)
+    .map(([forma, row]) => `${forma}: ${row?.resource}`)
+    .join(" | "),
+);
+
+const mailed = await publishedOffer("Correo dentro del texto");
+check(
+  "Un correo dentro del texto sale tapado",
+  mailed?.resource === "Camión de 8 toneladas, escríbeme a [contacto oculto]",
+  String(mailed?.resource),
+);
+
+// Una arroba de red social es un contacto igual, y `aid_log` ya descarta el
+// nombre entero por llevar una (0002). Aquí no se puede descartar el texto, así
+// que se tapa la palabra.
+const handled = await publishedOffer("Arroba de red social");
+check(
+  "Un «@usuario» de red social sale tapado, que es un contacto como el correo",
+  handled?.resource === "Diez bultos de ropa por tallas, soy [contacto oculto]",
+  String(handled?.resource),
+);
+
+// El otro lado del recorte, y el que se rompe sin que se note: si tapar de más
+// se comiera las cantidades, el registro dejaría de servir para lo que existe.
+// El texto es el de los datos de muestra, literal.
+const quantities = await publishedOffer("Cantidades intactas");
+check(
+  "Las cantidades no se tapan: ni «2,44 m» ni «300 bloques» ni «600 tejas»",
+  quantities?.resource === "600 tejas de zinc de 2,44 m y 300 bloques",
+  String(quantities?.resource),
+);
+
+// Y la prueba de conjunto: ningún contacto de la tabla asoma por ninguna columna
+// de ninguna fila publicada, ni entero ni recortado. No se comprueba una columna:
+// se comprueba la fila, que es lo que sirve la API.
+await asPostgres();
+const everyContact = (
+  await db.query("select offerer_contact from public.offers")
+).rows.map((row) => row.offerer_contact);
+
+await asAnon();
+const wholeOfferLog = await db.query("select * from public.offer_log");
+const offerValues = wholeOfferLog.rows.flatMap((row) =>
+  Object.values(row).map((value) => String(value)),
+);
+check(
+  "Ningún contacto de la tabla de ofertas asoma en ninguna columna publicada",
+  !everyContact.some((contact) => offerValues.some((value) => value.includes(contact))),
+  `filas=${wholeOfferLog.rows.length}, contactos=${everyContact.length}`,
+);
+
+// La misma idea sin depender de qué contactos haya cargados: nada que se parezca
+// a un teléfono o a un correo. `id` queda fuera del barrido y no por comodidad:
+// es el identificador de la oferta, hexadecimal, y la vista lo publica a
+// propósito —igual que `aid_log`— porque es lo que va a enlazar «puedo completar
+// esto». Un uuid trae dígitos seguidos por casualidad y no es el contacto de
+// nadie.
+const offerValuesSinId = wholeOfferLog.rows.flatMap((row) =>
+  Object.entries(row)
+    .filter(([column]) => column !== "id")
+    .map(([, value]) => String(value)),
+);
+check(
+  "En ninguna columna publicada queda algo con forma de teléfono ni de correo",
+  !offerValuesSinId.some((value) => /[0-9]{7}/.test(value)) &&
+    !offerValuesSinId.some((value) => value.includes("@")),
+  offerValuesSinId.filter((value) => /[0-9]{7}/.test(value) || value.includes("@")).join(" | "),
+);
+
+// --- El nombre, y la condición que aid_log no tiene ---------------------
+await asPostgres();
+const namedStates = {
+  confirmada: await publishedOffer("Confirmada con nombre"),
+  pendiente: await publishedOffer("Pendiente con permiso"),
+  conTelefono: await publishedOffer("Nombre con teléfono dentro, 3167778899"),
+};
+check(
+  "Con la oferta aceptada y autorización, el nombre sí aparece",
+  namedStates.confirmada?.offerer_name === "Confirmada con nombre",
+  String(namedStates.confirmada?.offerer_name),
+);
+
+// La condición que no está en `aid_log`: allí el nombre acompaña a algo que ya
+// ocurrió. Aquí acompañaría a una promesa que nadie del equipo ha valorado y que
+// puede acabar rechazada, y eso no es lo que autorizó quien marcó la casilla.
+check(
+  "Con la oferta pendiente el nombre no sale, aunque esté autorizado",
+  namedStates.pendiente?.offerer_name === null,
+  String(namedStates.pendiente?.offerer_name),
+);
+
+check(
+  "Un teléfono escrito en el campo del nombre no se publica, ni con autorización",
+  namedStates.conTelefono?.offerer_name === null,
+  String(namedStates.conTelefono?.offerer_name),
+);
+
+// --- Los dos estados públicos -------------------------------------------
+check(
+  "El estado se publica en dos palabras que hablan de fiabilidad y no de la bandeja",
+  namedStates.confirmada?.state === "confirmada" &&
+    namedStates.pendiente?.state === "sin_confirmar",
+  `${namedStates.confirmada?.state} | ${namedStates.pendiente?.state}`,
+);
+
+// --- Qué necesidad se puede nombrar -------------------------------------
+const zoneOffer = await publishedOffer("Ofrece contra una necesidad de zona");
+const caseOffer = await publishedOffer("Ofrece contra la necesidad de un caso");
+check(
+  "Una oferta contra una necesidad de zona la nombra: la escribió el equipo y describe al pueblo",
+  zoneOffer?.need_title === "Tejas de zinc",
+  String(zoneOffer?.need_title),
+);
+
+// El título de una necesidad de un caso está escrito en la ficha de esa familia,
+// así que nombrarlo aquí es señalarla dando un rodeo. La fila sale; el título, no.
+check(
+  "Una oferta contra la necesidad de un caso sale sin nombrarla, y con su municipio",
+  caseOffer !== undefined &&
+    caseOffer.need_title === null &&
+    caseOffer.city_name === "Quibdó",
+  JSON.stringify(caseOffer),
+);
+
+// --- El texto, solo si la oferta no va dirigida a nadie ------------------
+//
+// El mismo rodeo que el título, por el otro campo y con más margen: `resource` lo
+// escribe quien ofrece, después de leer la ficha, y nadie lo revisa antes de que
+// se guarde. Una oferta a la familia de una señora de 78 años que vive sola puede
+// llegar descrita como «el tratamiento de la señora», y eso la señala igual que
+// nombrar su necesidad.
+//
+// Lo que se comprueba aquí es el reparto, no el recorte: la fila se queda —es lo
+// que permite que alguien le ponga el transporte que le falta— y lo que se va es
+// la frase. Las dos mitades, y en las dos direcciones, porque cada una se rompe
+// sola: sin la primera se publica a una familia, y sin la segunda el registro se
+// queda sin lo único que permite cruzar unas tejas con un camión.
+check(
+  "Una oferta dirigida a una familia no publica su texto, y la fila sigue estando",
+  caseOffer !== undefined && caseOffer.resource === null,
+  JSON.stringify(caseOffer),
+);
+
+check(
+  "Una oferta de zona sí publica su texto",
+  zoneOffer?.resource === "Tejas para la escuela",
+  String(zoneOffer?.resource),
+);
+
+// La segunda mitad del guardián: apuntar a la necesidad de un caso basta, aunque
+// la oferta no lleve el caso copiado. Es la fila que hoy no escribe nadie y que
+// ninguna restricción de la tabla impide.
+const needOnlyOffer = await publishedOffer(
+  "Apunta a la necesidad de un caso sin copiar el caso",
+);
+check(
+  "Apuntar solo a la necesidad de un caso también deja el texto sin publicar",
+  needOnlyOffer !== undefined && needOnlyOffer.resource === null,
+  JSON.stringify(needOnlyOffer),
+);
+
+// Y la prueba de conjunto, que es la que aguanta cuando alguien añada una oferta
+// más: se cuenta contra la tabla, no contra las filas que este archivo escribió.
+// Si un día se puede llegar a una familia por una tercera columna, esto lo dice.
+const textoDeCasos = await one(`select
+  count(*) filter (where l.resource is not null)::int as con_caso_y_con_texto,
+  count(*)::int                                       as con_caso
+from public.offer_log l
+  join public.offers o on o.id = l.id
+ where o.case_id is not null
+    or exists (select 1 from public.needs cn
+                where cn.id = o.need_id and cn.case_id is not null)`);
+check(
+  "Ninguna fila publicada que llegue a una familia lleva texto, por ninguna de las dos vías",
+  textoDeCasos.con_caso_y_con_texto === 0 && textoDeCasos.con_caso > 0,
+  JSON.stringify(textoDeCasos),
+);
+
+// El otro lado, por si el `case` de la vista se cerrara de más: lo de zona sigue
+// publicando. Un registro donde nada trae texto no protege a nadie: no sirve.
+const textoDeZona = await one(`select
+  count(*) filter (where l.resource is not null)::int as con_texto,
+  count(*)::int                                       as de_zona
+from public.offer_log l
+  join public.offers o on o.id = l.id
+ where o.case_id is null
+   and not exists (select 1 from public.needs cn
+                    where cn.id = o.need_id and cn.case_id is not null)`);
+check(
+  "Las ofertas que no van a nadie siguen publicando su texto, todas",
+  textoDeZona.con_texto === textoDeZona.de_zona && textoDeZona.de_zona > 0,
+  JSON.stringify(textoDeZona),
+);
+
+// --- Quién no entra -----------------------------------------------------
+const excluded = {
+  rechazada: await publishedOffer("Rechazada de prueba"),
+  retirada: await publishedOffer("Retirada de prueba"),
+  vieja: await publishedOffer("Promesa vieja"),
+  entregada: await publishedOffer("Ferretería El Progreso"),
+};
+check(
+  "Lo rechazado, lo retirado, lo caducado y lo ya entregado no se publican como prometido",
+  Object.values(excluded).every((row) => row === undefined),
+  Object.entries(excluded)
+    .map(([clase, row]) => `${clase}: ${row ? "SALE" : "fuera"}`)
+    .join(", "),
+);
+
+// Los dos registros son disjuntos, y esto es lo que lo demuestra sobre la misma
+// fila: la entrega de la ferretería está en uno y no puede estar en el otro.
+await asAnon();
+const bothLogs = await one(`select
+  (select count(*)::int from public.aid_log)                                as entregado,
+  (select count(*)::int from public.offer_log)                              as prometido,
+  (select count(*)::int from public.aid_log a
+     join public.offer_log l on l.id = a.id)                                as en_los_dos`);
+check(
+  "Ninguna oferta está a la vez en lo prometido y en lo que llegó",
+  bothLogs.en_los_dos === 0 && bothLogs.entregado > 0 && bothLogs.prometido > 0,
+  JSON.stringify(bothLogs),
+);
+
+// La caducidad es por fecha y no una columna que alguien tenga que mantener,
+// porque una oferta no se cancela: se olvida. Se comprueba moviendo la fecha de
+// la fila vieja al presente, que es lo que separa «no aparece» de «no aparece
+// porque el filtro de ocho semanas la deja fuera».
+await asPostgres();
+await sql(
+  "update public.offers set created_at = now() where offerer_name = 'Promesa vieja'",
+);
+const revived = await publishedOffer("Promesa vieja");
+check(
+  "La misma oferta con fecha de hoy sí aparece, así que lo que la dejaba fuera era la caducidad",
+  revived?.resource === "40 colchonetas que ya nadie recuerda",
+  String(revived?.resource),
+);
+
+// El día de la oferta sí se publica —hace falta para atenuar lo que lleva
+// semanas esperando— y es el día de Colombia, no el de UTC. Es el motivo por el
+// que 0002 eligió `date` para `delivered_on`: una oferta enviada a las 20:30 en
+// Quibdó se guarda como la 01:30 del día siguiente en UTC, así que un `::date` a
+// secas publicaría el día de después.
+//
+// La fecha se coloca a 01:30 UTC de anteayer, que es exactamente ese caso, y se
+// calcula desde `now()` para que la prueba no caduque con el calendario. La
+// segunda mitad de la comprobación es la que le da sentido a la primera: si el
+// instante elegido no cruzara la medianoche, las dos respuestas coincidirían y
+// esto pasaría con la vista mal escrita.
+await sql(`update public.offers
+  set created_at = (((now() at time zone 'UTC')::date - 2) + time '01:30') at time zone 'UTC'
+  where offerer_name = 'Promesa vieja'`);
+const bogota = await one(`select
+  to_char(timezone('America/Bogota', o.created_at), 'YYYY-MM-DD') as dia_colombia,
+  to_char(timezone('UTC', o.created_at), 'YYYY-MM-DD')            as dia_utc,
+  to_char(l.offered_on, 'YYYY-MM-DD')                             as publicado
+  from public.offers o join public.offer_log l on l.id = o.id
+  where o.offerer_name = 'Promesa vieja'`);
+check(
+  "El día que se publica es el de Colombia y no el de UTC",
+  bogota?.publicado === bogota?.dia_colombia && bogota?.dia_utc !== bogota?.dia_colombia,
+  JSON.stringify(bogota),
+);
+
+// --- La categoría, contra el mismo vocabulario cerrado ------------------
+//
+// `offers.category` es texto libre, así que sin el `case` de la vista bastaría
+// escribir la frase entera ahí para publicarla por una puerta que nadie mira. Es
+// la misma comprobación que se hace sobre `aid_log`, y hay que hacerla otra vez
+// porque son dos vistas y cada una tiene su propio `case`.
+await sql(`update public.offers set category = 'Tratamiento para la tensión, tres meses'
+  where offerer_name = 'Cantidades intactas'`);
+const forgedOfferCategory = await publishedOffer("Cantidades intactas");
+check(
+  "Una frase escrita en el campo de la categoría no se publica: sale «otro»",
+  forgedOfferCategory?.category === "otro",
+  String(forgedOfferCategory?.category),
+);
+await sql(
+  "update public.offers set category = 'techo' where offerer_name = 'Cantidades intactas'",
+);
+
+// --- El público lee la vista y no la tabla ------------------------------
+await asAnon();
+const anonReadsLog = await one("select count(*)::int as n from public.offer_log");
+check(
+  "El público lee el registro de lo ofrecido",
+  anonReadsLog.n > 0,
+  `n=${anonReadsLog.n}`,
+);
+
+// La otra mitad, y la que importa: la vista abierta no abre la tabla. Falla por
+// permiso de tabla, antes de llegar a las políticas, igual que con `aid_log`.
+await expectError(
+  "Publicar lo ofrecido no le da al público ninguna puerta nueva a la tabla de ofertas",
+  "select offerer_contact from public.offers",
+  "permission denied",
+);
+
+await expectError(
+  "El público no puede pedir el mensaje del registro: la columna no existe",
+  "select message from public.offer_log",
+  'column "message" does not exist',
+);
+
+// --- Volver a pegar la migración no reabre la vista ---------------------
+//
+// `create view` hace una vista nueva y una vista nueva de `public` nace con todo
+// concedido al público. El `revoke` vive en 0012 justo por esto, y esto es lo que
+// comprueba que sigue viviendo ahí: es el descuido que dejó `aid_log` abierta
+// entre 0005 y 0008.
+await asPostgres();
+await sql(migration("migrations/0012_registro_de_lo_ofrecido.sql"));
+const logPrivileges = (await publicTablePrivileges()).offer_log;
+check(
+  "Volver a pegar 0012 deja la vista con select y nada más",
+  logPrivileges?.anon === "SELECT" && logPrivileges?.authenticated === "SELECT",
+  JSON.stringify(logPrivileges),
+);
+
+// ===========================================================================
+// «Puedo completar esto»: el camino de vuelta
+//
+// El muro publica ofertas sin contacto, así que el emparejamiento no puede pasar
+// por el teléfono de quien ofreció: pasa por el portal. Quien ve las 600 tejas
+// sin transporte llega a /ofrecer?completa=<id de la oferta> y manda la suya, y
+// las dos tienen que llegar emparejadas a la bandeja del equipo. Emparejadas
+// quiere decir con el mismo `city_id` y el mismo `need_id`.
+//
+// Y ahí está el problema que se comprueba aquí. La vista no publica ninguno de
+// los dos —son punteros, y por `need_id` se llega a la necesidad de un caso, o
+// sea a la ficha de una familia—, pero `getOfferTarget` (lib/data.ts) no puede
+// leerlos de `public.offers`: esa página es pública y en la tabla está el
+// contacto. Así que los reconstruye desde lo que la vista sí publica, y estas
+// comprobaciones recorren ese camino exactamente como lo recorre el portal: como
+// anónimo, de la vista al municipio por el `slug` y del municipio a la necesidad
+// de zona por el título. Ni una tabla más.
+// ===========================================================================
+
+await asPostgres();
+const zoneSource = await one(`select id, city_id, need_id from public.offers
+  where offerer_name = 'Ofrece contra una necesidad de zona'`);
+const caseSource = await one(`select id, city_id, need_id from public.offers
+  where offerer_name = 'Ofrece contra la necesidad de un caso'`);
+
+const inherited = (id) =>
+  one(`select c.id as city_id, n.id as need_id
+    from public.offer_log l
+      left join public.cities c on c.slug = l.city_slug
+      left join public.needs n
+        on n.city_id = c.id and n.case_id is null and n.title = l.need_title
+    where l.id = '${id}'`);
+
+await asAnon();
+const zoneInherited = await inherited(zoneSource.id);
+check(
+  "Desde el registro público se llega al municipio y a la necesidad de la oferta original, sin abrir la tabla",
+  zoneInherited?.city_id === zoneSource.city_id && zoneInherited?.need_id === zoneSource.need_id,
+  JSON.stringify({ heredado: zoneInherited, original: zoneSource }),
+);
+
+// El límite del camino, y no es un fallo: de una oferta dirigida a una familia se
+// hereda el municipio y nada más, porque la vista deja `need_title` en nulo justo
+// para que por ese título no se llegue a la ficha de esa familia. La oferta nueva
+// entra al municipio correcto y el equipo, que sí lo ve todo, la vincula desde la
+// bandeja.
+const caseInherited = await inherited(caseSource.id);
+check(
+  "De una oferta dirigida a una familia se hereda el municipio y no la necesidad, que es lo que la vista esconde",
+  caseInherited?.city_id === caseSource.city_id &&
+    caseInherited?.need_id === null &&
+    caseSource.need_id !== null,
+  JSON.stringify({ heredado: caseInherited, original: caseSource }),
+);
+
+// Y la pregunta de fondo: recorrer ese camino no expone el contacto de quien hizo
+// la oferta original. Se barre el camino entero —la fila de la vista, la del
+// municipio y la de la necesidad, con todas sus columnas— contra la lista de
+// contactos de la tabla. Va en un solo `jsonb` por fila y no en columnas
+// sueltas porque las tres relaciones repiten nombres de columna, y una fila
+// aplanada perdería valores por el camino: se barrería menos de lo que parece.
+await asPostgres();
+const contactsInTable = (await db.query("select offerer_contact from public.offers")).rows.map(
+  (row) => row.offerer_contact,
+);
+
+await asAnon();
+const wholePath = (
+  await db.query(`select jsonb_build_object(
+      'oferta',    to_jsonb(l),
+      'municipio', to_jsonb(c),
+      'necesidad', to_jsonb(n)
+    )::text as fila
+    from public.offer_log l
+      left join public.cities c on c.slug = l.city_slug
+      left join public.needs n
+        on n.city_id = c.id and n.case_id is null and n.title = l.need_title`)
+).rows.map((row) => row.fila);
+
+check(
+  "Completar una oferta no expone el contacto de la original: en el camino entero no aparece ninguno",
+  !contactsInTable.some((contact) => wholePath.some((fila) => fila.includes(contact))),
+  `filas=${wholePath.length}, contactos=${contactsInTable.length}`,
+);
+
+// ===========================================================================
+// Quitar del muro, de un clic
+//
+// La bandeja publica al entrar, así que necesita salida rápida. El botón escribe
+// un estado y ninguna otra columna, y eso es lo que hay que demostrar: que la
+// oferta sale de lo público al momento, que sigue entera para el equipo, y que
+// volver a publicarla es tan fácil como quitarla —que es lo que permite que
+// quitar no pida confirmación—.
+// ===========================================================================
+
+await asUser("charlie@test.com");
+await sql(`update public.offers set team_notes = 'Llamé, no contesta'
+  where offerer_name = 'Cantidades intactas'`);
+await sql(`update public.offers set status = 'retirada'
+  where offerer_name = 'Cantidades intactas'`);
+
+await asAnon();
+const withdrawn = await one(`select count(*)::int as n from public.offer_log
+  where resource like '600 tejas de zinc%'`);
+check("Retirar una oferta la saca del muro público al momento", withdrawn.n === 0, `n=${withdrawn.n}`);
+
+await asPostgres();
+const withdrawnRow = await one(`select status, team_notes, offerer_contact
+  from public.offers where offerer_name = 'Cantidades intactas'`);
+check(
+  "La oferta retirada sigue entera en la bandeja: es una baja, no un borrado",
+  withdrawnRow.status === "retirada" &&
+    withdrawnRow.team_notes === "Llamé, no contesta" &&
+    withdrawnRow.offerer_contact === "3001110006",
+  JSON.stringify(withdrawnRow),
+);
+
+// Quitar es de quien atiende ese municipio, y esto es la mitad que no está en el
+// panel. Un clic tiene menos fricción que un formulario, así que la barrera de
+// abajo importa más: la política no le deja ni ver la fila para escribirla, de
+// modo que el `update` no falla, simplemente no toca nada.
+await asUser("otra@test.com");
+await sql(`update public.offers set status = 'retirada'
+  where offerer_name = 'Ofrece contra una necesidad de zona'`);
+await asPostgres();
+const foreignOffer = await one(`select status from public.offers
+  where offerer_name = 'Ofrece contra una necesidad de zona'`);
+check(
+  "Quien documenta otro municipio no puede retirar una oferta ajena",
+  foreignOffer.status === "pendiente",
+  foreignOffer.status,
+);
+
+// La otra mitad de la misma frase, y hay que comprobarla aparte: sin ella, lo de
+// arriba pasaría igual si la política le prohibiera a documentación tocar
+// cualquier oferta, que no es lo que dice. Lo que recorta es el municipio.
+await asUser("documenta@test.com");
+await sql(`update public.offers set status = 'retirada'
+  where offerer_name = 'Ofrece contra una necesidad de zona'`);
+await asPostgres();
+const ownOffer = await one(`select status from public.offers
+  where offerer_name = 'Ofrece contra una necesidad de zona'`);
+check(
+  "Quien documenta el municipio de la oferta sí la retira",
+  ownOffer.status === "retirada",
+  ownOffer.status,
+);
+
+await asUser("charlie@test.com");
+await sql(`update public.offers set status = 'pendiente'
+  where offerer_name = 'Cantidades intactas'`);
+await asAnon();
+const restored = await one(`select count(*)::int as n from public.offer_log
+  where resource like '600 tejas de zinc%'`);
+check(
+  "Reponer una oferta retirada la devuelve al muro, así que la baja se deshace",
+  restored.n === 1,
+  `n=${restored.n}`,
+);
+
+// El escenario de esta sección se retira: lo que viene después cuenta ofertas.
+await asPostgres();
+await sql("delete from public.offers where offerer_contact like '300111%'");
 
 // --- Despublicar un municipio esconde todo su contenido -----------------
 await asUser("charlie@test.com");
@@ -2172,16 +2947,35 @@ check(
   `n=${aidAfterUnpublish.n}`,
 );
 
-// La llave es la única cosa pública que la cascada NO se lleva, y es a propósito:
-// no pertenece a ningún municipio, así que no hay ninguno que la pueda despublicar.
-// Se comprueba aquí, en el sitio donde todo lo demás desaparece, porque leído en
-// otra parte parecería un olvido de la cascada y es lo contrario: es la diferencia
-// entre la llave del portal y el enlace de una fundación.
-const keyAfterUnpublish = await one("select key_value from public.donation_key");
+// Lo mismo con lo prometido, y hay que comprobarlo aparte: son dos vistas con dos
+// copias de la cascada, así que una puede quedarse sin ella sin que la otra lo
+// note. Lo que queda es la oferta sin municipio —un camión, un cupo de carga—,
+// que no pertenece a ningún pueblo y no cuenta nada de nadie.
+const offerAfterUnpublish = await one(`select
+  count(*)::int                                    as n,
+  count(*) filter (where city_name is not null)::int as con_municipio
+  from public.offer_log`);
 check(
-  "La llave del portal sigue en pie con todos los municipios despublicados: no es de ninguno",
-  keyAfterUnpublish.key_value === "@soschoco3",
-  JSON.stringify(keyAfterUnpublish),
+  "Al despublicar el municipio, sus ofertas salen de lo prometido y solo quedan las que no van a ningún sitio",
+  offerAfterUnpublish.con_municipio === 0,
+  JSON.stringify(offerAfterUnpublish),
+);
+
+// Los canales se van con la cascada, y eso es lo que antes no pasaba: la llave
+// global seguía publicada con el portal entero despublicado, porque no era de
+// nadie. Ahora el destino del dinero es una columna de la fila de quien lo
+// recibe, así que despublicar a esa gente se lleva también a dónde enviarles.
+// Se comprueba aquí, donde desaparece todo lo demás, porque es la prueba de que
+// el canal pertenece de verdad a alguien.
+const channelsAfterUnpublish = await one(`select
+  (select count(*)::int from public.cities
+     where donation_key <> '' or donation_url <> '') as ciudades,
+  (select count(*)::int from public.cases
+     where donation_key <> '' or donation_url <> '') as casos`);
+check(
+  "Al despublicar el municipio, sus canales de donación desaparecen con él",
+  channelsAfterUnpublish.ciudades === 0 && channelsAfterUnpublish.casos === 0,
+  JSON.stringify(channelsAfterUnpublish),
 );
 
 // --- Informe -----------------------------------------------------------

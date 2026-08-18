@@ -4,7 +4,7 @@ import { useActionState, useState, useSyncExternalStore } from "react";
 import { submitOffer, type OfferFormState } from "./actions";
 import { NEED_CATEGORIES } from "@/lib/constants";
 import { alertBox, button, field, panel } from "@/components/ui/styles";
-import type { OfferTarget } from "@/lib/types";
+import type { OfferTargetWithSource } from "@/lib/data";
 
 /** Ejemplos que se pueden tocar: quien no sabe qué escribir, copia uno. */
 const EXAMPLES = [
@@ -47,7 +47,7 @@ function useHydrated(): boolean {
  * la ayuda que ofrece la gente, y no puede sonar a otro sitio: van en frase, del
  * tamaño del texto corrido, como las pastillas blandas del resto.
  */
-export function OfferForm({ target }: { target: OfferTarget | null }) {
+export function OfferForm({ target }: { target: OfferTargetWithSource | null }) {
   const [state, action, pending] = useActionState<OfferFormState, FormData>(submitOffer, null);
   const [step, setStep] = useState(0);
   const [resource, setResource] = useState("");
@@ -121,7 +121,21 @@ export function OfferForm({ target }: { target: OfferTarget | null }) {
       {/* ------------------------------- Paso 1 ------------------------------ */}
       {shows(0) && (
         <div className="enters">
-          <h2 className="font-display text-3xl leading-tight text-ink">{STEPS[0].title}</h2>
+          {/* Quien llega a completar la oferta de otro tiene que leer otra
+              pregunta. «¿Qué puedes dar?» invita a ofrecer una cosa entera otra
+              vez, y lo que hace falta aquí es justo lo contrario: la pieza que
+              falta —el transporte de unas tejas, unas manos, el resto del
+              material—. Es la misma pregunta con el foco corrido, así que no
+              cambia ni el campo, ni el paso, ni lo que se guarda. */}
+          <h2 className="font-display text-3xl leading-tight text-ink">
+            {target?.completes ? "¿Qué parte puedes cubrir?" : STEPS[0].title}
+          </h2>
+          {target?.completes && (
+            <p className="mt-2 text-[14px] leading-relaxed text-muted">
+              Lo que le falta a esa oferta para llegar: el transporte, unas manos, el resto del
+              material. Sirve igual si lo que puedes aportar es más de lo mismo.
+            </p>
+          )}
 
           <label className="mt-5 block">
             <span className={field.label}>Lo que puedes dar</span>

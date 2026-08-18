@@ -1,30 +1,33 @@
-import { saveDonationKey } from "@/app/admin/actions";
-import { SubmitButton } from "@/components/admin/SubmitButton";
-import { alertBox, eyebrow, field, panel } from "@/components/ui/styles";
-import { getDonationKeyRow } from "@/lib/admin-data";
-import { formatDateTime } from "@/lib/format";
+import Link from "next/link";
+import { eyebrow, panel } from "@/components/ui/styles";
+import { getMoneyDestinations } from "@/lib/admin-data";
 import { currentTeam } from "@/lib/team";
+import type { MoneyDestination } from "@/lib/donation-channel";
 
 export const dynamic = "force-dynamic";
 
 /**
- * La llave de transferencia del portal: un formulario de tres campos, y es el
- * formulario más delicado del panel.
+ * A dónde va el dinero: todos los destinos que publica el portal, en una lista y
+ * sin un solo campo que se pueda editar.
  *
- * Está aparte de la ficha de un municipio a propósito, y eso es lo que la pantalla
- * tiene que conseguir que se entienda de un vistazo: la llave es UNA para todo el
- * portal. El enlace de donación de una fundación se edita dentro de su municipio y
- * solo afecta a ese municipio; esto se edita aquí y cambia a dónde transfiere todo
- * el que done desde cualquier pantalla. Si estas dos cosas vivieran en el mismo
- * formulario, cambiar una con prisa sería cambiar la otra sin darse cuenta.
+ * Aquí estaba el formulario de la llave del portal, una para todo el Chocó. Esa
+ * llave se fue: no existe un canal general, porque un canal general no puede
+ * decir a dónde va el dinero de nadie. Ahora cada municipio tiene el suyo y cada
+ * caso el suyo, y **se editan en la ficha de quien lo recibe**, con su nombre y su
+ * historia delante. Poner aquí un formulario sería un segundo sitio donde cambiar
+ * lo mismo, que es exactamente cómo se cambia el que no se quería cambiar.
  *
- * La comprobación de rol de abajo no es lo que protege nada: es la primera de tres
- * —la pantalla, la Server Action y la política `donation_key_coordination`, que
- * rechaza el update aunque la llamada llegue desde fuera de la web—. Aquí se
- * comprueba para no ofrecerle a quien documenta un campo que la base de datos le va
- * a rechazar, y sobre todo para no enseñarle dónde está.
+ * Lo que sí se perdió al repartir los canales es la pregunta que esta pantalla
+ * vuelve a contestar: **¿qué destinos estamos publicando ahora mismo?** Con un
+ * solo campo bastaba mirarlo; con uno por pueblo y uno por familia hay que poder
+ * recorrerlos de un vistazo, porque es así como se detecta el que no debería
+ * estar ahí. Es la pantalla que se abre el día que el dinero aparezca donde no
+ * debe.
+ *
+ * Es de coordinación por lo mismo que lo eran los canales: es la lista completa
+ * de a dónde va el dinero del portal, junta y en una pantalla.
  */
-export default async function DonationKeyPage() {
+export default async function MoneyPage() {
   const session = await currentTeam();
 
   if (session?.role !== "coordinacion") {
@@ -32,137 +35,114 @@ export default async function DonationKeyPage() {
       <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
         <h1 className="font-display text-3xl text-ink">Esta pantalla es de coordinación</h1>
         <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
-          La llave a la que transfiere quien dona la cambia quien coordina, igual que los enlaces de
-          donación de las fundaciones. Tu cuenta documenta municipios.
+          A dónde va el dinero de cada municipio y de cada familia lo registra quien coordina.
+          Tu cuenta documenta municipios: puedes escribir todo lo demás de sus fichas.
         </p>
       </div>
     );
   }
 
-  const donationKey = await getDonationKeyRow();
+  const destinations = await getMoneyDestinations();
+  const live = destinations.filter((row) => row.live);
+  const draft = destinations.filter((row) => !row.live);
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
       <p className={eyebrow}>Panel del equipo</p>
       <h1 className="mt-1 font-display text-3xl text-ink">A dónde va el dinero</h1>
       <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Esta llave es <span className="text-ink">una para todo el portal</span> y sale en{" "}
-        <code className="rounded bg-line px-1.5 py-0.5 text-xs text-body">/donaciones</code>, en la
-        ficha de cada municipio y en la de cada caso. Cambiarla aquí la cambia en las tres, en la
-        siguiente carga y sin desplegar nada.
+        Todos los destinos que el portal publica hoy, juntos. No se cambian aquí: cada uno se
+        edita en la ficha de quien lo recibe, y el enlace de cada fila lleva allí.
       </p>
       <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        No es el enlace de donación de una fundación. Ese es de su municipio, va en la ficha del
-        municipio y solo afecta a ese municipio.
+        Un caso sin canal propio <span className="text-ink">no hereda ninguno</span>: ni el de su
+        municipio ni el de su fundación. Si no está en esta lista, su ficha dice que todavía no
+        hay a dónde enviarle.
       </p>
 
-      {donationKey === null ? (
-        /* Sin fila no hay nada que editar, y ofrecer el formulario sería ofrecer un
-           guardado que no tiene dónde caer. Se dice qué falta con el nombre del
-           archivo, que es lo que hay que pegar en el SQL Editor. */
-        <p className={`${alertBox} mt-8 max-w-prose leading-relaxed`}>
-          La base de datos todavía no tiene la tabla de la llave. Pega{" "}
-          <code>supabase/migrations/0010_llave_de_transferencia.sql</code> en el SQL Editor de
-          Supabase y vuelve a esta pantalla.
-        </p>
-      ) : (
-        <>
-          <section className="mt-8">
-            <form action={saveDonationKey} className={`${panel} space-y-4 p-5`}>
-              <label className="block">
-                <span className={field.label}>La llave</span>
-                <input
-                  name="key_value"
-                  defaultValue={donationKey.value}
-                  className={`${field.input} font-mono`}
-                  placeholder="@soschoco"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <span className={field.hint}>
-                  Tal y como se teclea en la app, sin espacios. Se guarda literal: no se le añade
-                  nada ni se le corrige nada, porque cualquier arreglo automático sobre un destino de
-                  dinero sería un destino distinto. Vacía retira la llave del portal y las tres
-                  pantallas dejan de ofrecerla; es lo primero que hay que hacer si se compromete.
-                </span>
-              </label>
-
-              <label className="block">
-                <span className={field.label}>En qué app se usa</span>
-                <input
-                  name="app_label"
-                  defaultValue={donationKey.app}
-                  className={field.input}
-                  placeholder="Bre-B, Nequi, Daviplata…"
-                  autoComplete="off"
-                />
-                <span className={field.hint}>
-                  Sale escrito al lado de la llave y dentro de las instrucciones. Vacío no rompe
-                  nada: el portal dice entonces «tu app de banco o billetera», que es cierto pero
-                  hace dudar. Ponlo.
-                </span>
-              </label>
-
-              <label className="block">
-                <span className={field.label}>A nombre de quién aparece</span>
-                <input
-                  name="holder"
-                  defaultValue={donationKey.holder}
-                  className={field.input}
-                  placeholder="El nombre que muestra la app al confirmar"
-                  autoComplete="off"
-                />
-                <span className={field.hint}>
-                  El portal le pide a quien dona que compruebe este nombre antes de confirmar la
-                  transferencia. Es lo único con lo que puede darse cuenta de que la llave ha sido
-                  cambiada por otra, así que tiene que estar escrito exactamente como lo muestra la
-                  app. Si no lo sabes con seguridad, déjalo vacío antes que poner uno aproximado.
-                </span>
-              </label>
-
-              <SubmitButton>Guardar la llave</SubmitButton>
-            </form>
-          </section>
-
-          {/* Quién y cuándo, tomado de la fila y no del panel: lo escribe un
-              disparador desde el correo del token, así que dice de qué sesión salió
-              el cambio y no lo que un formulario quisiera afirmar. Es lo primero
-              que se va a mirar el día que el dinero aparezca donde no debe. */}
-          <p className="mt-4 text-xs leading-relaxed text-faint">
-            Último cambio: {formatDateTime(donationKey.updatedAt)}
-            {donationKey.updatedBy
-              ? ` · ${donationKey.updatedBy}`
-              : " · sin sesión (SQL Editor o la propia migración)"}
+      <section className="mt-8">
+        <h2 className="font-display text-2xl text-ink">Se ven en el portal</h2>
+        {live.length === 0 ? (
+          <p className={`${panel} mt-4 p-4 text-sm leading-relaxed text-muted`}>
+            Ningún destino publicado. Nadie que abra el portal encuentra a dónde enviar dinero.
           </p>
+        ) : (
+          <ul className="mt-4 space-y-3">
+            {live.map((row) => (
+              <DestinationRow key={`${row.level}-${row.owner}-${row.target}`} destination={row} />
+            ))}
+          </ul>
+        )}
+      </section>
 
-          <section className="mt-10 border-t border-line pt-6">
-            <h2 className="font-display text-2xl text-ink">Cómo se ve ahora mismo</h2>
-            {donationKey.value ? (
-              <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-                Quien entre a{" "}
-                <code className="rounded bg-line px-1.5 py-0.5 text-xs text-body">/donaciones</code>{" "}
-                lee la llave <span className="font-mono text-ink">{donationKey.value}</span>, escrita
-                entera y en grande, con los pasos para pegarla en{" "}
-                {donationKey.app || "su app de banco o billetera"}
-                {donationKey.holder
-                  ? `, y con el aviso de comprobar que la app dice ${donationKey.holder} antes de confirmar.`
-                  : ", y sin ningún nombre que comprobar, porque no hay ninguno registrado."}
-              </p>
-            ) : (
-              <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-                No hay llave puesta, así que el portal no la ofrece en ninguna pantalla. Un caso sin
-                canal propio y sin fundación en su municipio se puede leer y no se le puede enviar
-                dinero.
-              </p>
-            )}
-            <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
-              El portal no cobra ni recibe nada: publica la llave y la transferencia se hace dentro
-              de la app de quien dona. Sin JavaScript se ve igual, porque la llave va escrita en la
-              página y el botón de copiar es solo un añadido.
-            </p>
-          </section>
-        </>
+      {/* Los que aún no salen se listan igual, y aparte. Un canal escrito en una
+          ficha que todavía no está publicada es justo lo que conviene revisar
+          antes de que salga, no después. */}
+      {draft.length > 0 && (
+        <section className="mt-10">
+          <h2 className="font-display text-2xl text-ink">Escritos, pero todavía sin salir</h2>
+          <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted">
+            Están guardados y no los ve nadie: su municipio está sin publicar, o el caso sigue en
+            borrador o sin consentimiento. Se revisan ahora, que es cuando todavía no hay dinero
+            de por medio.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {draft.map((row) => (
+              <DestinationRow key={`${row.level}-${row.owner}-${row.target}`} destination={row} />
+            ))}
+          </ul>
+        </section>
       )}
+
+      <section className="mt-10 border-t border-line pt-6">
+        <h2 className="font-display text-2xl text-ink">Quién puede cambiarlos</h2>
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
+          Solo coordinación, y está comprobado en tres capas que no dependen entre sí: la ficha
+          no ofrece el campo, la Server Action lo rechaza, y un disparador de la base de datos
+          para el cambio aunque la llamada llegue desde fuera de la web. Esa tercera capa es la
+          que importa: quien documenta un municipio <span className="text-ink">sí</span> puede
+          escribir el resto del caso, así que sin ella cambiar el canal sería una edición más de
+          la ficha.
+        </p>
+      </section>
     </div>
+  );
+}
+
+const LEVEL_LABEL: Record<MoneyDestination["level"], string> = {
+  municipio: "Municipio",
+  caso: "Caso",
+  fundacion: "Fundación",
+};
+
+/**
+ * El destino escrito entero y en monoespaciada, no recortado.
+ *
+ * Esta pantalla existe para comparar lo que está publicado con lo que se acordó,
+ * y eso se hace carácter a carácter: una llave con un dígito cambiado y un enlace
+ * con un dominio parecido son las dos formas que tiene esto de salir mal, y las
+ * dos se leen igual de bien en letra de texto.
+ */
+function DestinationRow({ destination }: { destination: MoneyDestination }) {
+  return (
+    <li className={`${panel} p-4`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="min-w-0 font-medium text-ink">{destination.owner}</p>
+        <p className="shrink-0 text-xs text-faint">
+          {LEVEL_LABEL[destination.level]} · {destination.cityName}
+        </p>
+      </div>
+
+      <p className="mt-2 break-all font-mono text-[13px] leading-relaxed text-body">
+        {destination.target}
+      </p>
+
+      <Link
+        href={destination.href}
+        className="mt-2 inline-block text-sm text-accent hover:underline"
+      >
+        Abrir la ficha donde se cambia
+      </Link>
+    </li>
   );
 }

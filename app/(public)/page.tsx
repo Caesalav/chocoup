@@ -141,8 +141,8 @@ export default async function HomePage() {
             páginas interiores: el inicio es lo que se comparte por WhatsApp y
             mucha gente no pasa de aquí. */}
         <p className="mt-8 text-[12px] leading-relaxed text-faint lg:col-start-2 lg:row-start-2 lg:mt-6">
-          {SITE_NAME} publica los casos con el consentimiento de cada persona. Las donaciones se
-          coordinan con la fundación de su municipio y no pasan por este portal.
+          {SITE_NAME} publica los casos con el consentimiento de cada persona. Las donaciones van
+          al canal de cada municipio o de cada familia, y no pasan por este portal.
         </p>
       </div>
     </div>
