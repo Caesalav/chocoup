@@ -1,5 +1,5 @@
 import { getDonationLog } from "@/lib/data";
-import { DONATION_LOG_LIMIT } from "@/lib/donation-log";
+import { DONATION_LOG_LIMIT, parseDonationLogSort } from "@/lib/donation-log";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const caseId = url.searchParams.get("caso") ?? undefined;
   const cityId = url.searchParams.get("ciudad") ?? undefined;
+  const sort = parseDonationLogSort(url.searchParams.get("orden"));
   const rawLimit = Number(url.searchParams.get("limite"));
   const limit = Number.isFinite(rawLimit)
     ? Math.min(Math.max(Math.trunc(rawLimit), 1), 50)
@@ -27,6 +28,6 @@ export async function GET(request: Request) {
     return Response.json({ donations: [] }, { status: 400 });
   }
 
-  const donations = await getDonationLog({ caseId, cityId, limit });
+  const donations = await getDonationLog({ caseId, cityId, limit, sort });
   return Response.json({ donations });
 }

@@ -145,3 +145,20 @@ export function countOpenBudgetCases(
   }
   return open.size;
 }
+
+/** Casos con presupuesto y todo ya comprado: las causas solucionadas. */
+export function countSolvedBudgetCases(
+  items: Pick<BudgetItem, "case_id" | "purchased">[],
+): number {
+  const pending = new Set<string>();
+  const withBudget = new Set<string>();
+  for (const item of items) {
+    withBudget.add(item.case_id);
+    if (!item.purchased) pending.add(item.case_id);
+  }
+  let solved = 0;
+  for (const id of withBudget) {
+    if (!pending.has(id)) solved += 1;
+  }
+  return solved;
+}

@@ -53,7 +53,7 @@ export default async function CityPage({ params }: Props) {
   const budget = mergeBudget(cases.map((row) => row.budget));
 
   /**
-   * El porcentaje del municipio, sobre lo mismo que mide el anillo de la barra
+   * El porcentaje del municipio, sobre lo mismo que mide la pista de la barra
    * que tiene justo debajo.
    *
    * Iba sobre `budget.ratio`, que es lo recaudado cuando hay algo recaudado y lo
@@ -246,8 +246,7 @@ export default async function CityPage({ params }: Props) {
             <section className="mt-12">
               <h2 className={screenTitle}>Donaciones a {city.name}</h2>
               <p className="mt-2 text-[13px] leading-relaxed text-muted lg:text-[15px]">
-                Lo que ha llegado a las causas de este municipio. Si quien donó no autorizó su
-                nombre, la fila dice que es anónima.
+                Lo que ha llegado a las causas de este municipio.
               </p>
               <div className="mt-4">
                 <DonationLog

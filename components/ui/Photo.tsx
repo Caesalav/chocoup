@@ -14,6 +14,8 @@ type Props = {
   emptyLabel?: string;
   /** Encuadre guardado. Nulo: el recorte por omisión de `.photo-crop`. */
   frame?: PhotoFrame | null;
+  /** Situación (paisaje, 62 %) o retrato (cara, 22 %). */
+  kind?: "situation" | "portrait";
 };
 
 /**
@@ -40,6 +42,7 @@ export function Photo({
   eager = false,
   emptyLabel,
   frame = null,
+  kind = "situation",
 }: Props) {
   if (!path) {
     return (
@@ -59,6 +62,7 @@ export function Photo({
       src={photoUrl(path)}
       alt={alt}
       frame={frame}
+      kind={kind}
       eager={eager}
       className={className}
     />

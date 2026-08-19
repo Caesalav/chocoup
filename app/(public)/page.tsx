@@ -1,29 +1,39 @@
 import Link from "next/link";
 import { CaseRow } from "@/components/cards/CaseRow";
 import { CityRailCard } from "@/components/cards/CityRailCard";
-import { DonationLog } from "@/components/donations/DonationLog";
+import { DonationLog, DonationLogSortNav } from "@/components/donations/DonationLog";
 import { HomeBoard } from "@/components/home/HomeBoard";
 import { ProgressCard } from "@/components/home/ProgressCard";
 import { SectionLinks } from "@/components/home/SectionLinks";
 import { Logo } from "@/components/Logo";
+import { CountChip } from "@/components/ui/Chip";
 import { screenTitle, shell } from "@/components/ui/styles";
 import { byCampaignPriority, resolveCampaign } from "@/lib/campaign";
 import { SITE_NAME } from "@/lib/constants";
-import { getCampaignFocusRow, getCaseCards, getCityCards, getDonationLog, getPortalTotals } from "@/lib/data";
+import { countDonationLog, getCampaignFocusRow, getCaseCards, getCityCards, getDonationLog, getPortalTotals } from "@/lib/data";
+import { parseDonationLogSort } from "@/lib/donation-log";
 import { relativeDays } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 /** Cuántos casos caben en el inicio antes de que deje de ser una portada. */
 const CASES_ON_HOME = 4;
+const DONATIONS_ON_HOME = 8;
 
-export default async function HomePage() {
-  const [cities, cases, totals, focusRow, donations] = await Promise.all([
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ donaciones?: string }>;
+}) {
+  const { donaciones } = await searchParams;
+  const donationSort = parseDonationLogSort(donaciones);
+  const [cities, cases, totals, focusRow, donations, donationCount] = await Promise.all([
     getCityCards(),
     getCaseCards(),
     getPortalTotals(),
     getCampaignFocusRow(),
-    getDonationLog({ limit: 8 }),
+    getDonationLog({ limit: DONATIONS_ON_HOME, sort: donationSort }),
+    countDonationLog(),
   ]);
   const campaign = resolveCampaign(focusRow, cities, cases);
   const ranked = byCampaignPriority(cities, campaign?.city.id ?? null);
@@ -153,19 +163,29 @@ export default async function HomePage() {
             mucha gente no pasa de aquí. */}
         <p className="mt-8 text-[12px] leading-relaxed text-faint lg:col-start-2 lg:row-start-2 lg:mt-6">
           {SITE_NAME} publica los casos con el consentimiento de cada persona. Las donaciones van
-          al canal de cada caso, o al canal general cuando no tiene uno propio, y no pasan por
-          este portal.
+          por Mercado Pago, a la cuenta de {SITE_NAME}: quedan registradas para la causa que
+          elijas, o para el fondo si no eliges una. Nada del dinero pasa por este portal.
         </p>
       </div>
 
-      <section className="enters enters-3 mt-10 lg:mt-14">
-        <h2 className={screenTitle}>Donaciones recientes</h2>
-        <p className="mt-2 max-w-[68ch] text-[13px] leading-relaxed text-muted lg:text-[15px]">
-          Quién donó, a qué causa y cuánto. Si quien donó no autorizó su nombre, la fila dice que
-          es anónima.
+      <section id="donaciones" className="enters enters-3 mt-10 scroll-mt-24 lg:mt-14">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h2 className={screenTitle}>Donaciones</h2>
+          <CountChip value={donationCount} label={`${donationCount} donaciones`} />
+        </div>
+        <DonationLogSortNav active={donationSort} />
+        <p className="mt-3 max-w-[68ch] text-[13px] leading-relaxed text-muted lg:text-[15px]">
+          {donationSort === "generosas"
+            ? "Las que más pusieron, de mayor a menor."
+            : "Quién donó, a qué causa y cuánto."}
         </p>
         <div className="mt-4 max-w-[68ch]">
-          <DonationLog initial={donations} scope="portal" limit={8} />
+          <DonationLog
+            initial={donations}
+            scope="portal"
+            limit={DONATIONS_ON_HOME}
+            sort={donationSort}
+          />
         </div>
       </section>
     </div>

@@ -1,35 +1,37 @@
 import Link from "next/link";
 import { DonateButton, DonateOverlay } from "@/components/donations/DonateOverlay";
 import { CaseProgressBar } from "@/components/case/CaseProgressBar";
+import { CityChip } from "@/components/ui/Chip";
 import { Photo } from "@/components/ui/Photo";
 import { button } from "@/components/ui/styles";
-import { caseKindLabel } from "@/lib/constants";
 import { caseLead } from "@/lib/format";
 import type { CaseCard } from "@/lib/types";
 
 export function DonationCauseCard({ caseCard }: { caseCard: CaseCard }) {
   const href = `/ciudades/${caseCard.citySlug}/casos/${caseCard.id}`;
   const story = caseLead(caseCard, 140);
-  const onPhoto = Boolean(caseCard.coverPath);
+  const person = caseCard.case_kind === "persona";
+  const path = person ? (caseCard.coverPath ?? caseCard.portraitPath) : caseCard.coverPath;
+  const frame = person ? caseCard.portraitFrame : caseCard.coverFrame;
+  const onPhoto = Boolean(path);
 
   return (
-    <DonateOverlay title={`Donar a ${caseCard.display_name}`}>
+    <DonateOverlay title={`Donar a ${caseCard.display_name}`} caseId={caseCard.id}>
       <article className="flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-panel-high shadow-card">
         <div className="relative aspect-4/3 overflow-hidden">
           <Photo
-            path={caseCard.coverPath}
-            frame={caseCard.coverFrame}
+            path={path}
+            frame={frame}
+            kind={person ? "portrait" : "situation"}
             alt=""
             className="absolute inset-0 size-full"
             emptyLabel="Sin fotografías publicadas."
           />
           {onPhoto && <span aria-hidden className="veil-b absolute inset-0" />}
           <div className="absolute inset-x-0 bottom-0 z-10 p-4">
-            <p className={`text-[12px] ${onPhoto ? "text-paper/75" : "text-faint"}`}>
-              {caseCard.cityName} · {caseKindLabel(caseCard.case_kind)}
-            </p>
+            <CityChip name={caseCard.cityName} onPhoto={onPhoto} />
             <h2
-              className={`mt-1 line-clamp-2 font-display text-[22px] leading-tight ${
+              className={`mt-2 line-clamp-2 font-display text-[22px] leading-tight ${
                 onPhoto ? "text-paper" : "text-ink"
               }`}
             >
@@ -54,6 +56,10 @@ export function DonationCauseCard({ caseCard }: { caseCard: CaseCard }) {
           <Link href={href} className={`${button.secondary} min-w-0 flex-1`}>
             Ver más
           </Link>
+          {/* `primary` y no `invite`: esta tarjeta lleva la foto y el nombre de
+              una persona, así que es del registro sobrio aunque viva en la
+              rejilla de /donaciones. La regla del final de eslint.config.mjs la
+              tiene en la lista por eso. */}
           <DonateButton className={`${button.primary} min-w-0 flex-1`}>Donar</DonateButton>
         </div>
       </article>

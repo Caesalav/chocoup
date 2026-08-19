@@ -6,7 +6,6 @@ import { MoneyTrackFill } from "@/components/case/CaseMoneyTrack";
 import { DonateLink, DonateOverlay } from "@/components/donations/DonateOverlay";
 import { ShareLink } from "@/components/ShareLink";
 import { button } from "@/components/ui/styles";
-import type { CaseDonation } from "@/lib/donation-channel";
 import {
   moneyAction,
   shortCOP,
@@ -20,11 +19,10 @@ export const DONATIONS_ANCHOR = "donaciones-recibidas";
 
 type Props = {
   caseName: string;
+  caseId: string;
   progress: MoneyProgress;
-  donation: CaseDonation;
   donateHref: string;
   budgetHref: string;
-  offerHref: string;
   shareUrl: string;
   shareTitle: string;
   /** «Lucía Restrepo donó $150 mil». Lleva al registro. */
@@ -54,13 +52,11 @@ function ActionButton({
   action,
   donateHref,
   budgetHref,
-  offerHref,
   className,
 }: {
   action: MoneyAction;
   donateHref: string;
   budgetHref: string;
-  offerHref: string;
   className: string;
 }) {
   if (action.kind === "donar") {
@@ -71,7 +67,7 @@ function ActionButton({
     );
   }
   return (
-    <Link href={action.kind === "gasto" ? budgetHref : offerHref} className={className}>
+    <Link href={budgetHref} className={className}>
       {action.label}
     </Link>
   );
@@ -81,7 +77,6 @@ function Pair({
   action,
   donateHref,
   budgetHref,
-  offerHref,
   shareUrl,
   shareTitle,
   mainClass,
@@ -90,7 +85,6 @@ function Pair({
   action: MoneyAction;
   donateHref: string;
   budgetHref: string;
-  offerHref: string;
   shareUrl: string;
   shareTitle: string;
   mainClass: string;
@@ -102,7 +96,6 @@ function Pair({
         action={action}
         donateHref={donateHref}
         budgetHref={budgetHref}
-        offerHref={offerHref}
         className={mainClass}
       />
       <ShareLink url={shareUrl} title={shareTitle} className={shareClass}>
@@ -122,27 +115,28 @@ function Pair({
  */
 export function CaseActions({
   caseName,
+  caseId,
   progress,
-  donation,
   donateHref,
   budgetHref,
-  offerHref,
   shareUrl,
   shareTitle,
   donorLabel,
   donorHref,
   children,
 }: Props) {
-  const action = moneyAction(progress, donation);
+  const action = moneyAction(progress);
   const metaInView = useMetaStillInView(CASE_META_ANCHOR);
   const revealed = !metaInView;
+  // `primary` y no `invite`: la acción principal debajo del retrato de alguien
+  // es el bloque de `selva`, no el de `brote`. Ver MARCA.md, «Los dos
+  // registros», y la regla del final de eslint.config.mjs, que lo falla.
   const main = `${button.primary} min-w-0 flex-1 text-[15px]`;
   const share = `${button.share} min-w-0 flex-1 text-[15px]`;
   const pair = {
     action,
     donateHref,
     budgetHref,
-    offerHref,
     shareUrl,
     shareTitle,
     mainClass: main,
@@ -197,7 +191,7 @@ export function CaseActions({
 
   const tree =
     action.kind === "donar" ? (
-      <DonateOverlay title={`Donar a ${caseName}`}>
+      <DonateOverlay title={`Donar a ${caseName}`} caseId={caseId}>
         {hero}
         {dock}
       </DonateOverlay>

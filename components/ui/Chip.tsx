@@ -1,4 +1,5 @@
 import { CheckIcon } from "@/components/ui/icons";
+import { pillOnPhoto } from "@/components/ui/styles";
 import { isCoveredNeed } from "@/lib/needs";
 import type { NeedStatus, OfferRecordState, OfferStatus, FeedbackKind } from "@/lib/types";
 import {
@@ -23,6 +24,36 @@ export function CategoryChip({ category }: { category: string }) {
   return (
     <span className={`${base} border border-line-strong text-muted`}>
       {needCategoryLabel(category)}
+    </span>
+  );
+}
+
+/** El municipio de una causa: lavanda, más chica que las de categoría.
+ *
+ * El color la separa de «Agua» o «Techo» de un vistazo —es el pueblo, no la
+ * necesidad—. El tamaño es el de una nota al pie, no el de una pastilla de
+ * filtro: en la fila del caso va encima del retrato, para no estirar la tarjeta.
+ */
+export function CityChip({ name, onPhoto = false }: { name: string; onPhoto?: boolean }) {
+  if (onPhoto) {
+    return <span className={pillOnPhoto}>{name}</span>;
+  }
+
+  return (
+    <span className="inline-flex max-w-full items-center rounded-full bg-lavanda px-1.5 py-0.5 text-[10px] font-medium leading-4 text-ink">
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
+/** Un recuento al lado de un titular: el número, en la misma pastilla. */
+export function CountChip({ value, label }: { value: number; label: string }) {
+  return (
+    <span
+      className={`${base} border border-line-strong tabular-nums text-muted`}
+      aria-label={label}
+    >
+      {value}
     </span>
   );
 }

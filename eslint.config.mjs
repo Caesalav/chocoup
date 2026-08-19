@@ -117,6 +117,14 @@ const eslintConfig = defineConfig([
     // prohíbe es `selva` ni `accent`: son los dos que funcionan en los dos
     // registros, y sin ellos la ficha de un caso se quedaría sin marca.
     //
+    // Lo que esta regla NO puede ver: la clase escrita en otro archivo. Mira el
+    // texto `bg-liana` y el nombre `button.invite` tal como aparecen en los
+    // archivos de la lista, así que una receta que viva en
+    // `components/ui/styles.ts` y solo se use desde aquí pasa sin más. No es un
+    // agujero que tapar con más selectores —siempre habrá una indirección más—
+    // sino el criterio de quien la escriba: una receta que solo se usa en el
+    // registro sobrio es del registro sobrio, y se decide con la misma vara.
+    //
     // Si algún día hay que romperlo, se rompe aquí y a la vista, no en la
     // pantalla.
     // ---------------------------------------------------------------------
@@ -150,6 +158,11 @@ const eslintConfig = defineConfig([
           selector: "Identifier[name=/^(blockDark|blockLive|blockInvite|blockOffer)$/]",
           message:
             "Las tres superficies de bloque son del registro abierto: llevan cintas o color a plena potencia. En la ficha de una persona se usan `card` y `panel`. Ver MARCA.md, «Los dos registros».",
+        },
+        {
+          selector: 'MemberExpression[object.name="button"][property.name="invite"]',
+          message:
+            "`button.invite` es el botón de brote del registro abierto. En la ficha de una persona la acción principal es `button.primary`, que es el bloque de selva. Ver MARCA.md, «Los dos registros».",
         },
       ],
     },

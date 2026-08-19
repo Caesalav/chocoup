@@ -442,6 +442,8 @@ export type CityCardData = City & {
    * color dice cuánto falta. Ver `countOpenCases` en lib/needs.ts.
    */
   openCases: number;
+  /** Casos con el presupuesto comprado entero. */
+  solvedCases: number;
   caseCount: number;
   needs: NeedFacet[];
   /**
@@ -513,6 +515,9 @@ export type NeedCard = Need & {
 export type PortalTotals = {
   cities: number;
   cases: number;
+  /** Casos con el presupuesto comprado entero. */
+  solvedCases: number;
+  openCases: number;
   /** Ítems de presupuesto registrados: el total, comprados incluidos. */
   needs: number;
   coveredNeeds: number;

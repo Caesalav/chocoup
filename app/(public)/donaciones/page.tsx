@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { DonationCauseCard } from "@/components/donations/DonationCauseCard";
-import { MercadoPagoCheckout } from "@/components/donations/MercadoPagoCheckout";
+import { GeneralFundHero } from "@/components/donations/GeneralFundHero";
 import { ScreenHeader } from "@/components/nav/ScreenHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { screenTitle, shell } from "@/components/ui/styles";
@@ -52,48 +52,52 @@ export default async function DonationsPage() {
       <div className={`${shell} pt-4 lg:pt-10`}>
         <ScreenHeader
           title="Donaciones"
-          subtitle="Un fondo general, y debajo las causas como un menú: elige por lo que más falta, por tipo, o por las que están a punto de cerrar."
+          subtitle="Al fondo general, o a una causa concreta."
           backHref="/"
           backLabel="Volver al inicio"
         />
 
-        <section className="enters enters-1 mt-6 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start lg:gap-x-12">
-          <div>
-            <h2 className={screenTitle}>Fondo general</h2>
-            <p className="mt-2 text-[14px] leading-relaxed text-muted">
-              Para quien no quiere elegir una familia. Se reparte entre las causas documentadas.
-            </p>
-          </div>
-          <div className="mt-5 lg:mt-0 lg:max-w-md">
-            <MercadoPagoCheckout heading="Donar al fondo general" />
-          </div>
-        </section>
+        <div className="enters enters-1 mt-6">
+          <GeneralFundHero />
+        </div>
 
-        <nav aria-label="Categorías" className="mt-12 flex gap-2 overflow-x-auto pb-1">
-          {menu.map((shelf) => (
-            <a
-              key={shelf.id}
-              href={`#${shelf.id}`}
-              className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-panel-high px-4 text-[14px] text-body hover:border-line-strong hover:text-ink"
-            >
-              {shelf.label}
-            </a>
-          ))}
-        </nav>
+        {menu.length > 0 && (
+          <>
+            <section className="enters enters-2 mt-12 lg:mt-16">
+              <h2 className={screenTitle}>¿No sabes en qué donar?</h2>
+              <p className="mt-2 max-w-[68ch] text-[15px] leading-relaxed text-muted">
+                Elige una causa: por lo que más falta, por tipo, o por las que están a punto de
+                cerrar.
+              </p>
+            </section>
 
-        {menu.map((shelf) => (
-          <section key={shelf.id} id={shelf.id} className="mt-10 scroll-mt-24">
-            <h2 className={screenTitle}>{shelf.label}</h2>
-            <p className="mt-1 text-[13px] text-muted">{shelf.hint}</p>
-            <ul className="mt-5 flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-3 lg:overflow-visible">
-              {shelf.cards.map((caseCard) => (
-                <li key={caseCard.id} className="w-[min(80vw,22rem)] shrink-0 lg:w-auto">
-                  <DonationCauseCard caseCard={caseCard} />
-                </li>
+            <nav aria-label="Categorías" className="mt-5 flex gap-2 overflow-x-auto pb-1">
+              {menu.map((shelf) => (
+                <a
+                  key={shelf.id}
+                  href={`#${shelf.id}`}
+                  className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-panel-high px-4 text-[14px] text-body hover:border-line-strong hover:text-ink"
+                >
+                  {shelf.label}
+                </a>
               ))}
-            </ul>
-          </section>
-        ))}
+            </nav>
+
+            {menu.map((shelf) => (
+              <section key={shelf.id} id={shelf.id} className="mt-10 scroll-mt-24">
+                <h2 className={screenTitle}>{shelf.label}</h2>
+                <p className="mt-1 text-[13px] text-muted">{shelf.hint}</p>
+                <ul className="mt-5 flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-3 lg:overflow-visible">
+                  {shelf.cards.map((caseCard) => (
+                    <li key={caseCard.id} className="w-[min(80vw,22rem)] shrink-0 lg:w-auto">
+                      <DonationCauseCard caseCard={caseCard} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </>
+        )}
       </div>
 
       <SiteFooter />

@@ -5,26 +5,29 @@ import type { PortalTotals } from "@/lib/types";
 
 /**
  * Donde la referencia tiene la tarjeta de puntos, aquí va el estado real del
- * registro: cuántas necesidades se han anotado y cuántas están cerradas.
+ * registro: qué parte de las causas del Chocó ya está cubierta del todo.
  *
  * El tono es lo que decide esta pieza. La referencia celebra —"¡ya casi!", un
- * descuento, una llama—, y esto documenta un terremoto: son dos cifras, una
- * barra y ni un adjetivo. La barra crece con lo cubierto, no con lo que falta,
- * porque lo que falta es la lista entera y no un logro a medias.
+ * descuento, una llama—, y esto documenta un terremoto: un porcentaje, una
+ * barra y ni un adjetivo. La barra crece con lo solucionado, no con lo que
+ * falta, porque lo que falta es la lista entera y no un logro a medias.
  *
  * Los números salen de la misma consulta (getPortalTotals) para que no puedan
  * contradecirse en la misma pantalla.
  */
 export function ProgressCard({ totals }: { totals: PortalTotals }) {
-  const done = totals.needs > 0 ? Math.round((totals.coveredNeeds / totals.needs) * 100) : 0;
+  const percent =
+    totals.cases > 0 ? Math.round((totals.solvedCases / totals.cases) * 100) : 0;
 
   return (
     <div className={`${card} p-4`}>
       <div className="flex items-start justify-between gap-4">
         <p className="font-display text-[26px] leading-none tabular-nums text-ink">
-          {totals.coveredNeeds}
-          <span className="text-faint"> /{totals.needs}</span>{" "}
-          <span className="font-sans text-[15px] font-normal text-muted">ítems</span>
+          {percent}
+          <span className="text-faint"> %</span>{" "}
+          <span className="font-sans text-[15px] font-normal text-muted">
+            causas solucionadas
+          </span>
         </p>
 
         <Link
@@ -39,16 +42,16 @@ export function ProgressCard({ totals }: { totals: PortalTotals }) {
           tarjeta blanca es el único hueco que se ve sin dibujarle un borde. */}
       <div
         role="img"
-        aria-label={`${totals.coveredNeeds} de ${totals.needs} ítems comprados`}
+        aria-label={`${percent} por ciento de las causas del Chocó solucionadas`}
         className="mt-4 h-2 overflow-hidden rounded-full bg-canvas"
       >
-        <div className="h-full rounded-full bg-accent" style={{ width: `${done}%` }} />
+        <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
       </div>
 
       <p className="mt-2.5 text-[12px] text-faint">
-        {totals.coveredNeeds} comprados ·{" "}
-        {plural(totals.openNeeds, "pendiente", "pendientes")} en{" "}
-        {plural(totals.cities, "municipio", "municipios")}
+        {totals.cases === 0
+          ? "Todavía no hay causas publicadas"
+          : `${plural(totals.solvedCases, "causa", "causas")} de ${totals.cases} · ${plural(totals.cities, "municipio", "municipios")}`}
       </p>
 
       {/* Cuándo se tocó esto por última vez. En el móvil va arriba del inicio,

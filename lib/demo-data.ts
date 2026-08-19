@@ -23,6 +23,7 @@ import {
   asCaseProgress,
   budgetProgress,
   countOpenBudgetCases,
+  countSolvedBudgetCases,
   type BudgetItem,
 } from "./budget";
 import { countOpenNeeds, isOpenNeed } from "./needs";
@@ -362,6 +363,28 @@ const caseSeeds: CaseSeed[] = [
     case_kind: "colegio",
     summary: "Dos salones sin techo: piden teja, madera y pupitres antes de las lluvias.",
   },
+  {
+    citySlug: "quibdo",
+    display_name: "Caninos del malecón",
+    household: "Una camada y tres adultos, a cargo de vecinas del puerto",
+    story:
+      "Con el temblor se cayeron dos ranchos del malecón donde dormían. Las vecinas los están alimentando con lo que alcanza.\n\nPiden concentrado para un mes y madera para armar un refugio seco, fuera de la crecida.",
+    consent_to_publish: true,
+    published: true,
+    case_kind: "animal",
+    summary: "Sin ranchos en el malecón: piden concentrado y un refugio seco.",
+  },
+  {
+    citySlug: "istmina",
+    display_name: "Casa de la cultura de Istmina",
+    household: "Sede del pueblo, hoy albergue de cuatro familias",
+    story:
+      "La casa de la cultura resistió, pero el techo del salón principal gotea y el piso de madera se levantó en una esquina.\n\nAhí duermen cuatro familias desalojadas y se guarda lo que sacaron de las casas marcadas. Piden teja, un rollo de plástico y apuntalar el piso antes de que empeoren las lluvias.",
+    consent_to_publish: true,
+    published: true,
+    case_kind: "fundacion",
+    summary: "El albergue del pueblo gotea: teja, plástico y apuntalar el piso.",
+  },
 ];
 
 /**
@@ -564,6 +587,38 @@ const needSeeds: NeedSeed[] = [
     title: "Madera para tres pilotes y reparación del motor de la lancha",
     urgent: true,
   },
+  {
+    citySlug: "istmina",
+    caseName: "Escuela del barrio Niño Jesús",
+    category: "techo",
+    title: "Teja y madera para rearmar la cubierta de dos salones",
+    quantity: "Para dos salones",
+    urgent: true,
+  },
+  {
+    citySlug: "istmina",
+    caseName: "Escuela del barrio Niño Jesús",
+    category: "otro",
+    title: "Pupitres para los dos salones que quedaron debajo",
+    quantity: "40 pupitres",
+    status: "parcial",
+  },
+  {
+    citySlug: "quibdo",
+    caseName: "Caninos del malecón",
+    category: "alimentos",
+    title: "Concentrado para un mes",
+    quantity: "Para una camada y tres adultos",
+    urgent: true,
+  },
+  {
+    citySlug: "istmina",
+    caseName: "Casa de la cultura de Istmina",
+    category: "techo",
+    title: "Teja, plástico y apuntalar el piso del salón",
+    details: "Hoy es albergue de cuatro familias. El techo gotea.",
+    urgent: true,
+  },
 ];
 
 export const demoNeeds: Need[] = needSeeds.map((seed, index) => ({
@@ -651,6 +706,39 @@ const budgetSeeds: BudgetSeed[] = [
     title: "Madera para tres pilotes y reparación del motor de la lancha",
     amount_cop: 5_400_000,
   },
+  {
+    caseName: "Escuela del barrio Niño Jesús",
+    title: "Teja y madera para la cubierta de dos salones",
+    amount_cop: 6_200_000,
+  },
+  {
+    caseName: "Escuela del barrio Niño Jesús",
+    title: "40 pupitres para los salones que quedaron debajo",
+    amount_cop: 1_800_000,
+    purchased: true,
+  },
+  {
+    caseName: "Caninos del malecón",
+    title: "Concentrado para un mes",
+    amount_cop: 420_000,
+    purchased: true,
+  },
+  {
+    caseName: "Caninos del malecón",
+    title: "Madera para un refugio seco fuera de la crecida",
+    amount_cop: 780_000,
+  },
+  {
+    caseName: "Casa de la cultura de Istmina",
+    title: "Teja y plástico para el salón principal",
+    amount_cop: 2_400_000,
+  },
+  {
+    caseName: "Casa de la cultura de Istmina",
+    title: "Apuntalar el piso de madera",
+    amount_cop: 900_000,
+    purchased: true,
+  },
 ];
 
 export const demoBudgetItems: BudgetItem[] = budgetSeeds.map((seed, index) => {
@@ -685,16 +773,23 @@ type DonationSeed = {
 
 const donationSeeds: DonationSeed[] = [
   { caseName: DANIELA, amount_cop: 1_500_000, donor_name: "Lucía Restrepo", publish_name: true, at: at(19, 11, 20) },
-  { caseName: DANIELA, amount_cop: 1_000_000, donor_name: "Carlos Vélez", publish_name: false, at: at(18, 16, 5) },
+  { caseName: DANIELA, amount_cop: 1_000_000, donor_name: "Carlos Vélez", publish_name: true, at: at(18, 16, 5) },
   { caseName: DANIELA, amount_cop: 700_000, donor_name: "Andrés Palacios", publish_name: true, at: at(17, 9, 40) },
   { caseName: "Familia Mosquera Palacios", amount_cop: 1_200_000, donor_name: "Carmen Lozano", publish_name: true, at: at(18, 19, 12) },
-  { caseName: "Familia Mosquera Palacios", amount_cop: 600_000, donor_name: "", publish_name: false, at: at(15, 8, 30) },
-  { caseName: "Doña Bernarda Rentería", amount_cop: 400_000, donor_name: "Marta Hinestroza", publish_name: false, at: at(16, 13, 45) },
+  { caseName: "Familia Mosquera Palacios", amount_cop: 600_000, donor_name: "Yulieth Mena", publish_name: true, at: at(15, 8, 30) },
+  { caseName: "Doña Bernarda Rentería", amount_cop: 400_000, donor_name: "Marta Hinestroza", publish_name: true, at: at(16, 13, 45) },
   { caseName: "Familia Asprilla Moreno", amount_cop: 250_000, donor_name: "Diego Murillo", publish_name: true, at: at(14, 10, 15) },
   { caseName: "Familia Perea Córdoba", amount_cop: 650_000, donor_name: "Ana Isabel Córdoba", publish_name: true, at: at(17, 21, 8) },
-  { caseName: "Familia Perea Córdoba", amount_cop: 500_000, donor_name: "", publish_name: false, at: at(13, 7, 50) },
-  { caseName: "Yeison Córdoba y su hermana", amount_cop: 350_000, donor_name: "Un vecino de Istmina", publish_name: true, at: at(16, 18, 22) },
+  { caseName: "Familia Perea Córdoba", amount_cop: 500_000, donor_name: "Jairo Rivas", publish_name: true, at: at(13, 7, 50) },
+  { caseName: "Yeison Córdoba y su hermana", amount_cop: 350_000, donor_name: "Sofía Caicedo", publish_name: true, at: at(16, 18, 22) },
   { caseName: "Familia Klinger Valencia", amount_cop: 800_000, donor_name: "Wilmer Caicedo", publish_name: true, at: at(15, 12, 0) },
+  { caseName: "Escuela del barrio Niño Jesús", amount_cop: 1_000_000, donor_name: "Colegio San José", publish_name: true, at: at(18, 10, 0) },
+  { caseName: "Escuela del barrio Niño Jesús", amount_cop: 800_000, donor_name: "Rotary Club Medellín", publish_name: true, at: at(16, 15, 30) },
+  { caseName: "Caninos del malecón", amount_cop: 250_000, donor_name: "Paola Mosquera", publish_name: true, at: at(17, 8, 10) },
+  { caseName: "Caninos del malecón", amount_cop: 200_000, donor_name: "", publish_name: false, at: at(14, 19, 40) },
+  { caseName: "Casa de la cultura de Istmina", amount_cop: 700_000, donor_name: "Alberto Mena", publish_name: true, at: at(18, 12, 25) },
+  { caseName: "Casa de la cultura de Istmina", amount_cop: 400_000, donor_name: "Vecindario San Agustín", publish_name: true, at: at(15, 9, 5) },
+  { caseName: DANIELA, amount_cop: 50_000, donor_name: "", publish_name: false, at: at(19, 20, 15) },
 ];
 
 const demoDonationRows = donationSeeds.map((seed, index) => {
@@ -941,6 +1036,13 @@ const photoSeeds: PhotoSeed[] = [
   { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "choco-palafitos", caption: "Su palafito, sobre el estero." },
   { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "choco-canoas", caption: "La lancha con la que pescan." },
   { citySlug: "bahia-solano", caseName: "Familia Klinger Valencia", image: "persona-wilmar", caption: "Retrato de archivo, para la demostración." },
+  { citySlug: "quibdo", caseName: DANIELA, image: "persona-aristides", caption: "Retrato de archivo, para la demostración." },
+  { citySlug: "istmina", caseName: "Escuela del barrio Niño Jesús", image: "choco-edificio", caption: "La escuela, el día que se documentó." },
+  { citySlug: "istmina", caseName: "Escuela del barrio Niño Jesús", image: "choco-camino", caption: "El patio, con el muro agrietado." },
+  { citySlug: "quibdo", caseName: "Caninos del malecón", image: "choco-canoas", caption: "El malecón, donde estaban los ranchos." },
+  { citySlug: "quibdo", caseName: "Caninos del malecón", image: "choco-rio", caption: "El Atrato, el día del censo." },
+  { citySlug: "istmina", caseName: "Casa de la cultura de Istmina", image: "choco-edificio", caption: "La casa de la cultura, hoy albergue." },
+  { citySlug: "istmina", caseName: "Casa de la cultura de Istmina", image: "choco-pueblo", caption: "El pueblo, el día que se apuntaló el piso." },
 ];
 
 export const demoPhotos: Photo[] = photoSeeds.map((seed, index) => ({
@@ -967,6 +1069,7 @@ export const demoPhotos: Photo[] = photoSeeds.map((seed, index) => ({
  * casos así— para que esa tarjeta se pueda ver en el panel.
  */
 const portraitSeeds: Record<string, string> = {
+  [DANIELA]: "persona-aristides",
   "Familia Mosquera Palacios": "persona-josefa",
   "Doña Bernarda Rentería": "persona-bernarda",
   "Familia Asprilla Moreno": "persona-asprilla",
@@ -1123,6 +1226,27 @@ const updateSeeds: UpdateSeed[] = [
     title: "El motor se puede recuperar",
     body: "Lo revisó el mecánico del pueblo. Piden madera para los pilotes y el arreglo.",
     photoCaption: "Las lanchas del pueblo, cuando el mecánico revisó el motor.",
+  },
+  {
+    caseName: "Escuela del barrio Niño Jesús",
+    happenedOn: "2026-08-11",
+    title: "Se documentó la cubierta",
+    body: "Dos salones sin techo. Las clases están en turnos, en la casa de la cultura y en la sede alterna.",
+    photoCaption: "La escuela, el día que se documentó.",
+  },
+  {
+    caseName: "Caninos del malecón",
+    happenedOn: "2026-08-12",
+    title: "Se documentó el malecón",
+    body: "Los ranchos se cayeron. Las vecinas los están alimentando. Se pidió concentrado y madera para un refugio.",
+    photoCaption: "El malecón, donde estaban los ranchos.",
+  },
+  {
+    caseName: "Casa de la cultura de Istmina",
+    happenedOn: "2026-08-13",
+    title: "El piso ya está apuntalado",
+    body: "Se apuntaló la esquina que se levantó. El techo sigue goteando. Ahí duermen cuatro familias.",
+    photoCaption: "El pueblo, el día que se apuntaló el piso.",
   },
 ];
 
@@ -1447,6 +1571,7 @@ export function demoCityCards(): CityCardData[] {
         ),
         openNeeds: budget.pendingItems,
         openCases: countOpenBudgetCases(items),
+        solvedCases: countSolvedBudgetCases(items),
         caseCount: cases.length,
         needs: needs.map((need) => ({
           category: need.category,
@@ -1618,6 +1743,8 @@ export function demoPortalTotals(): PortalTotals {
   return {
     cities: cities.length,
     cases: cases.length,
+    solvedCases: countSolvedBudgetCases(items),
+    openCases: countOpenBudgetCases(items),
     needs: budget.itemCount,
     coveredNeeds: budget.purchasedItems,
     openNeeds: budget.pendingItems,
@@ -1822,6 +1949,7 @@ export function demoDonationLog(filters: {
   caseId?: string;
   cityId?: string;
   limit?: number;
+  sort?: "recientes" | "generosas";
 } = {}): DonationLogEntry[] {
   // Reproduce lo que hace la vista `public.donation_log`: solo lo confirmado
   // —aquí todas lo son—, solo de causas publicadas con consentimiento, solo de
@@ -1857,7 +1985,12 @@ export function demoDonationLog(filters: {
         city_slug: city.slug,
       };
     })
-    .sort((a, b) => b.donated_at.localeCompare(a.donated_at) || b.id.localeCompare(a.id));
+    .sort((a, b) => {
+      if (filters.sort === "generosas") {
+        return b.amount_cop - a.amount_cop || b.donated_at.localeCompare(a.donated_at);
+      }
+      return b.donated_at.localeCompare(a.donated_at) || b.id.localeCompare(a.id);
+    });
 
   return rows.slice(0, filters.limit ?? rows.length);
 }

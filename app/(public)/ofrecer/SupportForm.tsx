@@ -49,7 +49,7 @@ export function VolunteerForm() {
       <Honeypot />
       <ContactFields />
       <label className="block">
-        <span className={field.label}>Desde dónde sales, o a qué municipio puedes ir</span>
+        <span className={field.label}>¿En dónde te encuentras?</span>
         <input name="city_name" className={field.input} placeholder="Ej.: Medellín, o ya estoy en Quibdó" />
       </label>
       <label className="block">

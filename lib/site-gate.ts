@@ -2,8 +2,8 @@
  * El portal todavía no es público: quien llega ve la landing, no el tablero.
  *
  * Abierto de verdad: `SITE_OPEN=1` en el entorno. El equipo entra por /entrar
- * (la sesión salta el cerrojo). Un avance puntual para quien no es del equipo
- * va con `SITE_PREVIEW_SECRET` y la dirección `/?abrir=…`.
+ * (la sesión salta el cerrojo). Quien no es del equipo abre el tablero de
+ * muestra con la clave de la landing, o con `SITE_PREVIEW_SECRET` y `/?abrir=…`.
  *
  * Cerrado es el valor por omisión a propósito: olvidarse de una variable no
  * puede publicar fichas de familias. Abrir exige una decisión.

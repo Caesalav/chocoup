@@ -44,10 +44,11 @@ export const SECTIONS: readonly Destination[] = [
 ] as const;
 
 /**
- * Las cuatro cosas que se hacen desde cualquier pantalla. No repiten las
- * secciones: aquí se vuelve al principio, se sitúa uno, se busca o se ofrece
- * algo. Buscar abre el campo en la barra; /buscar queda para quien no tiene
- * JavaScript y para enviar el formulario.
+ * Las cosas que se hacen desde cualquier pantalla. No repiten las secciones:
+ * aquí se vuelve al principio, se sitúa uno, se busca o se ofrece algo. Buscar
+ * abre el campo en la barra —en el móvil como mando al borde derecho, no como
+ * pestaña—; /buscar queda para quien no tiene JavaScript y para enviar el
+ * formulario.
  */
 export const TABS: readonly Destination[] = [
   { href: "/", label: "Inicio", Icon: HomeIcon },
@@ -106,8 +107,8 @@ export const AID_LOG: Destination = {
  * El buzón: reportar un error o pedir una función.
  *
  * No es una sección ni una pestaña. Va en el pie, donde caben los destinos que
- * no son ni material ni acción de ayuda, y además como botón suelto en el
- * portal porque el inicio y el mapa no montan pie.
+ * no son ni material ni acción de ayuda, y en el móvil a la izquierda de la
+ * barra, frente a buscar. En escritorio sigue suelto, porque ahí no hay dock.
  */
 export const FEEDBACK: Destination = {
   href: "/sugerencias",

@@ -13,7 +13,7 @@ import { moneyProgress } from "@/lib/money-progress";
 export function CampaignCard({ campaign }: { campaign: ResolvedCampaign }) {
   const { city, source, caseName, note } = campaign;
   const href = campaignHref(campaign);
-  // La misma cuenta que el anillo de la barra que va debajo. Con
+  // La misma cuenta que el tramo oscuro de la pista que va debajo. Con
   // `city.progress.ratio` esta frase decía un porcentaje y la barra otro.
   const progress = moneyProgress(city.budget);
 

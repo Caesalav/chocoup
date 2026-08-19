@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dock, DockAction, DockIcon } from "@/components/nav/Dock";
+import { Dock, DockAction, DockIcon, dockTool } from "@/components/nav/Dock";
 import { NavSearch, SearchTabLink, useNavSearch } from "@/components/nav/NavSearch";
-import { activeHref, DONATE, TABS } from "@/components/nav/destinations";
+import { activeHref, DONATE, FEEDBACK, TABS } from "@/components/nav/destinations";
+import { FeedbackIcon, SearchIcon } from "@/components/ui/icons";
 
 /**
  * Barra inferior fija del portal.
@@ -12,11 +14,13 @@ import { activeHref, DONATE, TABS } from "@/components/nav/destinations";
  * HTML ya llega con la pestaña correcta marcada y con los enlaces puestos, así
  * que sin JavaScript la barra funciona igual. Nada aquí depende de hidratar.
  *
- * Buscar no es una pantalla: abre el campo en esta misma barra. Sin JavaScript
- * el enlace sigue yendo a /buscar.
+ * Buscar no es una pantalla: abre el campo encima de esta misma barra. Sin
+ * JavaScript el enlace sigue yendo a /buscar. El mando va al borde derecho, y
+ * Sugerencias al izquierdo: dos círculos de papel que equilibran la píldora.
+ * Inicio, Mapa y Ofrecer son destinos; esos dos son herramientas.
  *
  * La pestaña activa es un círculo de papel. Donar va aparte, siempre con su
- * nombre, para que no haya que aprenderse un quinto dibujo.
+ * nombre, para que no haya que aprenderse un dibujo más.
  *
  * Se retira a partir de `lg`, donde los mismos destinos los lleva la cabecera:
  * una barra flotando sobre el borde inferior de una pantalla de 1080 px de alto
@@ -24,6 +28,7 @@ import { activeHref, DONATE, TABS } from "@/components/nav/destinations";
  * navegaría por duplicado.
  */
 const CASE_PATH = /^\/ciudades\/[^/]+\/casos\//;
+const INBOX = /^\/sugerencias(\/|$)/;
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -36,33 +41,40 @@ export function BottomNav() {
   }
 
   const onDonate = pathname === DONATE.href || pathname.startsWith(`${DONATE.href}/`);
-  const branch = onDonate ? null : (activeHref(pathname, TABS) ?? "/");
+  const places = TABS.filter((tab) => tab.href !== "/buscar");
+  const branch = onDonate ? null : (activeHref(pathname, places) ?? "/");
 
   return (
-    <Dock label="Secciones del portal">
-      {TABS.map(({ href, label, Icon }) => {
-        const active = href === branch && href !== "/buscar";
-        const icon = <Icon className="size-[22px] shrink-0" />;
-        if (href === "/buscar") {
-          return (
-            <li key={href}>
-              <SearchTabLink
-                href={href}
-                label={label}
-                onOpen={search.openSearch}
-                className="relative flex h-12 w-11 items-center justify-center rounded-full text-luz/65 transition-[background-color,color] duration-200 hover:bg-luz/15 hover:text-luz focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-luz"
-              >
-                {icon}
-              </SearchTabLink>
-            </li>
-          );
-        }
-        return (
-          <DockIcon key={href} href={href} label={label} active={active}>
-            {icon}
-          </DockIcon>
-        );
-      })}
+    <Dock
+      label="Secciones del portal"
+      leading={
+        INBOX.test(pathname) ? undefined : (
+          <Link
+            href={`${FEEDBACK.href}?desde=${encodeURIComponent(pathname)}`}
+            aria-label={FEEDBACK.label}
+            title={FEEDBACK.label}
+            className={dockTool}
+          >
+            <FeedbackIcon className="size-[22px] shrink-0" />
+          </Link>
+        )
+      }
+      trailing={
+        <SearchTabLink
+          href="/buscar"
+          label="Buscar"
+          onOpen={search.openSearch}
+          className={dockTool}
+        >
+          <SearchIcon className="size-[22px] shrink-0" />
+        </SearchTabLink>
+      }
+    >
+      {places.map(({ href, label, Icon }) => (
+        <DockIcon key={href} href={href} label={label} active={href === branch}>
+          <Icon className="size-[22px] shrink-0" />
+        </DockIcon>
+      ))}
       <DockAction href={DONATE.href} label={DONATE.label} active={onDonate} Icon={DONATE.Icon} />
     </Dock>
   );

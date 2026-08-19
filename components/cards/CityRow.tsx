@@ -48,8 +48,6 @@ export function CityRow({ city }: { city: CityCardData }) {
         </p>
         <p className="mt-0.5 text-[12px] text-faint">
           {plural(city.caseCount, "caso documentado", "casos documentados")}
-          {city.standingOffers > 0 &&
-            ` · ${plural(city.standingOffers, "aporte en camino", "aportes en camino")}`}
         </p>
       </div>
     </Link>

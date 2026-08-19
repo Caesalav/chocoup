@@ -57,16 +57,17 @@ export function DonateLink({
 type Props = {
   title: string;
   note?: React.ReactNode;
+  caseId?: string;
   children: React.ReactNode;
 };
 
 /**
- * El pop-up de donación: Mercado Pago, todavía sin conectar.
+ * El pop-up de donación: valor y Mercado Pago.
  *
  * Sin JavaScript el «Donar» es un ancla a la sección de dinero de la ficha, o
  * «Ver más» en la rejilla. El diálogo es una mejora, no el único camino.
  */
-export function DonateOverlay({ title, note, children }: Props) {
+export function DonateOverlay({ title, note, caseId, children }: Props) {
   const [open, setOpen] = useState(false);
   const titleId = useId();
 
@@ -114,7 +115,7 @@ export function DonateOverlay({ title, note, children }: Props) {
               </div>
               {note && <div className="mt-3">{note}</div>}
               <div className="mt-4">
-                <MercadoPagoCheckout heading={title} />
+                <MercadoPagoCheckout heading={title} caseId={caseId} showHeading={false} />
               </div>
             </div>
           </div>,

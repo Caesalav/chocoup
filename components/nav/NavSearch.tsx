@@ -46,7 +46,7 @@ export function useNavSearch() {
   };
 }
 
-/** El tab de buscar: sin JS va a /buscar; con JS abre el campo en la barra. */
+/** El mando de buscar: sin JS va a /buscar; con JS abre el campo en la barra. */
 export function SearchTabLink({
   href,
   className,

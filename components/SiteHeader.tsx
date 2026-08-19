@@ -35,7 +35,7 @@ const item =
   "flex min-h-10 items-center rounded-full px-3.5 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const idle = "text-body hover:bg-line hover:text-ink";
 const openClass = "bg-selva font-medium text-luz";
-const donateClass = `${item} bg-selva font-medium text-luz hover:bg-accent-strong`;
+const donateClass = `${item} border border-selva bg-brote font-medium text-selva hover:bg-liana hover:text-selva`;
 
 export function SiteHeader({ className = "" }: { className?: string }) {
   const pathname = usePathname();

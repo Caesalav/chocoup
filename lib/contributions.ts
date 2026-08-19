@@ -57,7 +57,7 @@ export const EMPTY_TALLY: ContributionTally = { ofrecidos: 0, entregados: 0 };
  * va la cifra grande y debajo la frase que la explica.
  */
 export function contributionHeadline(tally: ContributionTally): string {
-  return tally.ofrecidos === 1 ? "aporte ofrecido" : "aportes ofrecidos";
+  return tally.ofrecidos === 1 ? "ayuda ofrecida" : "ayudas ofrecidas";
 }
 
 /**

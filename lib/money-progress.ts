@@ -1,5 +1,4 @@
 import type { BudgetProgress } from "./budget";
-import type { CaseDonation } from "./donation-channel";
 
 /**
  * Qué enseña la barra de donaciones de una causa, y SOBRE QUÉ CIFRA lo enseña.
@@ -10,7 +9,23 @@ import type { CaseDonation } from "./donation-channel";
  * viene con la palabra pegada.
  *
  * ---------------------------------------------------------------------------
- * POR QUÉ EL ANILLO MIDE LO ENTREGADO Y NO LO RECIBIDO
+ * LAS DOS CIFRAS, Y QUÉ ENSEÑA CADA SITIO
+ *
+ * ESTO NO ESTÁ CERRADO. Hoy la pantalla dice las dos cosas en dos registros
+ * distintos, y quedó así porque la forma y la cifra se decidieron por separado:
+ *
+ *   - EL PORCENTAJE (`percent`) mide lo ENTREGADO. Es lo que se pinta como tramo
+ *     oscuro de la pista y lo que dicen la cabecera de un municipio y la tarjeta
+ *     de una campaña.
+ *   - LA CIFRA GRANDE de la ficha y de la barra fija es lo RECIBIDO cuando hay
+ *     algo recibido, y lo entregado solo cuando no. Está escrita en
+ *     `CaseMoneyTrack` y en `CaseActions`, no aquí.
+ *
+ * O sea que la misma pista lleva un número grande que cuenta una cosa y un
+ * relleno que cuenta otra. Se sostiene porque la pista enseña los dos tramos con
+ * su leyenda, así que nada queda sin rotular; pero es una decisión pendiente y no
+ * un diseño, y lo que sigue es el argumento de por qué el porcentaje —lo que se
+ * lee sin leer— mide lo entregado.
  *
  * Una causa tiene dos cifras de avance y no son la misma clase de dato:
  *
@@ -24,33 +39,33 @@ import type { CaseDonation } from "./donation-channel";
  *     cualquier otra puerta, y 0021 lo repite. Hoy no hay webhook escrito, así
  *     que en producción esta cifra es cero en todas las causas.
  *
- * El anillo es lo único de esta pantalla que se lee sin leer, y por tanto lo que
- * el portal afirma. Se le da a la cifra que el portal puede defender.
+ * Un porcentaje es lo único de esta pantalla que se lee sin leer, y por tanto lo
+ * que el portal afirma. Se le da a la cifra que el portal puede defender.
  *
  * Tiene tres consecuencias buenas y una mala, y la mala se paga a gusto:
  *
- *   1. El anillo significa lo mismo en todas las causas y seguirá significando
- *      lo mismo el día que la pasarela cobre. Midiendo lo recibido, ese día el
- *      mismo anillo pasaría de un cero universal a otra cosa sin que nada en
+ *   1. Significa lo mismo en todas las causas y seguirá significando lo mismo el
+ *      día que la pasarela cobre. Midiendo lo recibido, ese día el mismo
+ *      porcentaje pasaría de un cero universal a otra cosa sin que nada en
  *      pantalla marcara el cambio.
  *   2. Hoy sería un 0 % en el portal entero, que es el estado que menos ayuda.
  *   3. Deja de existir el 0 % ambiguo: cero entregado es «todavía no se ha
  *      comprado nada», que es una frase, no un porcentaje.
  *
- *   - Lo malo: el anillo se queda corto respecto al dinero que sí ha llegado.
- *     Una causa con un tercio del dinero dentro y una sola compra hecha marca
- *     poco. Eso lo dice el renglón de lo recibido, que va al lado y remite al
- *     registro donde ese dinero está fila por fila.
+ *   - Lo malo: se queda corto respecto al dinero que sí ha llegado. Una causa con
+ *     un tercio del dinero dentro y una sola compra hecha marca poco. Eso lo dice
+ *     el renglón de lo recibido, que va al lado y remite al registro donde ese
+ *     dinero está fila por fila.
  *
  * Y una corrección de vocabulario que sale sola de aquí: **lo entregado no puede
  * pasar de la meta**, porque la meta es la suma de todos los ítems y lo entregado
- * es la suma de los comprados. «Meta superada» no es un estado del anillo; es un
+ * es la suma de los comprados. «Meta superada» no es un estado del avance; es un
  * estado de lo recibido, y por eso vive en `funded` y no en `state`.
  * ---------------------------------------------------------------------------
  */
 
 export type MoneyState =
-  /** Sin presupuesto anotado. No hay anillo: no hay denominador. */
+  /** Sin presupuesto anotado. No hay pista: no hay denominador. */
   | "sin-meta"
   /** Hay meta y todavía no se ha comprado nada. El estado delicado. */
   | "sin-entregar"
@@ -65,7 +80,7 @@ export type MoneyFunding = "no" | "justo" | "de-sobra";
 export type MoneyProgress = {
   state: MoneyState;
   goal: number;
-  /** Comprado y en manos de la familia. Es lo que mide el anillo. */
+  /** Comprado y en manos de la familia. Es lo que mide `percent`. */
   delivered: number;
   /**
    * Lo que ha entrado: donaciones confirmadas. Cero mientras no haya pasarela,
@@ -74,11 +89,9 @@ export type MoneyProgress = {
   raised: number;
   /** Lo que falta para la meta contando lo recibido, que es lo que se pide. */
   missing: number;
-  /** 0–100 sobre lo entregado. Nulo cuando no hay anillo que dibujar. */
+  /** 0–100 sobre lo entregado. Nulo cuando no hay porcentaje que dar. */
   percent: number | null;
   funded: MoneyFunding;
-  /** Qué mide el porcentaje, en una palabra. Va pegado al anillo siempre. */
-  measures: string;
 };
 
 export function moneyProgress(budget: BudgetProgress): MoneyProgress {
@@ -107,29 +120,13 @@ export function moneyProgress(budget: BudgetProgress): MoneyProgress {
     missing,
     // Sin meta no hay denominador, y con cero entregado el número sería un 0 %
     // que desanima diciendo menos que la frase que lo sustituye. En los dos
-    // casos el anillo se dibuja vacío y quien lo pinta escribe otra cosa al lado.
+    // casos la pista se dibuja vacía y quien la pinta escribe otra cosa al lado.
     percent:
       state === "sin-meta" || state === "sin-entregar"
         ? null
         : Math.round((delivered / goal) * 100),
     funded,
-    measures: "entregado",
   };
-}
-
-/**
- * La frase que acompaña al anillo: qué se ha entregado de qué meta.
- *
- * Se escribe aquí y no en la plantilla porque la dicen la ficha, la tarjeta de
- * una causa y la barra fija, y con tres redacciones la de la barra acabaría
- * siendo la optimista.
- */
-export function moneyRingLabel(progress: MoneyProgress): string {
-  if (progress.state === "sin-meta") return "Todavía no hay presupuesto anotado";
-  if (progress.state === "sin-entregar") {
-    return `Todavía no se ha comprado nada de la meta de ${formatCOPLong(progress.goal)}`;
-  }
-  return `${progress.percent} % entregado: ${formatCOPLong(progress.delivered)} comprados de una meta de ${formatCOPLong(progress.goal)}`;
 }
 
 /**
@@ -155,7 +152,7 @@ export function raisedNote(progress: MoneyProgress): string | null {
   if (progress.raised === 0) return null;
 
   const amount = formatCOPLong(progress.raised);
-  const source = "Cada aporte está en el registro de donaciones de esta ficha.";
+  const source = "Cada donación está en el registro de esta ficha.";
 
   if (progress.funded === "de-sobra") {
     return `${amount} recibidos, por encima de la meta. ${source}`;
@@ -167,29 +164,17 @@ export function raisedNote(progress: MoneyProgress): string | null {
 }
 
 /**
- * Qué ofrece la acción principal, según el destino del dinero y el avance.
+ * Qué ofrece la acción principal, según el avance.
  *
- * Es la pieza que traduce los estados a un solo botón, y el orden de las ramas
- * es lo único importante:
- *
- *   - Con el presupuesto ya comprado entero, pedir más dinero contra una meta
- *     cumplida es lo que convertiría esto en un embudo. Lo útil ahí es abrir el
- *     gasto, que es la parte auditable.
- *   - Sin canal —ni propio ni general— no hay a dónde transferir, así que el
- *     botón no puede decir «Donar». Dice lo que esta página sí puede cumplir.
- *     Lo decide este valor y no un `if` de la plantilla, igual que antes.
+ * Con el presupuesto ya comprado entero, pedir más dinero contra una meta
+ * cumplida es lo que convertiría esto en un embudo. Lo útil ahí es abrir el
+ * gasto. En cualquier otro estado, Donar abre Mercado Pago a nombre de esta
+ * causa: no hay destinos distintos por ficha.
  */
-export type MoneyAction =
-  | { kind: "gasto"; label: string }
-  | { kind: "ofrecer"; label: string }
-  | { kind: "donar"; label: string };
+export type MoneyAction = { kind: "gasto"; label: string } | { kind: "donar"; label: string };
 
-export function moneyAction(
-  progress: MoneyProgress,
-  donation: CaseDonation,
-): MoneyAction {
+export function moneyAction(progress: MoneyProgress): MoneyAction {
   if (progress.state === "cumplida") return { kind: "gasto", label: "Ver el gasto" };
-  if (donation.source === "ninguno") return { kind: "ofrecer", label: "Ofrecer ayuda" };
   return { kind: "donar", label: "Donar" };
 }
 
@@ -204,7 +189,7 @@ export function moneyAction(
 //
 // La abreviatura NO sustituye a la cifra: es la versión para donde no cabe la
 // buena. El importe exacto sigue estando en la sección del dinero y en el
-// nombre accesible del anillo, así que nadie decide nada leyendo solo el
+// nombre accesible de la pista, así que nadie decide nada leyendo solo el
 // redondeo. Esa es la condición para poder redondear.
 // ---------------------------------------------------------------------------
 

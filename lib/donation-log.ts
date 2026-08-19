@@ -24,3 +24,10 @@ export const DONATION_LOG_POLL_MS = 15_000;
 
 /** Cuántas filas caben en una lista antes de que deje de ser un registro. */
 export const DONATION_LOG_LIMIT = 20;
+
+/** Recientes es el orden del registro; generosas es el de quién más puso. */
+export type DonationLogSort = "recientes" | "generosas";
+
+export function parseDonationLogSort(value: string | null | undefined): DonationLogSort {
+  return value === "generosas" ? "generosas" : "recientes";
+}

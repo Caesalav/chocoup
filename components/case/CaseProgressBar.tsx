@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ProgressRing } from "@/components/case/ProgressRing";
+import { MoneyTrackFill } from "@/components/case/CaseMoneyTrack";
 import { formatCOP } from "@/lib/format";
 import {
   firstPendingItem,
@@ -7,33 +7,31 @@ import {
   type BudgetItem,
   type BudgetProgress,
 } from "@/lib/budget";
-import {
-  raisedNote,
-  moneyProgress,
-  moneyRingLabel,
-  shortCOP,
-} from "@/lib/money-progress";
+import { raisedNote, moneyProgress, shortCOP } from "@/lib/money-progress";
 
 /**
- * La barra del presupuesto de una causa.
+ * El resumen del presupuesto de una causa, para donde no cabe la sección entera.
  *
- * Tres piezas, en el orden en que se leen, y cada una contesta una pregunta
- * distinta:
+ * LA FORMA ES LA PISTA, no un anillo. Aquí hubo un anillo con el porcentaje
+ * dentro, que es lo que hace la referencia, y la ficha se quedó con la pista
+ * lineal de `CaseMoneyTrack`. Un anillo en la tarjeta y una barra en la ficha a la
+ * que esa tarjeta lleva no son dos estilos: son dos formas de decir el mismo
+ * número, y quien va de una a otra tiene que volver a leer para saber si le
+ * están contando lo mismo. Así que esto usa la pista de la ficha, con su mismo
+ * reparto de tramos y sus mismos colores, y solo baja de alto.
  *
- *   1. EL ANILLO. Cuánto de la meta ya está comprado. Es la cifra auditable y la
- *      única que sale como porcentaje. Por qué esa y no lo recaudado está escrito
- *      largo en lib/money-progress.ts, que es donde se decide.
- *   2. LO RECIBIDO. El dinero que ha entrado, con su procedencia en la misma
- *      frase: está fila por fila en el registro de donaciones de esta ficha.
- *      Sin cifra no hay renglón; no se escribe «$0 recaudados».
- *   3. LA PRUEBA. Una línea con la última compra, que lleva al presupuesto
- *      entero. Es el sitio de la referencia donde va «Jennifer Creelman donated
- *      $300 ›» —prueba y navegación a la vez— con lo único que aquí se puede
- *      demostrar. Quién donó, con nombre o anónimo, vive en el registro de
- *      donaciones de la misma ficha (`DonationLog`), no en esta barra.
+ * Lo que el anillo hacía mejor y la pista tiene que resolver de otro modo:
  *
- * Con la meta a cero no se dibuja nada, igual que antes: un 0 % fingido diría que
- * no se ha hecho nada cuando lo que pasa es que todavía no se ha anotado el plan.
+ *   - EL PORCENTAJE dentro de la forma. Un anillo lleva el número en el hueco del
+ *     centro sin gastar sitio; una pista de 12 px no tiene dónde meterlo. Va en la
+ *     frase de al lado, que es donde ya estaba el importe.
+ *   - EL ANCHO. Un anillo son 40 px de ancho y los mismos de alto; la pista ocupa
+ *     todo el ancho y 12 px de alto. En una tarjeta eso es mejor negocio —el ancho
+ *     es lo que falta y el alto es lo que sobra—, y por eso el reparto cambia: el
+ *     anillo iba al lado del texto y la pista va debajo.
+ *
+ * Con la meta a cero no se dibuja nada: un 0 % fingido diría que no se ha hecho
+ * nada cuando lo que pasa es que todavía no se ha anotado el plan.
  */
 export function CaseProgressBar({
   budget,
@@ -44,7 +42,7 @@ export function CaseProgressBar({
 }: {
   budget: BudgetProgress;
   compact?: boolean;
-  /** Sobre una foto de portada el texto y el anillo tienen que ser papel. */
+  /** Sobre una foto de portada el texto y la pista tienen que ser papel. */
   tone?: "paper" | "photo";
   /**
    * Los ítems del presupuesto, si quien pinta esto los tiene. De aquí salen las
@@ -66,29 +64,23 @@ export function CaseProgressBar({
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3">
-        <ProgressRing
-          percent={progress.percent}
-          label={moneyRingLabel(progress)}
-          tone={tone}
-        />
-        <div className="min-w-0">
-          {/* El importe entregado en negrita y la meta en gris, que es la
-              jerarquía de la referencia: lo que ha pasado pesa y el techo
-              acompaña. En pesos las dos van abreviadas o la línea no cabe en una
-              tarjeta de rejilla. */}
-          <p className={`truncate text-[13px] ${soft}`}>
-            <span className={`font-medium ${ink}`}>
-              {shortCOP(progress.delivered)} entregados
-            </span>{" "}
-            de {shortCOP(progress.goal)}
+      <div>
+        {/* El importe entregado en negrita y la meta en gris, que es la
+            jerarquía de la referencia: lo que ha pasado pesa y el techo
+            acompaña. En pesos las dos van abreviadas o la línea no cabe en una
+            tarjeta de rejilla. */}
+        <p className={`truncate text-[13px] ${soft}`}>
+          <span className={`font-medium ${ink}`}>
+            {shortCOP(progress.delivered)} entregados
+          </span>{" "}
+          de {shortCOP(progress.goal)}
+        </p>
+        {progress.raised > 0 && (
+          <p className={`truncate text-[12px] ${muted}`}>
+            {shortCOP(progress.raised)} recibidos
           </p>
-          {progress.raised > 0 && (
-            <p className={`truncate text-[12px] ${muted}`}>
-              {shortCOP(progress.raised)} recibidos
-            </p>
-          )}
-        </div>
+        )}
+        <MoneyTrackFill progress={progress} className="mt-2 h-3" tone={tone} />
       </div>
     );
   }
@@ -98,35 +90,25 @@ export function CaseProgressBar({
 
   return (
     <div>
-      <div className="flex items-center gap-4">
-        <ProgressRing
-          percent={progress.percent}
-          label={moneyRingLabel(progress)}
-          size="lg"
-          tone={tone}
-        />
+      {progress.state === "sin-entregar" ? (
+        <p className={`text-[15px] leading-snug ${soft}`}>
+          <span className={`font-medium ${ink}`}>Todavía sin comprar nada</span> de una meta
+          de {shortCOP(progress.goal)}
+        </p>
+      ) : (
+        <p className={`text-[15px] leading-snug ${soft}`}>
+          <span
+            className={`font-display text-[24px] leading-none tabular-nums ${ink} lg:text-[28px]`}
+          >
+            {formatCOP(progress.delivered)}
+          </span>{" "}
+          entregados de {formatCOP(progress.goal)}
+        </p>
+      )}
 
-        <div className="min-w-0 flex-1">
-          {progress.state === "sin-entregar" ? (
-            <p className={`text-[15px] leading-snug ${soft}`}>
-              <span className={`font-medium ${ink}`}>Todavía sin comprar nada</span> de una
-              meta de {shortCOP(progress.goal)}
-            </p>
-          ) : (
-            <p className={`text-[15px] leading-snug ${soft}`}>
-              <span
-                className={`font-display text-[24px] leading-none tabular-nums ${ink} lg:text-[28px]`}
-              >
-                {formatCOP(progress.delivered)}
-              </span>
-              <br />
-              entregados de {formatCOP(progress.goal)}
-            </p>
-          )}
-        </div>
-      </div>
+      <MoneyTrackFill progress={progress} className="mt-3 h-3" tone={tone} />
 
-      {/* El estado delicado: hay meta y no se ha comprado nada. Un anillo vacío
+      {/* El estado delicado: hay meta y no se ha comprado nada. Una pista vacía
           con su 0 % desanima y además dice menos que esta frase, así que el hueco
           lo ocupa lo que sí se puede pedir: el primer ítem del presupuesto, con
           su precio. Es la versión honesta del «sé el primero» de la referencia

@@ -24,6 +24,7 @@ import {
   asCaseProgress,
   budgetProgress,
   countOpenBudgetCases,
+  countSolvedBudgetCases,
   mergeBudget,
   type BudgetItem,
 } from "./budget";
@@ -37,7 +38,7 @@ import {
   type ContributionTally,
 } from "./contributions";
 import { donationChannel, type DonationChannel } from "./donation-channel";
-import { DONATION_LOG_LIMIT, DONATION_LOG_VIEW } from "./donation-log";
+import { DONATION_LOG_LIMIT, DONATION_LOG_VIEW, type DonationLogSort } from "./donation-log";
 import { isCoveredNeed, isOpenNeed } from "./needs";
 import { savedFrame, type PhotoFrame } from "./photo-frame";
 import type {
@@ -188,6 +189,7 @@ function cityBoard(
   return {
     openNeeds: budget.pendingItems,
     openCases: countOpenBudgetCases(items),
+    solvedCases: countSolvedBudgetCases(items),
     progress: asCaseProgress(budget),
     budget,
     standingOffers,
@@ -446,6 +448,8 @@ export async function getPortalTotals(): Promise<PortalTotals> {
   return {
     cities: cities.length,
     cases: cities.reduce((sum, city) => sum + city.caseCount, 0),
+    solvedCases: cities.reduce((sum, city) => sum + city.solvedCases, 0),
+    openCases: cities.reduce((sum, city) => sum + city.openCases, 0),
     needs: budget.itemCount,
     coveredNeeds: budget.purchasedItems,
     openNeeds: budget.pendingItems,
@@ -567,6 +571,7 @@ export async function getDonationLog(filters: {
   caseId?: string;
   cityId?: string;
   limit?: number;
+  sort?: DonationLogSort;
 } = {}): Promise<DonationLogEntry[]> {
   const limit = Math.min(Math.max(filters.limit ?? DONATION_LOG_LIMIT, 1), 50);
   if (isDemoMode()) return demoDonationLog({ ...filters, limit });
@@ -576,19 +581,37 @@ export async function getDonationLog(filters: {
     .from(DONATION_LOG_VIEW)
     .select(
       "id, amount_cop, donated_at, donor_name, publish_name, case_id, case_name, city_id, city_name, city_slug",
-    )
-    .order("donated_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(limit);
+    );
 
   if (filters.caseId) query = query.eq("case_id", filters.caseId);
   if (filters.cityId) query = query.eq("city_id", filters.cityId);
 
-  const { data } = await query;
+  query =
+    filters.sort === "generosas"
+      ? query.order("amount_cop", { ascending: false }).order("donated_at", { ascending: false })
+      : query.order("donated_at", { ascending: false }).order("id", { ascending: false });
+
+  const { data } = await query.limit(limit);
   return ((data ?? []) as DonationLogEntry[]).map((row) => ({
     ...row,
     amount_cop: Number(row.amount_cop),
   }));
+}
+
+/** Cuántas donaciones confirmadas hay, sin recortar a las de la lista. */
+export async function countDonationLog(filters: {
+  caseId?: string;
+  cityId?: string;
+} = {}): Promise<number> {
+  if (isDemoMode()) return demoDonationLog(filters).length;
+
+  const supabase = await createSupabaseServerClient();
+  let query = supabase.from(DONATION_LOG_VIEW).select("id", { count: "exact", head: true });
+  if (filters.caseId) query = query.eq("case_id", filters.caseId);
+  if (filters.cityId) query = query.eq("city_id", filters.cityId);
+
+  const { count } = await query;
+  return count ?? 0;
 }
 
 export async function getAidRecords(): Promise<AidRecord[]> {

@@ -5,10 +5,8 @@ import { CaseActions, DONATIONS_ANCHOR } from "@/components/case/CaseActions";
 import { CasePortrait } from "@/components/case/CasePortrait";
 import { CaseMoneyTrack } from "@/components/case/CaseMoneyTrack";
 import { BudgetItemList } from "@/components/case/BudgetItemList";
-import { ChannelCheckNote } from "@/components/donations/ChannelCheckNote";
-import { DonationChannelCard } from "@/components/donations/DonationChannelCard";
 import { DonationLog } from "@/components/donations/DonationLog";
-import { GeneralChannelNote } from "@/components/donations/GeneralChannelNote";
+import { MercadoPagoCheckout } from "@/components/donations/MercadoPagoCheckout";
 import { PhotoGallery } from "@/components/case/PhotoGallery";
 import { ProgressTimeline } from "@/components/case/ProgressTimeline";
 import { ShareLink } from "@/components/ShareLink";
@@ -16,15 +14,15 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { DraftChip } from "@/components/ui/Chip";
 import { Logo } from "@/components/Logo";
 import { BackIcon, ShareIcon } from "@/components/ui/icons";
-import { button, iconOnPaper, iconOnPhoto, readable, screenTitle, shell } from "@/components/ui/styles";
+import { iconOnPaper, iconOnPhoto, readable, screenTitle, shell } from "@/components/ui/styles";
+import { SITE_NAME } from "@/lib/constants";
 import { getCasePage, getDonationLog } from "@/lib/data";
 import { firstPendingItem } from "@/lib/budget";
 import { situationPhotos } from "@/lib/case-photos";
-import { caseDonation, channelOriginLabel } from "@/lib/donation-channel";
 import { caseLead, formatDate, formatDay } from "@/lib/format";
 import { moneyProgress } from "@/lib/money-progress";
 import { savedFrame } from "@/lib/photo-frame";
-import { donorLine, latestDonor, sampleDonationLog } from "@/lib/sample-donations";
+import { donorLine, latestDonor } from "@/lib/sample-donations";
 import { absoluteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -77,43 +75,19 @@ export default async function CasePage({ params }: Props) {
   const data = await getCasePage(slug, id);
   if (!data) notFound();
 
-  const { city, caseRecord, photos, budgetItems, budget, updates, generalChannel, lastUpdateOn } =
-    data;
-  const liveDonations = await getDonationLog({ caseId: caseRecord.id, limit: 12 });
-  const sample = liveDonations.length === 0;
-  const donations = sample
-    ? sampleDonationLog({
-        caseId: caseRecord.id,
-        caseName: caseRecord.display_name,
-        cityId: city.id,
-        cityName: city.name,
-        citySlug: city.slug,
-      })
-    : liveDonations;
+  const { city, caseRecord, photos, budgetItems, budget, updates, lastUpdateOn } = data;
+  const donations = await getDonationLog({ caseId: caseRecord.id, limit: 12 });
   const gallery = situationPhotos(photos, caseRecord.portrait_photo_id, updates);
   const portrait = photos.find((photo) => photo.id === caseRecord.portrait_photo_id);
   const portraitPath = portrait?.storage_path ?? null;
   const caseHref = `/ciudades/${city.slug}/casos/${caseRecord.id}`;
-  const offerHref = "/ofrecer/recurso";
-  const donation = caseDonation(caseRecord, generalChannel);
-  const channel = donation.channel;
   const progress = moneyProgress(budget);
 
   /**
-   * El último aporte, SOLO SI ES REAL.
-   *
-   * La lista de abajo puede caer en filas de muestra cuando todavía no hay
-   * ninguna confirmada, y ahí está bien: lleva su aviso pegado y sirve para ver
-   * cómo queda. Este renglón no puede: sale arriba, en el bloque del avance, y
-   * repetido en la barra fija, sin sitio para el aviso y en el punto de la
-   * pantalla que más se lee. «Lucía Restrepo donó $1,5 M» sin nada al lado es
-   * una donación inventada presentada como prueba social, y mientras no haya
-   * pasarela ese sería el estado de TODAS las causas del portal en producción.
-   *
-   * Sin aportes reales no hay último aporte y el renglón no existe. Lo que ocupa
-   * su sitio ya está escrito: la última compra y el canal.
+   * El último renglón del avance solo si hay donaciones confirmadas. La lista
+   * de abajo enseña las mismas filas: no se inventan nombres para llenar.
    */
-  const lastGive = sample ? null : latestDonor(donations);
+  const lastGive = latestDonor(donations);
   const donorHref = `#${DONATIONS_ANCHOR}`;
   const shareUrl = await absoluteUrl(`/ciudades/${city.slug}/casos/${caseRecord.id}`);
   const shareTitle = `${caseRecord.display_name} · ${city.name}, Chocó`;
@@ -184,11 +158,10 @@ export default async function CasePage({ params }: Props) {
 
           <CaseActions
             caseName={caseRecord.display_name}
+            caseId={caseRecord.id}
             progress={progress}
-            donation={donation}
             donateHref={`#${MONEY_ANCHOR}`}
             budgetHref={`${caseHref}#presupuesto`}
-            offerHref={offerHref}
             shareUrl={shareUrl}
             shareTitle={shareTitle}
             donorLabel={lastGive ? donorLine(lastGive) : null}
@@ -265,80 +238,39 @@ export default async function CasePage({ params }: Props) {
 
           {/* --------------------------- Enviar dinero -----------------------
 
-              A DÓNDE VA EL DINERO DE ESTA PERSONA. Es la sección que no puede
-              faltar, y faltaba: el «Donar» de la barra llevaba al registro de
-              donaciones —una lista de lo que han dado otros—, así que sin
-              JavaScript la acción principal de la ficha no llevaba a ningún sitio
-              donde se pudiera dar nada, y con JavaScript solo al pop-up del correo
-              de Mercado Pago, que todavía no cobra. Mientras la pasarela no esté,
-              el canal ES la forma de enviar dinero hoy.
-
-              Y el rótulo de procedencia no es un adorno: es lo único que separa
-              «esto es para ella» de «esto entra en el fondo del portal y se
-              reparte», y las dos frases mandan a la misma llave desde la misma
-              pantalla. La escribe `channelOriginLabel()`/`GeneralChannelNote` una
-              sola vez. Ver el comentario largo de lib/donation-channel.ts, que es
-              donde está la razón por la que esta función devuelve la procedencia
-              junto con el canal y no el canal a secas. */}
+              El «Donar» de la barra, sin JavaScript, es un ancla hasta aquí. El
+              cobro es Mercado Pago, a la cuenta del portal: no hay teléfono ni
+              llave de cada causa. La preferencia lleva `caso:{id}` para que el
+              registro sepa a quién se donó y el equipo pueda repartir. */}
           <section id={MONEY_ANCHOR} className="mt-10 scroll-mt-6">
             <h2 className={screenTitle}>Enviar dinero</h2>
 
             <p className="mt-2 text-[14px] leading-relaxed text-muted">
-              {channelOriginLabel(donation)}.
+              El dinero entra por Mercado Pago, a la cuenta de {SITE_NAME}. Queda registrado para
+              esta causa, y el equipo lo reparte después.
             </p>
 
-            {donation.source === "general" && (
-              <GeneralChannelNote caseName={caseRecord.display_name} className="mt-3" />
-            )}
-
-            {channel && (
-              <>
-                <div className="mt-5">
-                  <DonationChannelCard channel={channel} />
-                </div>
-                {/* Desde cuándo nadie ha comprobado esto, pegado al canal y no en
-                    otra parte de la página: es la mitad de lo que hace útil a la
-                    otra. */}
-                <ChannelCheckNote channel={channel} className="mt-3" />
-              </>
-            )}
-
-            {donation.source === "ninguno" && (
-              <>
-                {/* «para {nombre}» y no «{nombre} no tiene»: los nombres de los
-                    casos son frases enteras —«Yeison Córdoba y su hermana»— y con
-                    el verbo detrás la concordancia se rompe en la mitad. */}
-                <p className="mt-3 text-[14px] leading-relaxed text-muted">
-                  No tiene canal propio y el portal tampoco tiene canal general registrado. No
-                  enseñamos el canal de otro. Lo que sí se puede hacer hoy es ofrecer un recurso
-                  concreto.
-                </p>
-                <Link href={offerHref} className={`${button.secondary} mt-5 w-full`}>
-                  Ofrecer un recurso en su lugar
-                </Link>
-              </>
-            )}
+            <div className="mt-5 rounded-3xl border border-line bg-panel-high shadow-card p-5">
+              <MercadoPagoCheckout
+                heading={`Donar a ${caseRecord.display_name}`}
+                caseId={caseRecord.id}
+                showHeading={false}
+              />
+            </div>
           </section>
 
           <section id={DONATIONS_ANCHOR} className="mt-10 scroll-mt-6">
             <h2 className={screenTitle}>Donaciones recibidas</h2>
             <p className="mt-2 text-[13px] leading-relaxed text-muted">
-              Quién donó a {caseRecord.display_name} y cuánto. Si no autorizó su nombre, la fila
-              dice que es anónima.
+              Quién donó a {caseRecord.display_name} y cuánto.
             </p>
-            {sample && (
-              <p className="mt-2 text-[12px] text-faint">
-                Estas filas son de muestra, para ver cómo queda la lista. No son donaciones
-                confirmadas.
-              </p>
-            )}
             <div className="mt-4">
               <DonationLog
                 initial={donations}
                 scope="case"
-                caseId={sample ? undefined : caseRecord.id}
+                caseId={caseRecord.id}
                 limit={12}
-                poll={!sample}
+                poll
               />
             </div>
           </section>

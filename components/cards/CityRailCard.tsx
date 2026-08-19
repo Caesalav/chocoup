@@ -7,7 +7,7 @@ import type { CityCardData } from "@/lib/types";
 
 /**
  * La tarjeta grande del inicio y del costado del mapa: foto de portada del
- * municipio, su nombre, cuánto ha avanzado y si hay gente yendo.
+ * municipio, su nombre y cuánto ha avanzado.
  *
  * El color del mapa y el porcentaje de esta tarjeta salen del mismo avance:
  * el montón de necesidades del pueblo. Los casos abiertos van al lado porque
@@ -82,12 +82,6 @@ export function CityRailCard({
             {hasBar
               ? `${percent} % cubierto`
               : `${percent} % de la meta`}
-            {city.standingOffers > 0 && (
-              <>
-                <span aria-hidden> · </span>
-                {plural(city.standingOffers, "aporte en camino", "aportes en camino")}
-              </>
-            )}
           </p>
           {hasBar && (
             <div

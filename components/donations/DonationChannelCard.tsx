@@ -58,7 +58,7 @@ export function DonationChannelCard({ channel, featured = false }: Props) {
           href={channel.url}
           target="_blank"
           rel="noreferrer noopener"
-          className={`${button.primary} mt-3 w-full ${featured ? "min-h-14 text-[16px]" : ""}`}
+          className={`${button.invite} mt-3 w-full ${featured ? "min-h-14 text-[16px]" : ""}`}
         >
           <DonationIcon className="size-5" />
           Donar dinero

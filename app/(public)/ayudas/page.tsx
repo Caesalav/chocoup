@@ -120,9 +120,9 @@ export default async function AidLogPage({ searchParams }: Props) {
           </p>
           <p className="mt-3 text-[13px] leading-relaxed text-muted">
             Tampoco está todo lo que llega al Chocó: solo lo que pasó por este portal. El dinero
-            que se dona por el canal de una causa se rinde allí, no aquí. Y lo prometido o en
-            camino no aparece hasta que llega. Si hace falta el detalle de una entrega concreta,
-            se puede pedir en{" "}
+            que se dona por Mercado Pago se rinde en la ficha de cada causa, no aquí. Y lo
+            prometido o en camino no aparece hasta que llega. Si hace falta el detalle de una
+            entrega concreta, se puede pedir en{" "}
             <Link href="/sugerencias" className="text-accent hover:underline">
               sugerencias
             </Link>

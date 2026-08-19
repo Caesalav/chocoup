@@ -63,12 +63,12 @@ export const button = {
   primary: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-selva px-6 py-3 text-sm font-medium text-luz hover:bg-accent-strong ${pressable}`,
   secondary: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-line-strong bg-panel-high px-6 py-3 text-sm font-medium text-body hover:border-ink/40 hover:text-ink ${pressable}`,
   ghost: `inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-muted hover:bg-line hover:text-ink ${pressable}`,
-  /* La acción de invitar, para las pantallas del registro abierto: el bloque de
-     `brote` de la referencia, con tinta `selva` encima a 9,52:1. Lleva filete de
-     `selva` porque su frontera contra el papel es de 1,30:1 y un control tiene
-     que verse dónde empieza; sin el filete es una mancha de color sin borde.
-     Donar no es esta receta: Donar es `primary`, el mismo `selva` en la ficha,
-     en las tarjetas de causa y en la cabecera. `invite` se queda en /ofrecer. */
+  /* La acción de donar, y la de invitar en /ofrecer: el bloque de `brote` de
+     la referencia, con tinta `selva` encima a 9,52:1. Lleva filete de `selva`
+     porque su frontera contra el papel es de 1,30:1 y un control tiene que
+     verse dónde empieza; sin el filete es una mancha de color sin borde.
+     Donar es esta receta en todo el portal —ficha, tarjetas, cabecera y barra—
+     para que el lima sea el color de esa acción y no otro verde. */
   invite: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-selva bg-brote px-6 py-3 text-sm font-medium text-selva hover:bg-liana ${pressable}`,
   /* Compartir, al lado de Donar: el oscuro de la familia lavanda. `ciruela` es
      a `lavanda` lo que `selva` es a `liana` —misma hue, más peso— y con tinta
@@ -87,20 +87,34 @@ export const button = {
 /**
  * Los tres tramos de la pista de dinero.
  *
- * Lo donado va en `liana`, el verde vivo: aquí es dato, no cinta. Lo utilizado
- * va en `selva`, más oscuro, el dinero que ya salió. El resto de la meta queda
- * en `canvas`. `liana` contra `canvas` da 2,37:1 y no llega a WCAG 1.4.11, así
- * que entre tramos va un filo de papel —el mismo dibujo que separa «Abierta» de
- * «Cubierta»—. `selva` contra `liana` sí llega, 4,81:1.
+ * Lo donado va en `brote` (lima), lo utilizado en `lavanda` (el morado claro)
+ * y el resto de la meta en `canvas`. Ya no son dos verdes de distinto peso:
+ * son dos hues que se leen a un vistazo. Entre tramo y tramo va un filo de
+ * papel, el mismo dibujo que separa «Abierta» de «Cubierta».
  *
- * La receta vive aquí y no en `components/case` porque el `lint` del registro
- * sobrio mira `bg-liana` escrito en esos archivos. Ver MARCA.md, «Los dos
- * registros».
+ * El lima y la lavanda están cerca en luminancia, así que el filo sigue
+ * haciendo falta: sin él los dos rellenos se funden en el extremo. Nada de
+ * degradados: apagan ese borde, que es el dato.
+ *
+ * SOBRE FOTO los mismos dos colores: sobre un velo oscuro el lima y la lavanda
+ * se recortan solos, que es lo que no hacían los verdes oscuros de antes.
+ *
+ * La receta vive aquí y no en `components/case` porque la usan la ficha, las
+ * tarjetas y la barra fija.
  */
 export const moneyTrack = {
   rest: "bg-canvas",
-  donated: "bg-liana",
-  used: "bg-selva",
+  donated: "bg-brote",
+  used: "bg-lavanda",
+  edge: "border-paper",
+};
+
+/** La misma pista cuando cae sobre una foto velada. */
+export const moneyTrackOnPhoto = {
+  rest: "bg-paper/25",
+  donated: "bg-brote",
+  used: "bg-lavanda",
+  edge: "border-paper",
 };
 
 /**

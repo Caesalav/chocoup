@@ -17,8 +17,9 @@ import { SiteHeader } from "@/components/SiteHeader";
  *
  * El pie no está aquí a propósito: lo montan las páginas que son documento
  * —municipio, caso, secciones—, y no el inicio ni el mapa, que son pantallas.
- * El botón de sugerencias sí está, porque esas dos pantallas no tienen pie y
- * la barra de abajo ya está llena.
+ * El botón de sugerencias sí está: en el móvil, a la izquierda de la barra;
+ * en escritorio, suelto abajo a la derecha, porque el inicio y el mapa no
+ * montan pie.
  */
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (

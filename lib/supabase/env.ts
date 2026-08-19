@@ -17,8 +17,17 @@ export function isSupabaseConfigured(): boolean {
 
 /**
  * Sin base de datos, el portal se llena con datos de muestra para poder
- * valorar el diseño y el recorrido. En cuanto existan las claves, desaparece.
+ * valorar el diseño y el recorrido. `DEMO_DATA=1` fuerza lo mismo aunque
+ * haya claves: el tablero cerrado se ve completo, y las cuentas cuadran.
  */
 export function isDemoMode(): boolean {
+  const force = (
+    process.env.NEXT_PUBLIC_DEMO_DATA ??
+    process.env.DEMO_DATA ??
+    ""
+  )
+    .trim()
+    .toLowerCase();
+  if (force === "1" || force === "true" || force === "yes") return true;
   return !isSupabaseConfigured();
 }

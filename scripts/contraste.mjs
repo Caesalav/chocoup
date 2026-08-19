@@ -528,4 +528,86 @@ console.log(
     "  que es la única de las cuatro con dibujo, y eso sobrevive a los tres filtros.\n" +
     "  Ver la lámina en capturas-verificacion/marca/.",
 );
+
+// ---------------------------------------------------------------------------
+// La pista de dinero: los dos bordes que tiene que sostener
+// ---------------------------------------------------------------------------
+//
+// Una barra de avance tiene DOS fronteras y no una, y se suele mirar solo la
+// primera:
+//
+//   1. RELLENO CONTRA CANAL VACÍO. Aquí acaba el relleno, y ese punto ES el
+//      dato. Si no se percibe, la barra dice «algo de verde» y nada más.
+//   2. TRAMO CONTRA TRAMO. Dónde acaba lo utilizado y empieza lo donado.
+//
+// Lo que sale de aquí es que con esta paleta NO hay un color que sostenga las
+// dos a la vez, así que la elección es forzada: el color se gasta en la primera
+// —la que lleva el dato— y la segunda la sostiene el filo de papel.
+//
+// Ver `moneyTrack` en components/ui/styles.ts.
+
+console.log("\n=== LA PISTA DE DINERO: DÓNDE ACABA CADA TRAMO ===");
+console.log("Los tres tramos son `selva` (utilizado), `accent` (donado) y `canvas` (resto).");
+console.log("WCAG 1.4.11 pide 3:1 para un objeto gráfico, que es lo que es un tramo.\n");
+
+const pista = [
+  ["donado vs canal vacío (EL DATO)", "accent", "canvas", 3],
+  ["utilizado vs canal vacío", "selva", "canvas", 3],
+  ["utilizado vs donado", "selva", "accent", 3],
+  ["filo de papel vs donado", "paper", "accent", 3],
+  ["filo de papel vs utilizado", "paper", "selva", 3],
+];
+for (const [etiqueta, a, b, pide] of pista) {
+  console.log(fila(etiqueta, contraste(color(a), color(b)), pide));
+}
+
+console.log("\n  Lo mismo con `liana` en el tramo donado, que es la alternativa:");
+for (const [etiqueta, a, b, pide] of [
+  ["donado vs canal vacío (EL DATO)", "liana", "canvas", 3],
+  ["utilizado vs donado", "selva", "liana", 3],
+]) {
+  console.log(fila(etiqueta, contraste(color(a), color(b)), pide));
+}
+
+// ¿Existe un color de la paleta que sostenga las dos fronteras? La ventana de
+// luminancia existe, pero está vacía: es lo que convierte esto en una elección
+// y no en un descuido.
+{
+  const Lcanvas = luminancia(color("canvas"));
+  const Lselva = luminancia(color("selva"));
+  const techo = (Lcanvas + 0.05) / 3 - 0.05;
+  const suelo = 3 * (Lselva + 0.05) - 0.05;
+  const candidatos = [...fichas.keys()].filter((n) => {
+    const L = luminancia(color(n));
+    return L >= suelo && L <= techo;
+  });
+  console.log(
+    `\n  Para sostener las dos, el tramo donado tendría que tener una luminancia\n` +
+      `  entre ${suelo.toFixed(3)} y ${techo.toFixed(3)}. Colores de la paleta ahí dentro: ` +
+      `${candidatos.length === 0 ? "NINGUNO" : candidatos.join(", ")}.\n` +
+      "  Así que el color se gasta en el borde que lleva el dato —dónde acaba lo\n" +
+      "  donado— y lo que separa un tramo del otro es el filo de papel.",
+  );
+}
+
+console.log("\n  Y en los tres filtros, por si el tono fuera lo único que separa:");
+console.log(`  ${"par".padEnd(30)} ${"color".padStart(8)} ${"gris".padStart(8)} ${"deuter.".padStart(8)}`);
+for (const [etiqueta, a, b] of [
+  ["donado / canal vacío", "accent", "canvas"],
+  ["utilizado / donado", "selva", "accent"],
+  ["filo / donado", "paper", "accent"],
+]) {
+  const x = color(a);
+  const y = color(b);
+  console.log(
+    `  ${etiqueta.padEnd(30)} ${fmt(contraste(x, y)).padStart(7)}:1 ` +
+      `${fmt(contraste(gris(x), gris(y))).padStart(7)}:1 ` +
+      `${fmt(contraste(deuteranopia(x), deuteranopia(y))).padStart(7)}:1`,
+  );
+}
+console.log(
+  "\n  Ninguna de las tres depende del tono: son saltos de luminosidad, así que\n" +
+    "  aguantan el gris y la deuteranopía igual que en color. Es la diferencia con\n" +
+    "  «Abierta / Cubierta» de arriba, que sí necesita dibujo.",
+);
 console.log();

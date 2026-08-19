@@ -30,8 +30,8 @@ export function SiteFooter() {
           <p className="max-w-prose text-sm leading-relaxed text-muted">
             {SITE_NAME} documenta la situación en municipios del Chocó tras el terremoto. Las fotos
             y los casos se publican con el consentimiento de las personas afectadas. El dinero no
-            pasa por aquí: cada caso tiene su propio canal o recibe por el canal general, y su
-            ficha dice cuál de los dos.
+            pasa por aquí: entra por Mercado Pago, a la cuenta de {SITE_NAME}, y queda
+            registrado para la causa que elijas —o para el fondo, si no eliges una.
           </p>
           <p className="mt-4 max-w-prose text-xs leading-relaxed text-faint">
             Si algo del portal no funciona o echas de menos una función, escríbelo en{" "}

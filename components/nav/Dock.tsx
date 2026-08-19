@@ -7,31 +7,50 @@ import Link from "next/link";
  * Lo usan el portal y el panel. Si cada uno escribiera las clases, acabaríamos
  * con dos barras que se parecen pero no son la misma pieza —y el equipo dejaría
  * de reconocer el portal al entrar a trabajar.
+ *
+ * `leading` y `trailing` son mandos que no son sección: van a los bordes, no
+ * dentro de la píldora. La píldora se queda en el centro; los dos círculos de
+ * papel la equilibran, cada uno a `px-3` de su filo.
  */
 export function Dock({
   label,
   children,
   wide = false,
+  leading,
+  trailing,
 }: {
   label: string;
   children: ReactNode;
   wide?: boolean;
+  leading?: ReactNode;
+  trailing?: ReactNode;
 }) {
   return (
-    <nav
-      aria-label={label}
-      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden"
-    >
-      <ul
-        className={`flex items-center gap-0.5 rounded-full bg-selva/95 p-1.5 shadow-float backdrop-blur ${
-          wide ? "w-full max-w-xl" : ""
-        }`}
-      >
-        {children}
-      </ul>
-    </nav>
+    <div className="fixed inset-x-0 bottom-0 z-40 px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden">
+      <div className="relative flex items-center justify-center">
+        {leading && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2">{leading}</div>
+        )}
+        <nav aria-label={label}>
+          <ul
+            className={`flex items-center gap-0.5 rounded-full bg-selva/95 p-1.5 shadow-float backdrop-blur ${
+              wide ? "w-full max-w-xl" : ""
+            }`}
+          >
+            {children}
+          </ul>
+        </nav>
+        {trailing && (
+          <div className="absolute right-0 top-1/2 -translate-y-1/2">{trailing}</div>
+        )}
+      </div>
+    </div>
   );
 }
+
+/** Círculo de papel a la altura de la píldora: un mando, no una pestaña. */
+export const dockTool =
+  "flex size-[3.75rem] shrink-0 items-center justify-center rounded-full border border-line bg-panel-high text-selva shadow-float transition-colors hover:border-line-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 export function DockIcon({
   href,
@@ -83,15 +102,12 @@ export function DockAction({
   active: boolean;
   Icon: (props: { className?: string }) => React.ReactElement;
 }) {
-  /* Donar es `selva` con tinta `luz` en todo el portal. Aquí el suelo ya es
-     `selva`, así que la pastilla se invierte —`luz` con tinta `selva`— para
-     que se recorte; son los mismos dos colores, no un tercer verde. */
   return (
     <li>
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-luz px-3.5 text-selva transition-colors hover:bg-panel-high focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-luz"
+        className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-brote px-3.5 text-selva transition-colors hover:bg-liana focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-luz"
       >
         <Icon className="size-[20px] shrink-0" />
         <span className="text-[13px] font-medium">{label}</span>

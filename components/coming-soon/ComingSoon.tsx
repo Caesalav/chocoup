@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { WaitlistForm } from "@/components/coming-soon/WaitlistForm";
+import { PreviewUnlock } from "@/components/coming-soon/PreviewUnlock";
 import { Logo } from "@/components/Logo";
 import { ChocoMap } from "@/components/map/ChocoMap";
 import { NeedsLegend } from "@/components/map/NeedsLegend";
@@ -61,13 +61,13 @@ const LESSONS = [
     n: "2",
     Icon: CasesIcon,
     title: "Casos reales, con consentimiento",
-    body: "Personas, colegios, animales, fundaciones. El dinero no pasa por esta página: cada causa enseña su propio canal.",
+    body: "Personas, colegios, animales, fundaciones. El dinero entra por Mercado Pago, a la cuenta de ChocóUp, y queda registrado para cada causa.",
   },
   {
     n: "3",
     Icon: OfferIcon,
     title: "Ayudar sin fingir que ya llegó",
-    body: "Quien puede aportar algo lo ofrece. El color del mapa solo cambia cuando el equipo lo confirma.",
+    body: "Quien puede ayudar lo ofrece. El color del mapa solo cambia cuando el equipo lo confirma.",
   },
 ] as const;
 
@@ -139,11 +139,7 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
           <WaitlistForm state={state} />
         </div>
 
-        <p className="enters enters-3 mt-6 text-[12px] text-faint">
-          <Link href="/entrar" className="hover:text-ink hover:underline">
-            Equipo
-          </Link>
-        </p>
+        <PreviewUnlock />
       </section>
     </div>
   );
