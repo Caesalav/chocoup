@@ -1,14 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { OFFER_STATUSES, PHOTO_BUCKET, TEAM_ROLES } from "@/lib/constants";
+import { CASE_KINDS, PHOTO_BUCKET, TEAM_ROLES } from "@/lib/constants";
 import { externalUrl, normalizePhone } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/env";
 import { canWriteCity, currentTeam } from "@/lib/team";
 import { uniqueSlug } from "@/lib/slug";
 import { clampFrame, type PhotoFrame } from "@/lib/photo-frame";
-import type { TeamSession } from "@/lib/types";
+import { today } from "./today";
+import type { OfferStatus, TeamSession } from "@/lib/types";
 
 /**
  * Autorización de todas las acciones del panel.
@@ -187,88 +188,48 @@ export async function deleteCity(formData: FormData) {
   const { error } = await supabase.from("cities").delete().eq("id", id);
   if (error) fail("No se pudo borrar el municipio", error);
 
-  redirect("/admin");
+  // A la lista de municipios y no a la puerta: quien acaba de borrar uno está
+  // trabajando en Ciudades y lo siguiente que quiere ver es la lista sin él.
+  redirect("/admin/ciudades");
 }
 
 // ---------------------------------------------------------------------------
-// Fundaciones
-// ---------------------------------------------------------------------------
-
-/**
- * Las fundaciones son de coordinación, y el motivo es el dinero: `donation_url`
- * es el destino del botón "Donar dinero" de la página pública. Quien pueda
- * editarlo puede desviar donaciones. El equipo en terreno pasa los datos de la
- * fundación a coordinación y coordinación los registra.
- *
- * Hay una por municipio y lo garantiza la base de datos, así que aquí ya no se
- * manda ninguna marca de «es la madre»: no había nada que marcar y la casilla sin
- * marcar publicaba «Organización aliada» sobre el canal de donación del pueblo.
- */
-export async function saveFoundation(formData: FormData) {
-  const { supabase } = await requireCoordination();
-  const cityId = optionalId(formData, "city_id");
-  if (!cityId) throw new Error("Falta el municipio.");
-
-  const values = {
-    city_id: cityId,
-    name: text(formData, "name"),
-    description: text(formData, "description"),
-    contact_name: text(formData, "contact_name"),
-    phone: text(formData, "phone"),
-    whatsapp: text(formData, "whatsapp"),
-    email: text(formData, "email"),
-    website: text(formData, "website"),
-    donation_url: text(formData, "donation_url"),
-    address: text(formData, "address"),
-  };
-
-  const id = optionalId(formData, "id");
-  const { error } = id
-    ? await supabase.from("foundations").update(values).eq("id", id)
-    : await supabase.from("foundations").insert(values);
-
-  // El panel ofrece un solo formulario por municipio, así que llegar aquí con una
-  // segunda fundación es o dos personas de coordinación guardando a la vez, o una
-  // llamada directa a la API. Se traduce el error de la restricción porque
-  // «duplicate key value violates unique constraint» no le dice a nadie qué hacer,
-  // y lo que hay que hacer no es reintentar: es recargar y ver cuál quedó.
-  if (error?.message.includes("foundations_one_per_city")) {
-    throw new Error(
-      "Este municipio ya tiene su fundación registrada. Recarga la página: si hay que cambiarla, quita la que está y registra la nueva.",
-    );
-  }
-
-  if (error) fail("No se pudo guardar la fundación", error);
-}
-
-export async function deleteFoundation(formData: FormData) {
-  const { supabase } = await requireCoordination();
-  const id = optionalId(formData, "id");
-  if (!id) throw new Error("Falta la fundación.");
-
-  const { error } = await supabase.from("foundations").delete().eq("id", id);
-  if (error) fail("No se pudo borrar la fundación", error);
-}
-
-// ---------------------------------------------------------------------------
-// El canal de donación de un municipio y el de un caso
+// El canal de donación de un caso y el general del portal
 //
 // Es la escritura más peligrosa del panel, y no por lo que borra: no borra nada.
-// Quien la toque cambia a dónde va el dinero de un pueblo o de una persona con
-// nombre y cara publicados, y el cambio no se nota mirando la pantalla porque un
-// canal nuevo se ve igual de bien que el bueno.
+// Quien la toque cambia a dónde va el dinero de una persona con nombre y cara
+// publicados —o el de todas las causas del portal a la vez, en el general— y el
+// cambio no se nota mirando la pantalla, porque un canal nuevo se ve igual de
+// bien que el bueno.
 //
-// Por eso es de coordinación, igual que las fundaciones y su `donation_url`, y en
-// tres capas que no dependen entre sí: la ficha no ofrece el campo, esto lo
-// rechaza, y el disparador `guard_donation_channel` de 0011 lo para aunque la
-// llamada llegue desde fuera de la web. La tercera no es redundante: quien
-// documenta un municipio SÍ puede escribir el resto del caso, así que las
-// políticas de fila dejan pasar la escritura entera y el canal necesita su propia
-// comprobación dentro de ella.
+// Por eso es de coordinación, y en tres capas que no dependen entre sí: la ficha
+// no ofrece el campo, esto lo rechaza, y la base de datos lo para aunque la
+// llamada llegue desde fuera de la web. Esa tercera capa no es la misma en los
+// dos niveles y conviene saber por qué:
 //
-// Los dos niveles pasan por la misma función porque el dato es el mismo y las
-// trampas también. Escribir dos versiones sería dejar que una se quedara sin la
-// validación que la otra aprendió.
+//   * En un caso es el disparador `guard_donation_channel` (0011, ampliado en
+//     0013), y no basta con la política: quien documenta ese municipio SÍ puede
+//     escribir el resto de la ficha, así que la escritura entera pasa y el canal
+//     necesita su propia comprobación dentro de ella.
+//
+//   * En el general basta la política `donation_channel_coordination` (0015),
+//     porque esa tabla no tiene ninguna otra escritura legítima que pudiera
+//     arrastrar el canal dentro.
+//
+// Los dos pasan por la misma validación porque el dato es el mismo y las trampas
+// también. Escribir dos versiones sería dejar que una se quedara sin lo que la
+// otra aprendió.
+//
+// Y los dos escriben una sexta columna desde 0016: el día en que alguien
+// comprobó de verdad ese destino. Hay un comportamiento de la base de datos que
+// se nota desde aquí y que el formulario tiene que contar con palabras: si el
+// destino cambia y la fecha llega igual que la guardada, la fecha se borra sola
+// (`guard_channel_verification`). No es un capricho —una comprobación es un acto
+// sobre un destino concreto, y con otro destino delante ese acto no ha
+// ocurrido— y es lo que impide el fallo silencioso de una ficha que dice
+// «Comprobado el 3 de agosto» debajo de una llave cambiada el 12 de septiembre.
+// El caso normal, cambiar la llave y anotar la comprobación de la nueva en el
+// mismo envío, funciona: la fecha llega distinta y se respeta.
 // ---------------------------------------------------------------------------
 
 /**
@@ -287,6 +248,12 @@ export async function deleteFoundation(formData: FormData) {
  * depender de tener a mano el siguiente. Los tres campos en blanco dejan la
  * ficha sin canal en la misma petición, y la pantalla pública pasa a decir que
  * todavía no hay a dónde enviar.
+ *
+ * La fecha de comprobación entra por aquí y no por el formulario grande de la
+ * ficha, y va con las otras cinco columnas por lo que dejó escrito 0016:
+ * comprobar es un acto sobre un destino concreto, así que cambiar el destino y
+ * afirmar que está comprobado son la misma clase de escritura y tienen que estar
+ * en el mismo círculo pequeño. Quien documenta no ve ninguno de los seis campos.
  */
 function donationChannelValues(formData: FormData) {
   const key = text(formData, "donation_key");
@@ -294,6 +261,7 @@ function donationChannelValues(formData: FormData) {
   const phoneRaw = text(formData, "donation_phone");
   const app = text(formData, "donation_app");
   const holder = text(formData, "donation_holder");
+  const verifiedOn = text(formData, "donation_verified_on");
 
   const filled = [key, url, phoneRaw].filter(Boolean).length;
   if (filled > 1) {
@@ -356,12 +324,33 @@ function donationChannelValues(formData: FormData) {
     phone = local;
   }
 
+  // Una comprobación es algo que ya ocurrió, así que no puede estar fechada
+  // mañana. El disparador `guard_channel_verification` (0016) lo rechaza igual, y
+  // se comprueba aquí porque el error de la base de datos habla de un código de
+  // estado y este dice qué es lo que no cuadra. Lo que se está fechando es la
+  // frase que el portal pone para que alguien se fíe: adelantarla dos meses le
+  // regala dos meses de vigencia a una comprobación que no se ha hecho.
+  if (verifiedOn) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(verifiedOn)) {
+      throw new Error("La fecha de comprobación del canal no tiene el formato de una fecha.");
+    }
+    if (verifiedOn > today()) {
+      throw new Error(
+        "Esa comprobación está en el futuro. Se anota el día en que alguien llamó al número o mandó el dinero de prueba, no el día en que piensa hacerlo.",
+      );
+    }
+  }
+
   return {
     donation_key: key,
     donation_url: url,
     donation_phone: phone,
     donation_app: app,
     donation_holder: holder,
+    // Vacío se guarda como nulo y no como cadena vacía: la columna es `date` y
+    // nulo es su estado normal —nadie lo ha comprobado—, que es lo que
+    // `channelCheck()` lee para callar en vez de afirmar nada.
+    donation_verified_on: verifiedOn || null,
   };
 }
 
@@ -379,18 +368,28 @@ function assertChannelSaved(rows: unknown[] | null) {
   }
 }
 
-export async function saveCityDonationChannel(formData: FormData) {
+/**
+ * El canal general: el destino con más alcance del portal.
+ *
+ * Es un `update` y nunca un `insert`: la fila la creó la migración y es única
+ * (`donation_channel_one_row`, 0015). Ni esta acción ni la base de datos permiten
+ * crear una segunda, porque «el canal general» tiene que poder señalar a una sola
+ * cosa; con dos filas volvería a ser «la primera que devuelva la consulta».
+ *
+ * `singleton` se escribe en el `where` y no en los valores: es la clave y no un
+ * campo editable. Sin `.eq()` el update alcanzaría la tabla entera, que hoy es la
+ * misma fila y mañana podría no serlo.
+ */
+export async function saveGeneralDonationChannel(formData: FormData) {
   const { supabase } = await requireCoordination();
-  const id = optionalId(formData, "id");
-  if (!id) throw new Error("Falta el municipio.");
 
   const { data, error } = await supabase
-    .from("cities")
+    .from("donation_channel")
     .update(donationChannelValues(formData))
-    .eq("id", id)
-    .select("id");
+    .eq("singleton", true)
+    .select("singleton");
 
-  if (error) fail("No se pudo guardar el canal del municipio", error);
+  if (error) fail("No se pudo guardar el canal general", error);
   assertChannelSaved(data);
 }
 
@@ -406,6 +405,38 @@ export async function saveCaseDonationChannel(formData: FormData) {
     .select("id");
 
   if (error) fail("No se pudo guardar el canal del caso", error);
+  assertChannelSaved(data);
+}
+
+/**
+ * El recado del momento. Un `update` y nunca un `insert`: la fila la creó la
+ * migración y es única. Vaciar ciudad y causa es válido: entonces el aviso
+ * del inicio cae en el pueblo más atrasado.
+ *
+ * Si llega una causa, el municipio se lee de esa fila y no del formulario.
+ * Marcar una familia de Quibdó y un pueblo distinto sería un recado que
+ * señala dos sitios.
+ */
+export async function saveCampaignFocus(formData: FormData) {
+  const { supabase } = await requireCoordination();
+  let cityId = optionalId(formData, "city_id");
+  const caseId = optionalId(formData, "case_id");
+  const note = text(formData, "note").slice(0, 280);
+
+  if (caseId) {
+    const { data } = await supabase.from("cases").select("city_id").eq("id", caseId).maybeSingle();
+    const fromCase = (data as { city_id: string } | null)?.city_id;
+    if (!fromCase) throw new Error("Esa causa no existe.");
+    cityId = fromCase;
+  }
+
+  const { data, error } = await supabase
+    .from("campaign_focus")
+    .update({ city_id: cityId, case_id: caseId, note })
+    .eq("singleton", true)
+    .select("singleton");
+
+  if (error) fail("No se pudo guardar el foco", error);
   assertChannelSaved(data);
 }
 
@@ -461,6 +492,44 @@ export async function deleteNeed(formData: FormData) {
 // Casos
 // ---------------------------------------------------------------------------
 
+/**
+ * Qué es la causa, comprobado contra la lista del desplegable.
+ *
+ * Llega de un formulario, así que puede llegar cualquier cosa —o nada, si el
+ * campo se queda fuera del envío—, y `cases_kind_valid` (0016) lo rechazaría con
+ * un error que habla de una restricción y no de lo que hay que arreglar. Vacío
+ * cae en 'persona' y no en un error: es lo que son todas las causas escritas
+ * hasta hoy y es el valor por omisión de la columna, así que un formulario viejo
+ * que no traiga el campo sigue guardando.
+ */
+function caseKind(formData: FormData): string {
+  const value = text(formData, "case_kind");
+  if (!value) return "persona";
+  if (!CASE_KINDS.some((kind) => kind.value === value)) {
+    throw new Error("Ese tipo de causa no existe.");
+  }
+  return value;
+}
+
+/**
+ * La frase que viaja por WhatsApp, con su límite comprobado aquí.
+ *
+ * Se rechaza en vez de recortar. Recortar sería exactamente el fallo que este
+ * campo vino a resolver —una frase cortada donde cae— y encima sin decirlo, así
+ * que quien la escribió creería que se guardó entera. El `maxlength` del
+ * formulario no basta: no viaja en una llamada a la API, que es por lo que
+ * `cases_summary_len` (0016) existe. Esto es para que el error se lea.
+ */
+function caseSummary(formData: FormData): string {
+  const value = text(formData, "summary");
+  if (value.length > 120) {
+    throw new Error(
+      `Ese resumen tiene ${value.length} caracteres y caben 120: es la frase que sale en la vista previa de WhatsApp y ahí se corta. Quítale ${value.length - 120}.`,
+    );
+  }
+  return value;
+}
+
 export async function createCase(formData: FormData) {
   const cityId = optionalId(formData, "city_id");
   const slug = text(formData, "city_slug");
@@ -471,13 +540,19 @@ export async function createCase(formData: FormData) {
   // Sin canal de donación, y no es un olvido: un caso nace sin él y lo pone
   // coordinación después, desde la ficha. Mandarlo aquí lo rechazaría el
   // disparador `guard_donation_channel` para quien documenta, que es quien crea
-  // casi todos los casos.
+  // casi todos los casos. Con la fecha de comprobación pasa lo mismo desde 0016,
+  // y por el mismo motivo: es parte del canal.
+  //
+  // El tipo y el resumen SÍ van aquí: los escribe quien documenta, como el resto
+  // de la ficha. El resumen se puede dejar vacío y es como nacen casi todos.
   const { data, error } = await supabase
     .from("cases")
     .insert({
       city_id: cityId,
       display_name: text(formData, "display_name"),
+      case_kind: caseKind(formData),
       household: text(formData, "household"),
+      summary: caseSummary(formData),
       story: text(formData, "story"),
       consent_to_publish: bool(formData, "consent_to_publish"),
     })
@@ -507,11 +582,21 @@ export async function updateCase(formData: FormData) {
   // que llegaría vacío, y un vacío distinto de lo guardado es un cambio de canal
   // que el disparador rechaza —con la ficha entera detrás—. Se guarda aparte, en
   // `saveCaseDonationChannel`.
+  //
+  // La fecha de comprobación tampoco va aquí, y es el mismo razonamiento con una
+  // vuelta más: quien documenta no la ve, así que llegaría vacía, y un nulo
+  // distinto de la fecha guardada es también un cambio que `guard_donation_channel`
+  // rechaza desde 0016. Y aunque quien guardara fuera coordinación, pasarla por
+  // este formulario borraría la comprobación al corregir una tilde en la historia.
+  //
+  // El tipo y el resumen sí: son de la ficha y los escribe quien la escribe.
   const { error } = await supabase
     .from("cases")
     .update({
       display_name: text(formData, "display_name"),
+      case_kind: caseKind(formData),
       household: text(formData, "household"),
+      summary: caseSummary(formData),
       story: text(formData, "story"),
       consent_to_publish: consent,
       published,
@@ -751,8 +836,228 @@ export async function deletePhoto(formData: FormData) {
 
 // ---------------------------------------------------------------------------
 // Ofertas
+//
+// Aquí había UNA acción para todo, y la bandeja obligaba a rellenar cinco campos
+// y pulsar «Guardar» para cualquier cosa: aceptar una oferta era mandar el estado,
+// la necesidad, la fecha, las notas y la casilla del nombre en el mismo envío. Con
+// esa forma, `withdrawOffer` tuvo que nacer aparte —un clic no puede borrar las
+// notas del equipo al pasar— y esa excepción era en realidad el diseño correcto
+// para las tres decisiones que se toman aquí.
+//
+// Ahora cada decisión tiene su acción y escribe una columna. No es una cuestión de
+// elegancia: quien las usa está en campo, con el teléfono en una mano y mala
+// señal, y aceptar una oferta tiene que ser un toque cuyo alcance se pueda leer
+// del botón. Lo que queda en `updateOffer` es lo que de verdad se rellena —la
+// fecha exacta, la necesidad que cubre, las notas, quitar el nombre— y sigue
+// escribiendo todo lo que le llega, así que sigue necesitando que el formulario le
+// mande esos campos completos.
+//
+// Las tres capas se mantienen en las cuatro acciones nuevas: el municipio se lee
+// de la fila con `requireRowCity` y nunca del formulario, `offers_scoped_update`
+// (0002) lo rechazaría igual, y `offers_delivery_requires_acceptance` (0002) sigue
+// impidiendo que lo rechazado o lo retirado figure como entregado.
 // ---------------------------------------------------------------------------
 
+/**
+ * El estado guardado de una oferta, que es el único que manda.
+ *
+ * Las acciones de un toque no reciben el estado actual del formulario, y eso es lo
+ * que las hace seguras: si llegara en un campo oculto, dos personas mirando la
+ * misma bandeja se pisarían —la segunda escribiría sobre una decisión que ya no es
+ * la que tenía en pantalla— y bastaría cambiar el campo para saltarse las reglas
+ * de abajo. Se pregunta a la base de datos en cada llamada, igual que el municipio.
+ */
+async function offerRow(
+  supabase: Session["supabase"],
+  id: string,
+): Promise<{ status: OfferStatus; delivered_on: string | null }> {
+  const { data } = await supabase
+    .from("offers")
+    .select("status, delivered_on")
+    .eq("id", id)
+    .maybeSingle();
+
+  const row = data as { status: OfferStatus; delivered_on: string | null } | null;
+  if (!row) {
+    throw new Error(
+      "Esa oferta ya no está en tu bandeja: la borraron, o la vincularon a una necesidad de otro municipio. Vuelve a cargar la lista.",
+    );
+  }
+  return row;
+}
+
+/**
+ * Cambia el estado de una oferta y nada más.
+ *
+ * UNA columna. Es la lección de `withdrawOffer` aplicada a las otras tres: un
+ * toque no puede arrastrar la fecha de entrega, las notas ni el vínculo con la
+ * necesidad, porque lo que no le llega a un `update` amplio le llega vacío.
+ *
+ * Si el estado guardado ya es el que se pide, no se escribe nada. Con mala señal
+ * el segundo toque es la respuesta normal a un botón que tarda, y así el segundo
+ * toque no es una escritura más ni un error: es la misma decisión otra vez.
+ *
+ * `OfferStatus` en vez de comprobar contra `OFFER_STATUSES`: aquí el valor no
+ * llega del formulario, lo pone cada acción, así que un estado que no exista no
+ * compila. La comprobación en tiempo de ejecución era necesaria mientras el estado
+ * venía de un desplegable.
+ */
+async function setOfferStatus(
+  formData: FormData,
+  status: OfferStatus,
+  deniedWhenDelivered: string,
+) {
+  const id = optionalId(formData, "id");
+  if (!id) throw new Error("Falta la oferta.");
+
+  // El municipio de la oferta se lee de la fila. Una oferta sin municipio —"un
+  // camión disponible", sin destino todavía— es de coordinación.
+  const { supabase } = await requireRowCity("offers", id);
+  const row = await offerRow(supabase, id);
+
+  // Una entrega registrada no se deshace cambiando el estado: sería borrar que
+  // aquello llegó. `offers_delivery_requires_acceptance` (0002) lo rechaza, y aquí
+  // se dice qué hacer en vez de devolver el nombre de una restricción.
+  if (status !== "aceptada" && row.delivered_on) throw new Error(deniedWhenDelivered);
+
+  if (row.status === status) return;
+
+  const { error } = await supabase.from("offers").update({ status }).eq("id", id);
+  if (error) fail("No se pudo cambiar el estado de la oferta", error);
+}
+
+/**
+ * Aceptar: el equipo habló con quien ofrece y cuenta con lo que ofrece.
+ *
+ * Publica además su nombre en el muro, si esa persona lo autorizó: la vista
+ * `public.offer_log` (0012) solo lo saca con las dos cosas juntas —autorización y
+ * oferta aceptada—, así que este toque tiene una consecuencia pública que no está
+ * en la palabra «aceptar». La bandeja lo escribe al lado del botón.
+ */
+export async function acceptOffer(formData: FormData) {
+  await setOfferStatus(
+    formData,
+    "aceptada",
+    "Esa ayuda ya está registrada como entregada, así que ya estaba aceptada.",
+  );
+}
+
+/**
+ * Negar: el equipo lo miró y decidió que no. No es lo mismo que retirar.
+ *
+ * Rechazar es un juicio sobre lo que se ofrecía y es el campo con el que después
+ * se le responde a esa persona; retirar es una baja del muro sin dictaminar nada.
+ * Ver `OfferStatus` en lib/types.ts.
+ */
+export async function rejectOffer(formData: FormData) {
+  await setOfferStatus(
+    formData,
+    "rechazada",
+    "Esa ayuda ya está registrada como entregada: negarla ahora borraría que llegó. Si la fecha está mal, quítala en «Más cosas de esta oferta».",
+  );
+}
+
+/**
+ * Devolver una oferta a la bandeja de pendientes.
+ *
+ * Es lo que deshace un «Negar» o un «Quitar del muro», y tiene que existir en un
+ * toque por lo que dejó escrito `withdrawOffer`: un botón que esconde lo que toca
+ * se usa con miedo si no hay forma rápida de reponerlo. La asimetría sigue siendo
+ * la de antes —quitar de más se arregla en veinte segundos y publicar de más ya lo
+ * ha leído alguien— y por eso reponer está en la ficha de la oferta y no en la
+ * fila de arriba.
+ */
+export async function reopenOffer(formData: FormData) {
+  await setOfferStatus(
+    formData,
+    "pendiente",
+    "Esa ayuda ya llegó, así que no vuelve a la bandeja de pendientes. Si la fecha está mal, quítala en «Más cosas de esta oferta».",
+  );
+}
+
+/**
+ * Quita una oferta del muro público, de un toque.
+ *
+ * Es la salida rápida que necesita un muro que no está moderado: desde 0012 una
+ * oferta se publica en /ofrecido en cuanto entra —sin contacto y con los
+ * teléfonos del texto tapados, pero sin que nadie la haya leído—, así que la
+ * bandeja tiene que poder sacarla en un gesto y no en tres. `retirada` y no
+ * `rechazada`: rechazar dice que el equipo habló con esa persona y decidió, y es
+ * el campo con el que después se le responde.
+ *
+ * No pide confirmación, al contrario que borrar, porque no se pierde nada: la
+ * fila se queda en la bandeja con su contacto y sus notas, se lista en el filtro
+ * de retiradas, y `reopenOffer` la repone de un toque.
+ *
+ * Que la oferta esté de verdad en el muro depende también de la caducidad de ocho
+ * semanas y de que su municipio siga publicado (0012). Eso no se recalcula aquí:
+ * una copia de ese filtro en el panel se separaría de la vista sin avisar, y lo
+ * que este botón decide es lo único que decide el equipo, que es el estado.
+ */
+export async function withdrawOffer(formData: FormData) {
+  await setOfferStatus(
+    formData,
+    "retirada",
+    "Esa ayuda ya está registrada como entregada, así que no está en el muro: está en el registro de ayudas. Si de verdad quieres retirarla, quita antes la fecha de entrega.",
+  );
+}
+
+/**
+ * Anota que la ayuda llegó hoy.
+ *
+ * Es el toque que convierte una promesa en una ayuda registrada, y es el único de
+ * los cuatro que escribe dos columnas: la fecha y el estado, juntas y en la misma
+ * escritura. No es una excepción a la regla de arriba, es lo que la regla exige
+ * aquí —`offers_delivery_requires_acceptance` (0002) impide que exista una fila
+ * con fecha y sin aceptar, así que las dos tienen que viajar en el mismo
+ * `update`— y además es cierto: lo que llegó, se acepta.
+ *
+ * Hoy y no una fecha elegida, porque este botón es para el gesto normal: alguien
+ * descarga las tejas y se anota. El día distinto —«llegó el martes pasado»— se
+ * escribe en el campo de fecha de `updateOffer`, que es donde se puede pensar.
+ *
+ * Y sobre lo negado o lo retirado no escribe: avisa. Convertir en aceptada de
+ * paso una oferta que el equipo rechazó sería reescribir en silencio una
+ * decisión, y con `retirada` sería la peor de las dos —devolvería al muro
+ * público, y encima como entregada, justo la que alguien acababa de quitar—. La
+ * pantalla tampoco ofrece el botón en esos dos estados; esto es la segunda capa.
+ */
+export async function markOfferDelivered(formData: FormData) {
+  const id = optionalId(formData, "id");
+  if (!id) throw new Error("Falta la oferta.");
+
+  const { supabase } = await requireRowCity("offers", id);
+  const row = await offerRow(supabase, id);
+
+  if (row.status === "rechazada" || row.status === "retirada") {
+    throw new Error(
+      `Esta oferta está ${row.status}. Si de verdad llegó, acéptala primero: así queda escrito que el equipo cambió de opinión y no se reescribe una decisión de paso.`,
+    );
+  }
+
+  // Ya anotada: el segundo toque no le cambia el día. Sin esto, volver a pulsar
+  // mañana movería una fecha que ya estaba bien, y la fecha de una entrega es lo
+  // que se publica en el registro de ayudas.
+  if (row.delivered_on) return;
+
+  const { error } = await supabase
+    .from("offers")
+    .update({ delivered_on: today(), status: "aceptada" })
+    .eq("id", id);
+
+  if (error) fail("No se pudo anotar la entrega", error);
+}
+
+/**
+ * Lo que se rellena escribiendo: la fecha exacta, la necesidad que cubre, las
+ * notas del equipo y quitar el nombre.
+ *
+ * Sigue escribiendo todo lo que le llega, y lo que no le llega le llega vacío. Eso
+ * ya no es un peligro escondido, porque el estado se cambia en las acciones de
+ * arriba y este formulario no lo toca: lo único que este `update` puede borrar por
+ * omisión son sus propios campos, y los cuatro están en el mismo `<details>`. Si
+ * algún día se le llama desde otro sitio, tiene que mandarlos todos.
+ */
 export async function updateOffer(formData: FormData) {
   const id = optionalId(formData, "id");
   if (!id) throw new Error("Falta la oferta.");
@@ -760,46 +1065,37 @@ export async function updateOffer(formData: FormData) {
   // El municipio de la oferta se lee de la fila. Una oferta sin municipio —"un
   // camión disponible", sin destino todavía— es de coordinación.
   const { supabase } = await requireRowCity("offers", id);
+  const row = await offerRow(supabase, id);
 
-  const status = text(formData, "status");
   const delivered = text(formData, "delivered_on");
-
-  // El estado se comprueba contra la lista del desplegable y no se pasa tal cual.
-  // Llega de un formulario, así que puede llegar cualquier cosa —o nada, si el
-  // campo se queda fuera del envío—, y `offers_status_valid` (0012) lo rechazaría
-  // con un error que habla de una restricción y no de lo que hay que arreglar.
-  if (!OFFER_STATUSES.some((option) => option.value === status)) {
-    throw new Error("Ese estado no existe para una oferta.");
-  }
 
   if (delivered && !/^\d{4}-\d{2}-\d{2}$/.test(delivered)) {
     throw new Error("La fecha de entrega no tiene el formato de una fecha.");
   }
-  if (delivered && delivered > new Date().toISOString().slice(0, 10)) {
+  if (delivered && delivered > today()) {
     throw new Error("Esa entrega está en el futuro. El registro es de lo que ya llegó.");
   }
-  // Una fecha de entrega dice que aquello llegó, y hay dos estados que dicen que
-  // no va a llegar. Se avisa en vez de arreglarlo por dentro: la línea de abajo
-  // convierte en aceptada cualquier oferta con fecha —lo que llegó, se acepta—, y
-  // aplicar eso aquí reescribiría en silencio una decisión del equipo. Con
-  // `retirada` sería además la peor de las dos: devolvería al muro público, y
-  // encima como entregada, justo la oferta que alguien acababa de quitar de ahí.
-  // La base de datos también lo rechaza (`offers_delivery_requires_acceptance`,
-  // 0002); esto es para que se lea qué hacer.
-  if (delivered && (status === "rechazada" || status === "retirada")) {
+  // El estado contra el que se comprueba es el GUARDADO y no uno que venga en el
+  // envío, que es la diferencia con la versión anterior de esta acción: entonces
+  // llegaba en un desplegable y bastaba mandar otro para colar una entrega sobre
+  // una oferta rechazada. La base de datos lo pararía igual
+  // (`offers_delivery_requires_acceptance`, 0002); esto es para que se lea qué hacer.
+  if (delivered && (row.status === "rechazada" || row.status === "retirada")) {
     throw new Error(
-      `Una oferta ${status} no puede figurar como entregada: quita la fecha o cambia el estado.`,
+      `Una oferta ${row.status} no puede figurar como entregada: acéptala primero, o deja la fecha vacía.`,
     );
   }
 
   const values: Record<string, unknown> = {
-    // Lo que llegó, se acepta: registrar la entrega de algo que seguía pendiente
-    // cierra también la conversación, y así el estado no se queda contradiciendo
-    // a la fecha.
-    status: delivered ? "aceptada" : status,
     delivered_on: delivered || null,
     team_notes: text(formData, "team_notes"),
   };
+
+  // Lo que llegó, se acepta: registrar la entrega de algo que seguía pendiente
+  // cierra también la conversación, y así el estado no se queda contradiciendo a
+  // la fecha. Al revés no: quitar la fecha no devuelve la oferta a pendiente,
+  // porque el acuerdo con esa persona sigue en pie.
+  if (delivered) values.status = "aceptada";
 
   // El nombre solo se puede retirar, nunca conceder: la autorización la da quien
   // ofrece marcando su casilla, y el equipo no puede marcarla por ella. Al revés
@@ -840,50 +1136,16 @@ export async function updateOffer(formData: FormData) {
 }
 
 /**
- * Quita una oferta del muro público, de un clic.
- *
- * Es la salida rápida que necesita un muro que no está moderado: desde 0012 una
- * oferta se publica en /ofrecido en cuanto entra —sin contacto y con los
- * teléfonos del texto tapados, pero sin que nadie la haya leído—, así que la
- * bandeja tiene que poder sacarla en un gesto y no en tres. `retirada` y no
- * `rechazada`: rechazar dice que el equipo habló con esa persona y decidió, y es
- * el campo con el que después se le responde.
- *
- * Escribe UNA columna y ninguna más, y ahí está el cuidado que justifica una
- * acción aparte. Mandar un formulario de un solo campo a `updateOffer` habría
- * borrado las notas del equipo, la fecha y el vínculo con la necesidad, porque
- * esa acción escribe todo lo que le llega y lo que no le llega, le llega vacío.
- * Un clic no puede tener ese alcance.
- *
- * Y no pide confirmación, al contrario que borrar, porque no se pierde nada: la
- * fila se queda en la bandeja con su contacto y sus notas, se lista en el filtro
- * de retiradas, y para reponerla basta el desplegable de estado. La asimetría es
- * deliberada —un clic para quitar, dos para volver a publicar—: quitar de más se
- * arregla en veinte segundos y publicar de más ya lo ha leído alguien.
+ * Borrar una nota del buzón. Lo decide coordinación: documentación las lee,
+ * no las limpia. Igual que las ofertas que no apuntan a ningún municipio.
  */
-export async function withdrawOffer(formData: FormData) {
+export async function deleteFeedback(formData: FormData) {
+  const { supabase } = await requireCoordination();
   const id = optionalId(formData, "id");
-  if (!id) throw new Error("Falta la oferta.");
+  if (!id) throw new Error("Falta la nota.");
 
-  // Igual que en `updateOffer`: el municipio se lee de la fila y no del
-  // formulario, así que quien documenta solo puede retirar las de los municipios
-  // que atiende y las que llegaron sin municipio son de coordinación. Las RLS
-  // (`offers_scoped_update`, 0002) lo rechazarían igual.
-  const { supabase } = await requireRowCity("offers", id);
-
-  // Una entrega ya registrada no se retira. `offers_delivery_requires_acceptance`
-  // (0002) lo rechaza, y con razón: retirarla sería borrar que aquello llegó. Si
-  // esto salta, la fila no es la que creía quien pulsó —lo entregado no está en
-  // el muro, está en el registro de ayudas—, así que el mensaje lo dice.
-  const { data } = await supabase.from("offers").select("delivered_on").eq("id", id).maybeSingle();
-  if ((data as { delivered_on: string | null } | null)?.delivered_on) {
-    throw new Error(
-      "Esa ayuda ya está registrada como entregada, así que no está en el muro. Si de verdad quieres retirarla, quita antes la fecha de entrega.",
-    );
-  }
-
-  const { error } = await supabase.from("offers").update({ status: "retirada" }).eq("id", id);
-  if (error) fail("No se pudo quitar la oferta del muro", error);
+  const { error } = await supabase.from("feedback").delete().eq("id", id);
+  if (error) fail("No se pudo borrar la nota", error);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CityRailCard } from "@/components/cards/CityRailCard";
+import { CampaignCard } from "@/components/home/CampaignCard";
+import { CampaignStrip } from "@/components/home/CampaignStrip";
 import { ChocoMap } from "@/components/map/ChocoMap";
 import { ColombiaLocator } from "@/components/map/ColombiaLocator";
 import { MapIntro } from "@/components/map/MapIntro";
@@ -7,25 +9,23 @@ import { MapStatus } from "@/components/map/MapStatus";
 import { MapViewTabs, parseMapView } from "@/components/map/MapViewTabs";
 import { NeedsLegend } from "@/components/map/NeedsLegend";
 import { screenTitle, shell } from "@/components/ui/styles";
-import { getCityCards } from "@/lib/data";
+import { byCampaignPriority, resolveCampaign } from "@/lib/campaign";
+import { getCampaignFocusRow, getCaseCards, getCityCards } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Mapa",
   description:
-    "Los treinta municipios del Chocó coloreados por necesidades abiertas. Toca uno documentado para ver qué ocurre allí.",
+    "Los treinta municipios del Chocó coloreados por cuánto falta por cubrir. Toca uno documentado para ver qué ocurre allí.",
 };
 
 /**
- * El mapa, que en la etapa anterior mandaba en la portada y ahora es su propia
- * vista.
+ * El mapa a pantalla: Colombia, la leyenda al pie y las tarjetas al lado.
  *
- * Dejó de mandar porque de un mapa del Chocó no sale una decisión: veintisiete de
- * los treinta municipios están sin documentar y salen en gris. Lo que sí hace es
- * situar, y para eso hay que buscarlo. Por eso la apertura Colombia → Chocó vive
- * aquí y no en el inicio: esta es la pantalla en la que alguien de fuera se
- * pregunta dónde queda esto.
+ * El inicio ya enseña el tablero a media altura. Esta vista es la que se
+ * comparte cuando alguien pregunta dónde queda esto, o quiere el departamento
+ * entero. Por eso la apertura Colombia → Chocó vive aquí y no en el inicio.
  *
  * Y por eso mismo hay dos vistas y no una. Quien pregunta «dónde queda» necesita
  * el país entero; quien ya lo sabe quiere el departamento y sus colores, y hasta
@@ -46,12 +46,24 @@ type Props = {
 };
 
 export default async function MapPage({ searchParams }: Props) {
-  const [{ ver }, cities] = await Promise.all([searchParams, getCityCards()]);
+  const [{ ver }, cities, cases, focusRow] = await Promise.all([
+    searchParams,
+    getCityCards(),
+    getCaseCards(),
+    getCampaignFocusRow(),
+  ]);
   const view = parseMapView(ver);
+  const campaign = resolveCampaign(focusRow, cities, cases);
+  const ranked = byCampaignPriority(cities, campaign?.city.id ?? null);
 
   const updatedAt =
     cities.map((city) => city.updated_at).sort((a, b) => b.localeCompare(a))[0] ?? null;
   const openNeeds = cities.reduce((sum, city) => sum + city.openNeeds, 0);
+  // Se suman los de cada municipio y no se vuelven a contar en global: un caso
+  // pertenece a un solo pueblo, así que las dos cuentas dan lo mismo y sumar es
+  // lo que garantiza que el total y las tarjetas del costado no puedan
+  // separarse. Ver `countOpenCases` en lib/needs.ts.
+  const openCases = cities.reduce((sum, city) => sum + city.openCases, 0);
 
   const pins = cities.map((city) => ({
     id: city.id,
@@ -59,7 +71,7 @@ export default async function MapPage({ searchParams }: Props) {
     slug: city.slug,
     lat: city.lat,
     lng: city.lng,
-    openNeeds: city.openNeeds,
+    progress: city.progress,
   }));
 
   // El Chocó es dos veces y media más alto que ancho, así que el dibujo lo
@@ -81,11 +93,20 @@ export default async function MapPage({ searchParams }: Props) {
         <h1 className="font-display text-[22px] leading-tight text-ink lg:text-[30px]">
           Mapa del Chocó
         </h1>
-        <p className="mt-1 text-[12px] leading-snug text-muted lg:mt-2 lg:text-[14px]">
-          {view === "colombia"
-            ? "Dónde queda el departamento dentro del país."
-            : "Los treinta municipios, coloreados por necesidades abiertas."}
-        </p>
+        {view === "colombia" ? (
+          <p className="mt-1 text-[12px] leading-snug text-muted lg:mt-2 lg:text-[14px]">
+            Dónde queda el departamento dentro del país.
+          </p>
+        ) : campaign ? (
+          <CampaignStrip
+            campaign={campaign}
+            className="mt-1 text-[12px] leading-snug text-muted lg:mt-2 lg:text-[14px]"
+          />
+        ) : (
+          <p className="mt-1 text-[12px] leading-snug text-muted lg:mt-2 lg:text-[14px]">
+            Los treinta municipios, coloreados por cuánto falta por cubrir.
+          </p>
+        )}
         <div className="mt-2.5 lg:mt-4">
           <MapViewTabs active={view} />
         </div>
@@ -99,6 +120,7 @@ export default async function MapPage({ searchParams }: Props) {
             <ChocoMap
               pins={pins}
               hrefFor={(pin) => `/ciudades/${pin.slug}`}
+              activeSlug={campaign?.city.slug}
               className="size-full"
             />
             <MapIntro />
@@ -119,7 +141,12 @@ export default async function MapPage({ searchParams }: Props) {
           <NeedsLegend />
         )}
         <div className="mt-2">
-          <MapStatus municipios={cities.length} openNeeds={openNeeds} updatedAt={updatedAt} />
+          <MapStatus
+            municipios={cities.length}
+            openCases={openCases}
+            openNeeds={openNeeds}
+            updatedAt={updatedAt}
+          />
         </div>
       </div>
 
@@ -128,15 +155,21 @@ export default async function MapPage({ searchParams }: Props) {
           la forma y la tarjeta del municipio, uno al lado del otro— y en una
           pantalla de 390 px no habría dónde ponerlo sin quitárselo al dibujo. */}
       <aside className="enters enters-2 hidden lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col">
+        {campaign && (
+          <div className="mb-6">
+            <CampaignCard campaign={campaign} />
+          </div>
+        )}
         <h2 className={screenTitle}>Municipios documentados</h2>
         <p className="mt-2 text-[14px] leading-relaxed text-muted">
-          Los que salen en color. Los otros veintisiete siguen en gris porque nadie ha llegado
-          todavía, no porque estén bien.
+          Los documentados salen en color, del más atrasado al más cubierto. Gris es que
+          nadie ha llegado todavía; un pueblo visitado donde ya no falta nada tiene otro
+          tono, no el gris.
         </p>
         <ul className="mt-5 grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 overflow-y-auto">
-          {cities.map((city) => (
+          {ranked.map((city) => (
             <li key={city.id}>
-              <CityRailCard city={city} />
+              <CityRailCard city={city} featured={city.id === campaign?.city.id ? campaign.source : undefined} />
             </li>
           ))}
         </ul>

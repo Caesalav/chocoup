@@ -1,9 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { OfferForm } from "./OfferForm";
+import { OFFER_TO_A_CASE_HEADLINE } from "@/components/cards/OfferRow";
+import { ContributionCounter } from "@/components/offers/ContributionCounter";
+import { UpdatesSignup } from "@/components/offers/UpdatesSignup";
 import { CategoryChip } from "@/components/ui/Chip";
 import { card } from "@/components/ui/styles";
-import { getOfferTarget } from "@/lib/data";
+import { getContributionTally, getOfferTarget } from "@/lib/data";
 import { formatDay } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -15,12 +18,49 @@ export const metadata: Metadata = {
 };
 
 type Props = {
-  searchParams: Promise<{ need?: string; case?: string; city?: string; completa?: string }>;
+  searchParams: Promise<{
+    need?: string;
+    case?: string;
+    city?: string;
+    completa?: string;
+    avisos?: string;
+  }>;
 };
+
+/**
+ * A dónde vuelve el formulario de avisos, reconstruido con los mismos parámetros
+ * con los que se abrió esta página.
+ *
+ * Se rehace aquí en vez de leer la dirección del navegador porque esto se pinta en
+ * el servidor y porque el destino tiene que ser exacto: quien está ofreciendo algo
+ * para una familia concreta llegó con `?case=…`, y perder ese parámetro al dejar un
+ * correo le cambiaría el formulario debajo de las manos.
+ *
+ * `avisos` se queda fuera a propósito: es la respuesta de la vez anterior y
+ * arrastrarla dejaría el aviso pegado a la dirección para siempre.
+ */
+function returnPath(params: { need?: string; case?: string; city?: string; completa?: string }) {
+  const query = new URLSearchParams();
+  for (const key of ["need", "case", "city", "completa"] as const) {
+    const value = params[key];
+    if (value) query.set(key, value);
+  }
+  const search = query.toString();
+  return search ? `/ofrecer?${search}` : "/ofrecer";
+}
+
+function parseSignupState(value: string | undefined): "recibido" | "correo" | null {
+  if (value === "recibido") return "recibido";
+  if (value === "correo") return "correo";
+  return null;
+}
 
 export default async function OfferPage({ searchParams }: Props) {
   const params = await searchParams;
-  const target = await getOfferTarget(params);
+  const [target, tally] = await Promise.all([
+    getOfferTarget(params),
+    getContributionTally(),
+  ]);
 
   // Sin flecha de volver: /ofrecer es una de las cuatro pestañas de la barra
   // inferior, y una pestaña no vuelve a ningún sitio.
@@ -41,6 +81,11 @@ export default async function OfferPage({ searchParams }: Props) {
           ? "Son tres preguntas cortas. No publicamos el contacto de quien ofreció aquello, ni vamos a publicar el tuyo, así que las dos ofertas se juntan por aquí: el equipo recibe la tuya al lado de la suya y las cruza."
           : "Son tres preguntas cortas y no hace falta crear una cuenta. Sirve igual si no eres tú quien dona, sino alguien que conoces."}
       </p>
+
+      {/* El contador va antes del formulario y no al final: contesta lo que se
+          piensa al llegar —si esto lo usa alguien— y esa duda se tiene antes de
+          escribir, no después. */}
+      <ContributionCounter tally={tally} />
 
       {/* El enlace que le da sentido al muro de lo prometido, y por eso está
           antes del formulario y no debajo: lo que más falta no siempre es una
@@ -65,9 +110,17 @@ export default async function OfferPage({ searchParams }: Props) {
       {target?.completes && (
         <div className={`${card} mt-6 p-4`}>
           <p className="text-[12px] text-accent-strong">Vas a completar esta oferta</p>
+          {/* El mismo respaldo que la fila de /ofrecido, y de ahí importado: la
+              vista no publica el texto de una oferta dirigida a una familia
+              (0012), así que aquí llega nulo igual que allí. Sin esto la tarjeta
+              enseñaba una pastilla de categoría suelta encima de la fecha, que se
+              lee como un dato que se perdió al abrir la página —y peor aquí que
+              en la fila, porque este es el sitio donde hay que reconocer lo que
+              se acaba de pulsar. Con las tejas de Istmina, que es hoy una de las
+              tres promesas del muro, era el caso más probable de todos. */}
           <div className="mt-2 flex flex-wrap items-center gap-2.5">
             <span className="font-display text-[18px] leading-tight text-ink">
-              {target.completes.resource}
+              {target.completes.resource ?? OFFER_TO_A_CASE_HEADLINE}
             </span>
             <CategoryChip category={target.completes.category} />
           </div>
@@ -126,6 +179,8 @@ export default async function OfferPage({ searchParams }: Props) {
       )}
 
       <OfferForm target={target} />
+
+      <UpdatesSignup from={returnPath(params)} state={parseSignupState(params.avisos)} />
     </div>
   );
 }

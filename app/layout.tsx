@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: `%s · ${SITE_NAME}`,
   },
   description:
-    "Mapa y registro de la situación en municipios del Chocó tras el terremoto: necesidades por zona, casos de personas y fundaciones con las que coordinar donaciones.",
+    "Mapa y registro de la situación en municipios del Chocó tras el terremoto: necesidades por zona y casos documentados, cada uno con el canal por el que recibe donaciones.",
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     apple: "/apple-icon.png",

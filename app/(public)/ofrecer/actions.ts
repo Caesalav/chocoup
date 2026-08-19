@@ -79,3 +79,70 @@ export async function submitOffer(
 
   redirect("/ofrecer/gracias");
 }
+
+/**
+ * Solo acepta un camino interno del portal. Es el mismo recorte que hace
+ * /sugerencias con `page_path`: el campo viene de un formulario, así que puede
+ * llegar cualquier cosa, y sin esto un `//dominio.ajeno` en la dirección de vuelta
+ * convertiría este botón en un redirector abierto —quien lo pulsara acabaría fuera
+ * del portal creyendo que sigue dentro—.
+ */
+function safeReturn(value: string): string {
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("://")) {
+    return "/ofrecer";
+  }
+  return value.slice(0, 300);
+}
+
+/**
+ * Apuntar un correo a los avisos del portal.
+ *
+ * NO devuelve estado: redirige. Es la diferencia con `submitOffer`, y es
+ * deliberada —sin JavaScript, `useActionState` necesita que se hidrate algo para
+ * pintar la respuesta, y esto tiene que decir «lo recibimos» en un móvil con la
+ * señal del Chocó y el JavaScript sin cargar—. La respuesta viaja en la
+ * dirección, así que llega en el HTML de la página siguiente.
+ *
+ * Y vuelve a la página desde la que se envió, con su caso o su necesidad dentro:
+ * quien estaba a medio ofrecer algo para una familia no puede perder ese contexto
+ * por dejar un correo.
+ *
+ * Un correo repetido responde exactamente lo mismo que uno nuevo, y eso no es una
+ * comodidad: la base de datos descarta el duplicado en silencio
+ * (`newsletter_skip_repeated`, 0015) justo para que este formulario no pueda usarse
+ * para averiguar si una dirección está en la lista.
+ */
+export async function subscribeToUpdates(formData: FormData) {
+  const back = safeReturn(text(formData, "desde"));
+  const separator = back.includes("?") ? "&" : "?";
+  const done = `${back}${separator}avisos=recibido`;
+
+  if (text(formData, "website")) redirect(done);
+
+  const email = text(formData, "email").toLowerCase();
+
+  // La forma se comprueba aquí y en la base de datos (`newsletter_email_shape`),
+  // y las dos hacen falta por lo de siempre: esto es para que el aviso se
+  // entienda, y aquello para que valga también cuando la llamada no venga de esta
+  // pantalla.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) {
+    redirect(`${back}${separator}avisos=correo`);
+  }
+
+  if (isDemoMode()) redirect(done);
+
+  const supabase = await createSupabaseServerClient();
+
+  // Sin `.select()`: el público no tiene permiso de lectura sobre esta tabla, ni
+  // siquiera para releer la fila que acaba de escribir. Añadirlo aquí haría que el
+  // formulario dejara de guardar en vez de publicar una lista de correos, que es
+  // el orden en el que se prefieren los fallos.
+  const { error } = await supabase.from("newsletter_signups").insert({ email });
+
+  // Un fallo aquí no se le cuenta a quien lo dejó con un mensaje distinto: la
+  // única diferencia visible entre «se guardó» y «no se guardó» sería otra forma
+  // de preguntarle a la tabla por un correo. Queda en los registros del servidor.
+  if (error) console.error("newsletter_signups", error.message);
+
+  redirect(done);
+}

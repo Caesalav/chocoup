@@ -6,6 +6,7 @@ import {
   INTRO_ZOOM_FROM,
 } from "@/lib/colombia-map";
 import type { CSSProperties } from "react";
+import { PaletteFillDefs } from "@/components/ui/PaletteFillDefs";
 
 type Props = {
   /** El tamaño lo decide quien lo usa; sin valor por defecto para que no gane
@@ -90,6 +91,7 @@ export function ColombiaLocator({ className, named = false, zooms = false }: Pro
       role="img"
       aria-label="Mapa de Colombia con el departamento del Chocó resaltado"
     >
+      <PaletteFillDefs />
       {zooms ? (
         <g
           className="intro-zoom"

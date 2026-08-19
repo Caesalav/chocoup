@@ -1,26 +1,33 @@
 import Link from "next/link";
 import { Photo } from "@/components/ui/Photo";
 import { lifts, pillOnPhoto } from "@/components/ui/styles";
+import { progressPercent } from "@/lib/case-progress";
 import { plural } from "@/lib/format";
 import type { CityCardData } from "@/lib/types";
 
 /**
- * La tarjeta grande del inicio: foto de portada del municipio, su nombre y
- * cuántas necesidades tiene abiertas.
+ * La tarjeta grande del inicio y del costado del mapa: foto de portada del
+ * municipio, su nombre, cuánto ha avanzado y si hay gente yendo.
+ *
+ * El color del mapa y el porcentaje de esta tarjeta salen del mismo avance:
+ * el montón de necesidades del pueblo. Los casos abiertos van al lado porque
+ * contestan otra pregunta: a cuánta gente le falta algo.
  *
  * El bloque de texto va abajo y no centrado, igual que en la referencia, y eso
  * no es una decisión estética: el velo solo garantiza contraste en su tercio
- * bajo (ver .veil-b en globals.css). Un titular a media altura sobre una foto de
- * mediodía se queda en 3:1.
- *
- * Cuando el municipio todavía no tiene foto, la tarjeta cambia de bando entera:
- * hueco claro y texto en tinta. Poner un velo oscuro sobre el hueco para no
- * tocar los colores del texto daría un rectángulo negro que finge ser una foto,
- * y va a pasar a menudo —se documenta un municipio y las fotos llegan días
- * después—, así que tiene que verse bien de verdad, no disimulado.
+ * bajo (ver .veil-b en globals.css).
  */
-export function CityRailCard({ city }: { city: CityCardData }) {
+export function CityRailCard({
+  city,
+  featured,
+}: {
+  city: CityCardData;
+  /** Si esta tarjeta es el pueblo del recado: editorial o el más atrasado. */
+  featured?: "editorial" | "automatic";
+}) {
   const onPhoto = Boolean(city.coverPath);
+  const percent = progressPercent(city.progress.ratio);
+  const hasBar = city.progress.total > 0;
 
   return (
     <Link
@@ -51,10 +58,14 @@ export function CityRailCard({ city }: { city: CityCardData }) {
               : "inline-flex items-center rounded-full border border-line-strong bg-panel-high px-3.5 py-1.5 text-[12px] font-medium text-muted"
           }
         >
-          Municipio documentado
+          {featured === "editorial"
+            ? "Foco ahora"
+            : featured === "automatic"
+              ? "Donde más falta"
+              : "Municipio documentado"}
         </span>
 
-        <div className="pb-1">
+        <div className="w-full pb-1">
           <h3
             className={`font-display text-[30px] leading-none ${onPhoto ? "text-paper" : "text-ink"}`}
           >
@@ -62,8 +73,35 @@ export function CityRailCard({ city }: { city: CityCardData }) {
             <span className={onPhoto ? "text-paper/65" : "text-faint"}>Chocó</span>
           </h3>
           <p className={`mt-2.5 text-[13px] ${onPhoto ? "text-paper/85" : "text-muted"}`}>
-            {plural(city.openNeeds, "necesidad abierta", "necesidades abiertas")}
+            {city.openCases > 0 && (
+              <>
+                {plural(city.openCases, "caso abierto", "casos abiertos")}
+                <span aria-hidden> · </span>
+              </>
+            )}
+            {hasBar
+              ? `${percent} % cubierto`
+              : plural(city.openNeeds, "necesidad abierta", "necesidades abiertas")}
+            {city.standingOffers > 0 && (
+              <>
+                <span aria-hidden> · </span>
+                {plural(city.standingOffers, "aporte en camino", "aportes en camino")}
+              </>
+            )}
           </p>
+          {hasBar && (
+            <div
+              aria-hidden
+              className={`mx-auto mt-3 h-1.5 w-full max-w-[12rem] overflow-hidden rounded-full ${
+                onPhoto ? "bg-paper/25" : "bg-canvas"
+              }`}
+            >
+              <div
+                className={`h-full rounded-full ${onPhoto ? "bg-paper" : "bg-accent"}`}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+          )}
         </div>
       </div>
     </Link>

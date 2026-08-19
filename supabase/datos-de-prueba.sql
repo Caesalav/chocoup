@@ -15,15 +15,22 @@
 --   * Quibdó queda fuera por completo. El primer caso de muestra es una copia
 --     literal del caso real —mismo nombre, misma historia—, así que insertarlo
 --     pondría una segunda Daniela, con caras de archivo, en el municipio de la
---     de verdad. Y una fundación de muestra en Quibdó colgaría un botón «Donar
---     dinero» inventado de la ficha del caso real.
---   * Los marcadores: ' (prueba)' en el nombre del municipio, de la fundación y
---     de quien ofrece, y 'CASO DE PRUEBA' al principio de cada historia.
---   * Fundaciones sin enlace de donación. Los de lib/demo-data.ts apuntan a
---     vaki.co, o sea a campañas vivas de terceros, y ese es el botón que mueve
---     dinero: un enlace de muestra que existe manda dinero a alguien que no lo
---     pidió. Los canales de muestra que sí lleva este archivo —más abajo— van a
---     `example.org`, que la IANA tiene reservado justo para esto.
+--     de verdad.
+--   * Los marcadores: ' (prueba)' en el nombre del municipio y de quien ofrece, y
+--     'CASO DE PRUEBA' al principio de cada historia.
+--   * Los canales de muestra van a `example.org`, que la IANA tiene reservado
+--     justo para esto. Los de lib/demo-data.ts apuntaban a vaki.co, o sea a
+--     campañas vivas de terceros, y ese es el botón que mueve dinero: un enlace de
+--     muestra que existe manda dinero a alguien que no lo pidió.
+--
+-- Aquí había además dos fundaciones de prueba. Se fueron con
+-- 0015_canal_general.sql, que borró la tabla: una fundación entra ahora como un
+-- caso más, y desde 0016 con `case_kind = 'fundacion'` para que su ficha no
+-- dibuje iniciales donde tendría que ir un logotipo. Por eso el cuarto caso de
+-- prueba es un colegio: es el mismo asunto y aquí no había ninguno.
+-- **Y este archivo no toca el canal general del portal**, que es real y
+-- no de muestra: cargarlo o vaciarlo desde aquí cambiaría a dónde va el dinero de
+-- todas las causas sin canal propio, incluida la de Quibdó.
 --
 -- Y tres frases de dos notas internas están recortadas respecto a
 -- lib/demo-data.ts: nombraban a Quibdó o a una oferta que no se insertó, y una
@@ -55,33 +62,36 @@ Llegar solo es posible por avioneta o por mar, así que todo lo que se mande hay
 where id = 'eb179d19-6172-4ee0-a32e-c7aa92208b3f'::uuid and name not like '%(prueba)%';
 
 -- ---------------------------------------------------------------------------
--- Fundaciones (2), sin enlace de donación
--- ---------------------------------------------------------------------------
-
-insert into public.foundations
-  (id, city_id, name, description, contact_name, phone, whatsapp, email, website, donation_url, address, created_at)
-values
-  ('00000000-0000-4000-8000-000200000001'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, 'Corporación Istmina Unida (prueba)', 'Junta de acción comunal ampliada. Tienen el censo de viviendas afectadas.', 'Alberto Perea', '604 670 8811', '3103334455', 'istminaunida@correo.com', '', '', 'Calle 8 # 3-40, frente a la casa de la cultura', '2026-08-06T14:30:00.000Z'::timestamptz),
-  ('00000000-0000-4000-8000-000200000002'::uuid, 'eb179d19-6172-4ee0-a32e-c7aa92208b3f'::uuid, 'Fundación Mar y Selva (prueba)', 'Trabajan con las asociaciones de pescadores de El Valle y Huina. Reciben donaciones en Medellín y las embarcan en Buenaventura.', 'Erika Klinger', '', '3148889900', 'marysleva.choco@correo.com', '', '', 'Calle principal, al lado de la Capitanía', '2026-08-06T14:30:00.000Z'::timestamptz)
-on conflict (id) do nothing;
-
--- ---------------------------------------------------------------------------
--- Casos (3). El retrato se pone más abajo: el disparador
+-- Casos (4). El retrato se pone más abajo: el disparador
 -- cases_portrait_belongs_to_case exige que la foto ya sea de este caso.
+--
+-- Cuatro y no tres desde 0016, y el cuarto es un colegio. Está para poder
+-- comprobar sobre la base de verdad lo único que el tipo de causa cambia en la
+-- pantalla: la reserva del retrato. Va sin retrato a propósito —un colegio no
+-- tiene cara—, así que su hueco tiene que decir «Colegio» y no dos iniciales
+-- inventadas del nombre.
+--
+-- El resumen también entra aquí, y no en todos: dos casos lo llevan escrito y dos
+-- no. Es la proporción que va a haber en terreno una buena temporada, y las dos
+-- mitades hay que poder verlas —con resumen sale la frase escrita a mano, sin
+-- resumen sigue saliendo el recorte de la historia—.
 -- ---------------------------------------------------------------------------
 
 insert into public.cases
-  (id, city_id, display_name, household, story, consent_to_publish, published, donation_url, created_at, updated_at)
+  (id, city_id, display_name, case_kind, household, summary, story, consent_to_publish, published, donation_url, created_at, updated_at)
 values
-  ('00000000-0000-4000-8000-000300000005'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, 'Familia Perea Córdoba', '7 personas, 4 menores de edad', 'CASO DE PRUEBA. La vivienda tiene una grieta que atraviesa dos muros de carga. La marcaron con cinta y les recomendaron desalojar.
+  ('00000000-0000-4000-8000-000300000005'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, 'Familia Perea Córdoba', 'persona', '7 personas, 4 menores de edad', 'CASO DE PRUEBA. Una grieta atraviesa dos muros de carga y les recomendaron desalojar.', 'CASO DE PRUEBA. La vivienda tiene una grieta que atraviesa dos muros de carga. La marcaron con cinta y les recomendaron desalojar.
 
 Están en la casa de la cultura con otras cuatro familias. Piden tejas y madera para reforzar, y un lugar donde guardar lo que alcanzaron a sacar.', true, true, '', '2026-08-07T14:30:00.000Z'::timestamptz, '2026-08-13T14:30:00.000Z'::timestamptz),
-  ('00000000-0000-4000-8000-000300000006'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, 'Yeison Córdoba y su hermana', '2 personas, 16 y 11 años, a cargo de una tía', 'CASO DE PRUEBA. El cuarto donde dormían quedó inhabitable. La tía los recibió pero no alcanza el espacio ni la comida para todos.
+  ('00000000-0000-4000-8000-000300000006'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, 'Yeison Córdoba y su hermana', 'persona', '2 personas, 16 y 11 años, a cargo de una tía', '', 'CASO DE PRUEBA. El cuarto donde dormían quedó inhabitable. La tía los recibió pero no alcanza el espacio ni la comida para todos.
 
 Yeison está en décimo y perdió los cuadernos y el uniforme. La escuela retoma clases la próxima semana en la sede alterna.', true, true, '', '2026-08-08T14:30:00.000Z'::timestamptz, '2026-08-14T14:30:00.000Z'::timestamptz),
-  ('00000000-0000-4000-8000-000300000007'::uuid, 'eb179d19-6172-4ee0-a32e-c7aa92208b3f'::uuid, 'Familia Klinger Valencia', '5 personas, 2 niños', 'CASO DE PRUEBA. La casa de palafito en El Valle perdió tres pilotes y el piso quedó ladeado. La lancha con la que Wilmar pescaba se partió contra el muelle.
+  ('00000000-0000-4000-8000-000300000007'::uuid, 'eb179d19-6172-4ee0-a32e-c7aa92208b3f'::uuid, 'Familia Klinger Valencia', 'persona', '5 personas, 2 niños', '', 'CASO DE PRUEBA. La casa de palafito en El Valle perdió tres pilotes y el piso quedó ladeado. La lancha con la que Wilmar pescaba se partió contra el muelle.
 
-Sin la lancha no hay ingreso. Piden madera para los pilotes y ayuda para reparar el motor, que se puede recuperar según el mecánico del pueblo.', true, true, '', '2026-08-09T14:30:00.000Z'::timestamptz, '2026-08-15T14:30:00.000Z'::timestamptz)
+Sin la lancha no hay ingreso. Piden madera para los pilotes y ayuda para reparar el motor, que se puede recuperar según el mecánico del pueblo.', true, true, '', '2026-08-09T14:30:00.000Z'::timestamptz, '2026-08-15T14:30:00.000Z'::timestamptz),
+  ('00000000-0000-4000-8000-000300000008'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, 'Escuela del barrio Niño Jesús (prueba)', 'colegio', '128 estudiantes, 6 docentes', 'CASO DE PRUEBA. Dos salones sin techo: piden teja, madera y pupitres.', 'CASO DE PRUEBA. El techo de dos salones se vino abajo la noche del temblor y el muro del patio quedó agrietado. No hubo nadie dentro.
+
+Las clases se reparten entre la casa de la cultura y la sede alterna, en turnos de media jornada. Piden teja y madera para rearmar la cubierta antes de las lluvias fuertes, y pupitres.', true, true, '', '2026-08-09T14:30:00.000Z'::timestamptz, '2026-08-12T14:30:00.000Z'::timestamptz)
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -135,13 +145,15 @@ end
 $do$;
 
 -- ---------------------------------------------------------------------------
--- Canales de donación de muestra: los cuatro formatos que hay que poder revisar
+-- Canales de donación de muestra: los dos formatos que hay que poder revisar
 --
--- Un municipio con llave, otro con enlace, un caso con llave y otro con enlace.
--- Con esto se ven en el portal publicado las dos formas en los dos niveles, y
--- además queda a la vista lo que más importa comprobar: Yeison Córdoba es de
--- Istmina, que tiene canal, y su ficha NO lo enseña —un caso sin canal propio no
--- hereda el de su municipio—.
+-- Un caso con llave y otro con enlace. Con esto se ven en el portal publicado las
+-- dos formas, y además queda a la vista lo que más importa comprobar: Yeison
+-- Córdoba no tiene canal propio, así que su ficha enseña el canal general y lo
+-- dice con esas palabras. Los dos estados de la ficha, uno al lado del otro.
+--
+-- Aquí había además dos canales de municipio. Se fueron con 0015: no hay canales
+-- por ciudad, y las columnas ya no existen.
 --
 -- **Ninguno es un destino real de dinero.** `example.org` está reservado por la
 -- IANA para ejemplos y las llaves llevan «prueba» dentro. Un enlace de muestra
@@ -153,16 +165,6 @@ $do$;
 -- estas líneas pasan; desde el panel haría falta una sesión de coordinación.
 -- ---------------------------------------------------------------------------
 
-update public.cities set
-  donation_key = '@ejemplo-de-prueba', donation_url = '',
-  donation_app = 'Bre-B', donation_holder = 'Municipio de prueba (no es real)'
-where id = 'eb179d19-6172-4ee0-a32e-c7aa92208b3f'::uuid;
-
-update public.cities set
-  donation_key = '', donation_url = 'https://example.org/donacion-de-prueba',
-  donation_app = '', donation_holder = ''
-where id = '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid;
-
 -- Con el disparador de updated_at apagado, por lo mismo que el retrato de más
 -- arriba: /casos ordena por esa columna y si no los casos de prueba saltarían por
 -- encima del caso real.
@@ -172,17 +174,40 @@ begin
 
   update public.cases set
     donation_key = '@caso-de-prueba', donation_url = '',
-    donation_app = 'Nequi', donation_holder = 'Caso de prueba (no es real)'
+    donation_app = 'Nequi', donation_holder = 'Caso de prueba (no es real)',
+    donation_verified_on = current_date
   where id = '00000000-0000-4000-8000-000300000005'::uuid;
 
   update public.cases set
     donation_key = '', donation_url = 'https://example.org/caso-de-prueba',
-    donation_app = '', donation_holder = ''
+    donation_app = '', donation_holder = '',
+    donation_verified_on = current_date - 78
   where id = '00000000-0000-4000-8000-000300000007'::uuid;
 
   alter table public.cases enable trigger cases_touch_updated_at;
 end
 $do$;
+
+-- ---------------------------------------------------------------------------
+-- Las dos fechas de comprobación de arriba, y por qué son relativas a hoy
+--
+-- 0016 añadió «Comprobado el …» y lo que hay que poder revisar no es la frase,
+-- son sus dos edades: recién comprobado se lee de una manera y comprobado hace
+-- once semanas tiene que leerse de otra, porque a los 60 días la ficha lo dice
+-- con palabras. Perea lleva la de hoy y Klinger la de hace 78 días, así que las
+-- dos salen a la vez en el portal publicado, una al lado de la otra.
+--
+-- Van con `current_date` y no con fechas escritas a mano por un motivo que se ve
+-- solo con el tiempo: una fecha fija de agosto es reciente esta semana y en
+-- octubre ya es vieja, así que en octubre las dos filas dirían lo mismo y el
+-- estado reciente dejaría de poder revisarse justo cuando nadie está mirando.
+-- Con la resta, los dos estados siguen siendo los dos estados el día que se
+-- pegue esto. Y ninguna es futura, que el disparador
+-- `guard_channel_verification` rechaza.
+--
+-- Yeison sigue sin canal y por lo tanto sin fecha: es el tercer estado —el
+-- normal, el de casi todos— y es el que enseña el canal general en su ficha.
+-- ---------------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------------
 -- Necesidades (9: 6 de zona y 3 de un caso)
@@ -214,12 +239,20 @@ values
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
--- Ofertas (6). Las de lib/demo-data.ts que apuntaban a Quibdó:
+-- Ofertas (8). Las de lib/demo-data.ts que apuntaban a Quibdó:
 --   * «Ferretería El Progreso» reapuntada — ofrecía tejas contra la necesidad de tejas de Quibdó; la equivalente en un municipio incluido es la de la Familia Perea Córdoba.
 --   * «Rotary Club Medellín» reapuntada — entrega de agua contra una necesidad de agua parcial; la de Quibdó no existe aquí.
 --   * «Logística Aburrá» fuera: su propio texto nombra Quibdó o una familia de Quibdó.
 --   * «Droguería La Salud» fuera: su propio texto nombra Quibdó o una familia de Quibdó.
 --   * «Ferretería El Trapiche» fuera: su propio texto nombra Quibdó o una familia de Quibdó.
+--
+-- Y dos añadidas que lib/demo-data.ts no tenía, para completar los cuatro estados
+-- de `offers_status_valid` (0012). Faltaban justo los dos que no se pueden
+-- revisar de otra manera: una negada y una retirada. La bandeja del panel es lo
+-- que decide qué se publica, así que hay que poder ver que una negada NO sale en
+-- /ayudas y que no se cuenta como recurso conseguido; y `retirada` no es lo mismo
+-- que `rechazada` —una la escribe quien ofrecía y la otra el equipo— así que
+-- tienen que poder distinguirse en pantalla sin abrir la fila.
 -- ---------------------------------------------------------------------------
 
 insert into public.offers
@@ -230,7 +263,9 @@ values
   ('00000000-0000-4000-8000-000600000003'::uuid, 'eb179d19-6172-4ee0-a32e-c7aa92208b3f'::uuid, null, null, 'Marta Villegas (prueba)', '3167778899', 'Contacto de un carpintero de Buenaventura', 'mano_de_obra', 'No soy yo quien ayuda: es mi cuñado, lleva años haciendo palafitos y está dispuesto a ir. Les paso su número si les interesa.', 'pendiente', null, false, '', '2026-08-13T14:30:00.000Z'::timestamptz),
   ('00000000-0000-4000-8000-000600000004'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, null, '00000000-0000-4000-8000-000400000006'::uuid, 'Rotary Club Medellín (prueba)', '3131112233', '12 tanques de 500 litros y pastillas potabilizadoras', 'agua', 'Aprobado por la junta. Podemos despachar en cuanto haya transporte confirmado.', 'aceptada', '2026-08-13'::date, true, 'Hasta aquí llegaron 12 tanques; los otros 13 quedan para el siguiente viaje.', '2026-08-14T14:30:00.000Z'::timestamptz),
   ('00000000-0000-4000-8000-000600000007'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, null, null, 'Colegio San José (prueba)', 'rectoria@sanjose.edu.co', '300 cuadernos, lápices y dos uniformes', 'otro', 'Colecta de los cursos de bachillerato. Ya están empacados por tallas y por curso.', 'aceptada', '2026-08-14'::date, true, 'Llegaron con el camión del jueves. Los recibió Alberto en la casa de la cultura.', '2026-08-12T14:30:00.000Z'::timestamptz),
-  ('00000000-0000-4000-8000-000600000008'::uuid, null, null, null, 'Marina Restrepo (prueba)', '3182223344', 'Flete de 8 toneladas desde Medellín', 'transporte', 'Tengo un camión que sube vacío. No quiero que aparezca mi nombre en ninguna parte.', 'aceptada', '2026-08-13'::date, false, 'Subió el jueves con los tanques y los mercados. Confirmado al descargar.', '2026-08-13T14:30:00.000Z'::timestamptz)
+  ('00000000-0000-4000-8000-000600000008'::uuid, null, null, null, 'Marina Restrepo (prueba)', '3182223344', 'Flete de 8 toneladas desde Medellín', 'transporte', 'Tengo un camión que sube vacío. No quiero que aparezca mi nombre en ninguna parte.', 'aceptada', '2026-08-13'::date, false, 'Subió el jueves con los tanques y los mercados. Confirmado al descargar.', '2026-08-13T14:30:00.000Z'::timestamptz),
+  ('00000000-0000-4000-8000-000600000009'::uuid, '1a92f9db-ff70-4dfc-9c96-751ab16e640f'::uuid, null, null, 'Distribuidora Andina (prueba)', 'ventas@andina-prueba.co', '400 cajas de leche en polvo', 'alimentos', 'Tenemos existencias de una promoción que no se vendió. Podemos donarlas contra una factura de descargo.', 'rechazada', null, false, 'La fecha de vencimiento es de hace dos meses. Se les explicó por teléfono y lo entendieron bien.', '2026-08-11T14:30:00.000Z'::timestamptz),
+  ('00000000-0000-4000-8000-000600000010'::uuid, 'eb179d19-6172-4ee0-a32e-c7aa92208b3f'::uuid, null, '00000000-0000-4000-8000-000400000009'::uuid, 'Aerocarga del Pacífico (prueba)', '3157776655', 'Dos cupos de avioneta a Bahía Solano', 'transporte', 'Podemos reservar dos cupos de carga en el vuelo del sábado.', 'retirada', null, false, 'Llamaron ellos: se les cayó el vuelo del sábado y no hay otro esta semana.', '2026-08-12T14:30:00.000Z'::timestamptz)
 on conflict (id) do nothing;
 
 commit;

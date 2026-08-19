@@ -15,13 +15,17 @@ export default async function NewCityPage() {
   if (team?.role !== "coordinacion") {
     return (
       <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
-        <Link href="/admin" className="text-sm text-muted hover:text-ink hover:underline">
-          ← Panel
+        <Link href="/admin/ciudades" className="text-sm text-muted hover:text-ink hover:underline">
+          ← Ciudades
         </Link>
         <h1 className="mt-6 font-display text-3xl text-ink">Los municipios los crea coordinación</h1>
         <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
           Si hace falta uno nuevo, pídelo por el grupo con el nombre y, si lo tienes, la ubicación.
-          En cuanto lo creen y te lo asignen, aparecerá en tu panel.
+          En cuanto lo creen y te lo asignen, aparecerá en la lista de{" "}
+          <Link href="/admin/ciudades" className="text-accent hover:underline">
+            Ciudades
+          </Link>
+          .
         </p>
       </div>
     );
@@ -30,10 +34,10 @@ export default async function NewCityPage() {
   return (
     <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
       <Link
-        href="/admin"
-        className="smallcaps inline-flex items-center gap-2 text-[15px] text-muted transition-colors hover:text-ink"
+        href="/admin/ciudades"
+        className="smallcaps inline-flex min-h-11 items-center gap-2 text-[15px] text-muted transition-colors hover:text-ink"
       >
-        <span className="text-accent">←</span> Panel
+        <span className="text-accent">←</span> Ciudades
       </Link>
 
       <p className="mt-6 text-[11px] uppercase tracking-[0.18em] text-faint">Nuevo municipio</p>

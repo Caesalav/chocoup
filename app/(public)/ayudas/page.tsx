@@ -119,10 +119,14 @@ export default async function AidLogPage({ searchParams }: Props) {
             nunca.
           </p>
           <p className="mt-3 text-[13px] leading-relaxed text-muted">
-            Tampoco está todo lo que llega al Chocó: solo lo que pasó por este portal. El dinero que
-            se dona por el canal de cada fundación se rinde allí, no aquí. Y lo prometido o en
+            Tampoco está todo lo que llega al Chocó: solo lo que pasó por este portal. El dinero
+            que se dona por el canal de una causa se rinde allí, no aquí. Y lo prometido o en
             camino no aparece hasta que llega. Si hace falta el detalle de una entrega concreta,
-            se puede pedir por el canal de la fundación del municipio.
+            se puede pedir en{" "}
+            <Link href="/sugerencias" className="text-accent hover:underline">
+              sugerencias
+            </Link>
+            .
           </p>
         </div>
 

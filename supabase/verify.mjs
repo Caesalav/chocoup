@@ -16,17 +16,35 @@
  * por la vía pública ni el día exacto, ni el caso al que fue, ni la descripción
  * que escribió quien la ofreció —y que el equipo sí lo conserve todo—, que lo que
  * se publique de qué llegó pertenezca siempre al vocabulario cerrado de nueve
- * categorías, que un municipio no pueda tener dos fundaciones con dos enlaces de
- * donación, que la migración que impone esa regla se niegue a aplicarse en vez de
- * borrar una de las dos, que el retrato de una persona no pueda ser la foto de
+ * categorías, que la tabla de fundaciones ya no exista con su enlace de donación
+ * dentro, que el retrato de una persona no pueda ser la foto de
  * otra, que la foto de un avance no pueda ser la de otra familia, que el encuadre
  * de una foto solo lo pueda mover quien documenta ese municipio, que el canal de
- * donación de un municipio o de un caso solo lo ponga coordinación —comprobado
+ * donación de un caso solo lo ponga coordinación —comprobado
  * también desde la sesión de quien documenta ese mismo municipio, que es la que
- * llega hasta ahí—, que un canal sea una llave o un enlace y nunca los dos, que un
- * caso sin canal propio no herede el de nadie, que el público los lea y no los
- * toque, que la llave global del portal ya no exista ni vuelva al volver a pegar
- * las migraciones, que del registro de lo que se ha prometido no salgan ni el
+ * llega hasta ahí—, que un canal sea una llave, un enlace o un número y nunca dos, que un
+ * caso sin canal propio lea vacío y el canal general viva en otra tabla para que
+ * ninguna consulta pueda confundirlos, que el canal general sea uno y solo uno y
+ * que ni el público ni quien documenta lo toquen ni lo borren, que un caso cuyo
+ * canal propio era la llave general se quede sin canal propio sin que se mueva el
+ * destino, que el público los lea y no los
+ * toque, que la llave global de 0010 ya no exista ni vuelva al volver a pegar
+ * las migraciones, que el contador de aportes cuente lo que sigue en pie y no lo
+ * rechazado ni lo de un municipio sin publicar, y diga exactamente lo mismo que
+ * el largo del registro de ayudas, que el correo de los avisos lo pueda dejar
+ * cualquiera y no lo lea nadie salvo coordinación —ni la lista, ni el recuento, y
+ * cada barrera comprobada sin la otra—, que apuntarse dos veces responda lo mismo
+ * que apuntarse una para que el formulario no diga quién está dentro, que la
+ * fecha en que se comprobó un canal esté en el mismo círculo pequeño que el
+ * canal y que NO sobreviva a un cambio de destino —ni en un caso ni en el
+ * general—, que una comprobación no se pueda fechar en el futuro, que el tipo de
+ * causa y el resumen sí los escriba quien documenta y que ni un tipo inventado ni
+ * un resumen más largo que una vista previa de WhatsApp entren, que un importe de
+ * donación NO lo pueda escribir nadie desde el navegador —ni el público ni
+ * coordinación— y solo entre por el webhook, comprobado en sus tres barreras y la
+ * tercera con las dos primeras desarmadas a mano, que un aviso repetido del
+ * proveedor no cuente dos veces y que una causa que recibió dinero no se borre,
+ * que del registro de lo que se ha prometido no salgan ni el
  * contacto ni el mensaje ni el caso, que una oferta dirigida a una familia no
  * publique la frase que la describiría —ni llegando por su caso ni llegando por
  * su necesidad— y que las de zona sí la publiquen, que un teléfono o un correo
@@ -102,6 +120,18 @@ async function asUser(email) {
   );
 }
 
+/**
+ * El webhook de pagos, que es el único que puede escribir un importe
+ * (0017_donaciones_preparadas.sql).
+ *
+ * No lleva correo en el token a propósito: no hay ninguna persona detrás de esta
+ * conexión. Es lo que separa «el navegador» del «servidor» y lo que hace que la
+ * barrera de las donaciones no se pueda pasar robando una cuenta del equipo.
+ */
+async function asService() {
+  await sql("reset role; select set_config('request.jwt.claims', '', false); set role service_role;");
+}
+
 // --- Stubs de lo que Supabase ya trae: roles, auth.jwt() y storage ----------
 //
 // Los privilegios por defecto del esquema `public` son parte del stub y no un
@@ -115,9 +145,29 @@ await sql(`
 create role anon;
 create role authenticated;
 
-alter default privileges in schema public grant all on tables    to anon, authenticated;
-alter default privileges in schema public grant all on functions to anon, authenticated;
-alter default privileges in schema public grant all on sequences to anon, authenticated;
+-- El tercer rol de Supabase, y el único que puede escribir un importe
+-- (0017_donaciones_preparadas.sql). Es el del webhook de pagos y su clave no baja
+-- nunca al navegador, así que aquí sirve para lo contrario de los otros dos: para
+-- comprobar que la barrera que rechaza a la web SÍ deja pasar al servidor. Sin
+-- este rol, «nadie puede escribir un importe» pasaría por el motivo equivocado.
+--
+-- Entra en los privilegios por omisión de abajo junto con los otros dos, porque es
+-- donde Supabase lo pone: en el proyecto de verdad service_role nace con el juego
+-- completo sobre toda tabla nueva del esquema public, y es lo que hace que el
+-- revoke de anon y authenticated que escriben 0008 y 0017 recorte la web sin tocar
+-- al servidor. Sin esta línea el webhook fallaría aquí por no poder leer la tabla
+-- de casos, que no es la barrera que se está comprobando.
+--
+-- Y con bypassrls, que es lo que Supabase le pone y sin lo cual esto no probaría
+-- nada: si el webhook tuviera que pasar por las RLS, haría falta escribirle una
+-- política de escritura sobre las donaciones, y esa política es exactamente la que
+-- 0017 no tiene que existir. Saltarse las RLS es la razón por la que su clave no
+-- puede bajar nunca al navegador.
+create role service_role bypassrls;
+
+alter default privileges in schema public grant all on tables    to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 
 create schema auth;
 create or replace function auth.jwt() returns jsonb language sql stable as $$
@@ -156,6 +206,11 @@ const MIGRATIONS = [
   "migrations/0011_canal_de_donacion.sql",
   "migrations/0012_registro_de_lo_ofrecido.sql",
   "migrations/0013_canal_de_telefono.sql",
+  "migrations/0014_sugerencias.sql",
+  "migrations/0015_canal_general.sql",
+  "migrations/0016_ficha_de_causa.sql",
+  "migrations/0017_donaciones_preparadas.sql",
+  "migrations/0018_tablero.sql",
 ];
 const migration = (file) => readFileSync(join(HERE, file), "utf8");
 
@@ -251,10 +306,23 @@ check("El seed carga los 10 municipios", seeded.n === 10, `n=${seeded.n}`);
 const bucket = await one("select public from storage.buckets where id = 'fotos'");
 check("El bucket fotos existe y es público", bucket?.public === true);
 
+// 0014 trae tres: insertar una nota, leerla el equipo, borrarla coordinación.
+// 0015 se lleva las tres de `public.foundations` y trae cuatro: las dos del
+// canal general y las dos del correo de avisos —insertar y leer— más la de
+// borrarlo, que son tres. Treinta y seis menos tres, más cinco, más las tres
+// del buzón.
+//
+// 0017 trae UNA sola, y que sea una es la mitad de lo que se comprueba de esa
+// tabla: `public.donations` tiene política de lectura para coordinación y ninguna
+// de escritura.
+//
+// 0018 trae dos: leer el foco y cambiarlo coordinación. Si esta cuenta sube a 45
+// sin que nadie lo explique, lo primero que hay que mirar es si alguien le
+// añadió al foco una política de `insert`.
 const policyCount = await one(
   "select count(*)::int as n from pg_policies where schemaname in ('public','storage')",
 );
-check("Se crean las 36 políticas RLS", policyCount.n === 36, `n=${policyCount.n}`);
+check("Se crean las 44 políticas RLS", policyCount.n === 44, `n=${policyCount.n}`);
 
 // ===========================================================================
 // El permiso de tabla: la otra mitad de cada regla de acceso
@@ -273,15 +341,37 @@ check("Se crean las 36 políticas RLS", policyCount.n === 36, `n=${policyCount.n
 // ===========================================================================
 
 const PUBLIC_TABLE_PRIVS = {
-  aid_log:      { anon: "SELECT", authenticated: "SELECT" },
-  case_updates: { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
-  cases:        { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
-  cities:       { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
-  foundations:  { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
-  needs:        { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
-  offer_log:    { anon: "SELECT", authenticated: "SELECT" },
-  offers:       { anon: "INSERT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
-  photos:       { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
+  aid_log:            { anon: "SELECT", authenticated: "SELECT" },
+  case_updates:       { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
+  cases:              { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
+  cities:             { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
+  // El canal general se lee y solo se cambia con sesión: no se crea ni se borra,
+  // porque vaciarlo dejaría sin destino a todos los casos que no tienen el suyo.
+  donation_channel:   { anon: "SELECT", authenticated: "SELECT,UPDATE" },
+  // El recado del momento: misma forma que el canal general. Vaciar la tabla
+  // dejaría al portal sin fila, y el aviso del inicio no tiene de dónde leer.
+  campaign_focus:     { anon: "SELECT", authenticated: "SELECT,UPDATE" },
+  // Movimiento hacia un pueblo: agregado de ofertas, se lee y no se escribe.
+  city_offer_activity:{ anon: "SELECT", authenticated: "SELECT" },
+  // Las donaciones no aparecen para `anon` en absoluto, y con sesión solo se leen.
+  // Es la primera de las tres barreras de 0017: sin `INSERT` aquí, un importe
+  // mandado desde la web no recibe cero filas, recibe un error de permisos. Que en
+  // esta línea no haya ninguna letra más es la condición que no se negocia.
+  donations:          { authenticated: "SELECT" },
+  // El buzón: el público inserta y NO lee. Documentación lee y no borra;
+  // coordinación borra. `anon` sin SELECT es lo que impide pedir la bandeja.
+  feedback:           { anon: "INSERT", authenticated: "DELETE,INSERT,SELECT" },
+  needs:              { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
+  // El correo de avisos: el público inserta y NO lee. Esta línea es media
+  // garantía de esa promesa —la otra media es la política, y las dos se
+  // comprueban por separado más abajo—. `anon` sin `SELECT` es también lo que
+  // impide pedir el recuento por la API, que es una lectura como cualquier otra.
+  newsletter_signups: { anon: "INSERT", authenticated: "DELETE,INSERT,SELECT" },
+  offer_log:          { anon: "SELECT", authenticated: "SELECT" },
+  // El contador es un agregado de dos enteros: se lee y no hay nada que escribir.
+  offer_tally:        { anon: "SELECT", authenticated: "SELECT" },
+  offers:             { anon: "INSERT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
+  photos:             { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
 };
 
 // Se leen de `relacl` y no de `information_schema.role_table_grants` porque allí
@@ -395,8 +485,6 @@ await asUser("charlie@test.com");
 await sql(`
 update public.cities set published = true, summary = 'Daños en el barrio Niño Jesús.'
   where slug = 'quibdo';
-insert into public.foundations (city_id, name, whatsapp)
-  select id, 'Fundación Atrato', '3001234567' from public.cities where slug = 'quibdo';
 insert into public.cases (city_id, display_name, story, consent_to_publish, published)
   select id, 'Familia Mosquera', 'Perdieron el techo.', true, true
   from public.cities where slug = 'quibdo';
@@ -408,7 +496,7 @@ insert into public.photos (city_id, storage_path) select id, 'quibdo/1.jpg' from
 insert into public.photos (city_id, case_id, storage_path)
   select c.city_id, c.id, 'quibdo/casos/1.jpg' from public.cases c;
 `);
-check("El equipo puede escribir municipio, fundación, caso, necesidades y fotos", true);
+check("El equipo puede escribir municipio, caso, necesidades y fotos", true);
 
 const updatedAt = await one(
   "select (updated_at > created_at) as touched from public.cities where slug = 'quibdo'",
@@ -418,20 +506,146 @@ check("El trigger actualiza updated_at al editar", updatedAt.touched === true);
 // --- El público ve solo lo publicado --------------------------------------
 await asAnon();
 const pub = await one(`select
-  (select count(*) from public.cities)      as cities,
-  (select count(*) from public.cases)       as cases,
-  (select count(*) from public.needs)       as needs,
-  (select count(*) from public.photos)      as photos,
-  (select count(*) from public.foundations) as foundations`);
+  (select count(*) from public.cities) as cities,
+  (select count(*) from public.cases)  as cases,
+  (select count(*) from public.needs)  as needs,
+  (select count(*) from public.photos) as photos`);
 check(
   "El público ve el municipio publicado con su contenido",
   Number(pub.cities) === 1 &&
     Number(pub.cases) === 1 &&
     Number(pub.needs) === 2 &&
-    Number(pub.photos) === 2 &&
-    Number(pub.foundations) === 1,
+    Number(pub.photos) === 2,
   JSON.stringify(pub),
 );
+
+// Las fundaciones ya no son una entidad del portal: una fundación que trabaje en
+// el Chocó entra como un caso más. Se comprueba que la tabla no está, y no solo
+// que esté vacía: mientras existiera, seguiría siendo un `donation_url` de
+// lectura pública que ninguna pantalla enseña, que es la peor forma de tener un
+// destino de dinero. Ver 0015_canal_general.sql.
+await asPostgres();
+const foundationsGone = await one(`select count(*)::int as n from information_schema.tables
+  where table_schema = 'public' and table_name = 'foundations'`);
+check(
+  "La tabla de fundaciones ya no existe, ni con su enlace de donación dentro",
+  foundationsGone.n === 0,
+  `n=${foundationsGone.n}`,
+);
+await asAnon();
+
+// ===========================================================================
+// Qué cuenta como necesidad abierta de un municipio
+//
+// De aquí salió un fallo que estuvo publicado: la ficha de Quibdó decía «0
+// necesidades abiertas» mientras /municipios y el mapa decían diez del mismo
+// municipio, porque cada pantalla contaba un conjunto distinto sin decirlo. La
+// definición vive ahora en lib/needs.ts, y esto comprueba las dos cosas de la
+// base de datos de las que depende esa definición para ser cierta.
+//
+// Lo que este arnés NO puede demostrar es que las tres pantallas la usen: eso es
+// TypeScript y lo sostiene la regla `no-restricted-syntax` de eslint.config.mjs,
+// que prohíbe volver a escribir la comparación a mano fuera de lib/needs.ts.
+// Aquí se protege el suelo sobre el que se apoya.
+// ===========================================================================
+
+// Uno: el vocabulario es de tres palabras y está cerrado.
+//
+// «Abierta» significa `abierta` o `parcial` porque son las dos únicas que no son
+// `cubierta`. Si algún día entrara una cuarta —`cancelada`, `duplicada`— esa
+// equivalencia dejaría de ser cierta en silencio y el portal empezaría a
+// contarla como algo que falta. `OPEN_STATUSES` está escrito en positivo para
+// que no se cuele, y esto es lo que avisa de que hay una decisión que tomar.
+await asPostgres();
+const needStatusVocabulary = await one(`select pg_get_constraintdef(oid) as def
+  from pg_constraint where conname = 'needs_status_valid'`);
+check(
+  "Los estados de una necesidad son tres y están cerrados, que es lo que hace 'no cubierta' = 'abierta o parcial'",
+  ["abierta", "parcial", "cubierta"].every((state) =>
+    needStatusVocabulary.def.includes(`'${state}'`),
+  ) && (needStatusVocabulary.def.match(/'/g) ?? []).length === 6,
+  needStatusVocabulary.def,
+);
+
+// Dos: al público le llegan las necesidades de un caso, no solo las de la zona.
+//
+// El municipio del escenario es el que reproduce Quibdó: sin ninguna necesidad
+// de zona y con todo lo que falta dentro de casos. Contando solo la zona da
+// cero, y ese cero era el que salía en la cabecera. Se comprueban los dos
+// números juntos y se exige que sean distintos: si algún día coincidieran, este
+// escenario habría dejado de vigilar lo que vino a vigilar.
+await asUser("charlie@test.com");
+await sql(`
+insert into public.cities (name, slug, lat, lng, published)
+  values ('Conteo', 'conteo', 5.7, -76.6, true);
+insert into public.cases (city_id, display_name, consent_to_publish, published)
+  select id, 'Familia publicada', true, true from public.cities where slug = 'conteo';
+insert into public.cases (city_id, display_name, consent_to_publish, published)
+  select id, 'Familia sin consentimiento', false, false from public.cities where slug = 'conteo';
+insert into public.needs (city_id, case_id, category, title, status)
+  select c.city_id, c.id, 'techo', 'Tejas', 'abierta'
+  from public.cases c join public.cities t on t.id = c.city_id
+  where t.slug = 'conteo';
+insert into public.needs (city_id, case_id, category, title, status)
+  select c.city_id, c.id, 'agua', 'Bidones', 'parcial'
+  from public.cases c join public.cities t on t.id = c.city_id
+  where t.slug = 'conteo' and c.display_name = 'Familia publicada';
+insert into public.needs (city_id, case_id, category, title, status)
+  select c.city_id, c.id, 'ropa', 'Cobijas', 'cubierta'
+  from public.cases c join public.cities t on t.id = c.city_id
+  where t.slug = 'conteo' and c.display_name = 'Familia publicada';
+`);
+
+await asAnon();
+const counts = await one(`select
+  count(*) filter (where n.case_id is null)                        as zona,
+  count(*) filter (where n.status <> 'cubierta')                   as municipio_abiertas,
+  count(*) filter (where n.status in ('abierta', 'parcial'))       as en_positivo,
+  count(*)                                                        as listadas
+  from public.needs n join public.cities c on c.id = n.city_id
+  where c.slug = 'conteo'`);
+check(
+  "Un municipio sin necesidades de zona no tiene cero abiertas: las de sus casos publicados cuentan",
+  Number(counts.zona) === 0 && Number(counts.municipio_abiertas) === 2,
+  JSON.stringify(counts),
+);
+
+check(
+  "Contar en positivo —abierta o parcial— da lo mismo que contar lo no cubierto mientras el vocabulario sea de tres",
+  Number(counts.en_positivo) === Number(counts.municipio_abiertas),
+  JSON.stringify(counts),
+);
+
+// La pestaña cuenta filas y la cabecera cuenta abiertas, así que el escenario
+// tiene que separarlas: con una cubierta dentro, las dos cifras no pueden
+// coincidir por casualidad, que es justo lo que pasaba en Quibdó y lo que hizo
+// que el descuadre solo se viera en un sitio de los tres.
+check(
+  "Lo que se lista y lo que está abierto son dos números distintos, y la ficha tiene que poder decir los dos",
+  Number(counts.listadas) === 3 && Number(counts.municipio_abiertas) === 2,
+  JSON.stringify(counts),
+);
+
+// Y lo de la familia sin consentimiento no entra en ninguno de los dos: el
+// conteo del portal cuenta lo que las RLS le dejan ver, no lo que hay.
+check(
+  "La necesidad de un caso sin consentimiento no se cuenta porque el público no la ve",
+  Number(counts.listadas) === 3,
+  JSON.stringify(counts),
+);
+
+await asPostgres();
+const teamCounts = await one(`select count(*) as n from public.needs n
+  join public.cities c on c.id = n.city_id where c.slug = 'conteo'`);
+check(
+  "El equipo sí ve la del caso sin consentimiento, así que el panel puede contar más que el portal",
+  Number(teamCounts.n) === 4,
+  `n=${teamCounts.n}`,
+);
+
+// El escenario se retira: lo de abajo cuenta municipios y necesidades.
+await asUser("charlie@test.com");
+await sql("delete from public.cities where slug = 'conteo'");
 
 // --- Ofertas: entran pero no se leen -------------------------------------
 await asAnon();
@@ -537,8 +751,6 @@ on conflict do nothing;
 -- Contenido en el municipio ajeno, para intentar modificarlo desde fuera.
 insert into public.needs (city_id, category, title)
   select id, 'agua', 'Bidones de Istmina' from public.cities where slug = 'istmina';
-insert into public.foundations (city_id, name, donation_url)
-  select id, 'Fundación Istmina', 'https://legitima.org/donar' from public.cities where slug = 'istmina';
 `);
 
 await asUser("documenta@test.com");
@@ -651,156 +863,132 @@ await expectError(
   "coordinación",
 );
 
-const donationEdit = await db.exec(
-  "update public.foundations set donation_url = 'https://ladron.example/donar' where name = 'Fundación Istmina'",
-);
-check(
-  "Quien documenta no puede cambiar el enlace de donación de una fundación",
-  donationEdit[0].affectedRows === 0,
-  `filas=${donationEdit[0].affectedRows}`,
-);
-
-await expectError(
-  "Quien documenta no puede añadir fundaciones",
-  `insert into public.foundations (city_id, name, donation_url)
-     select id, 'Fundación falsa', 'https://ladron.example' from public.cities where slug = 'quibdo'`,
-  "row-level security",
-);
-
 // ===========================================================================
-// Una sola fundación por municipio
+// El canal general del portal
 //
-// `donation_url` es a dónde va el dinero de quien pulsa «Donar». Con varias
-// fundaciones por municipio, cuál manda lo decidía un orden —la marcada como
-// madre, y si no la primera—, así que dos marcadas o ninguna dejaban el botón
-// apuntando a un enlace que nadie eligió, y sin que se notara en pantalla.
+// Aquí estaba el bloque de las fundaciones, que eran el otro sitio donde vivía
+// un destino de dinero. Ya no existen (0015): una fundación entra ahora como un
+// caso más. Lo que ocupa su sitio es el canal general, que es el destino con más
+// alcance de todo el portal —lo usan todos los casos que no tienen el suyo— y
+// que por eso tiene que estar más cerrado que ninguno.
 //
-// Lo que hay que demostrar aquí es que la garantía está en la base de datos y no
-// en el panel, porque el panel no es la única puerta; y que la migración que la
-// impone se niega a aplicarse cuando encuentra dos, en vez de quedarse con una.
+// Cuatro cosas, y la segunda es la que más importa: que solo haya UNO. Esto ya
+// se intentó en 0010 y 0011 lo retiró; vuelve porque el modelo cambió, pero la
+// preocupación de 0011 sigue en pie y su mitad de esquema es esta.
 // ===========================================================================
 
-await asUser("charlie@test.com");
-await sql(
-  "update public.foundations set donation_url = 'https://atratovive.org/donar' where name = 'Fundación Atrato'",
-);
-
-const foundationColumns = await db.query(
-  "select column_name from information_schema.columns where table_schema = 'public' and table_name = 'foundations'",
-);
-const foundationColumnNames = foundationColumns.rows.map((row) => row.column_name);
+const singleGeneral = await one(`select
+  (select count(*)::int from public.donation_channel)                  as filas,
+  (select donation_key from public.donation_channel where singleton)   as llave`);
 check(
-  "La fundación ya no lleva marca de «es la madre»",
-  !foundationColumnNames.includes("is_primary"),
-  foundationColumnNames.join(", "),
+  "Hay un canal general y solo uno, con la llave del portal dentro",
+  singleGeneral.filas === 1 && singleGeneral.llave === "@soschoco",
+  JSON.stringify(singleGeneral),
 );
 
-await expectError(
-  "Un municipio no puede tener dos fundaciones",
-  `insert into public.foundations (city_id, name, donation_url)
-     select id, 'Fundación paralela', 'https://ladron.example/donar' from public.cities where slug = 'quibdo'`,
-  "foundations_one_per_city",
-);
-
-// La restricción no sirve de nada si el intento fallido deja el enlace movido: lo
-// que se protege es a dónde va el dinero, no el número de filas.
-const quibdoFoundation = await one(`select count(*)::int as n, min(donation_url) as url
-  from public.foundations where city_id = (select id from public.cities where slug = 'quibdo')`);
-check(
-  "El intento rechazado deja intactos la fundación de Quibdó y su enlace de donación",
-  quibdoFoundation.n === 1 && quibdoFoundation.url === "https://atratovive.org/donar",
-  JSON.stringify(quibdoFoundation),
-);
-
-// La regla es «no más de una», no «tiene que haber una». Un municipio se crea
-// antes de la visita y pasa días sin fundación registrada: si la restricción
-// obligara a tener una, no se podría abrir el municipio en el panel.
-const withoutFoundation = await one(`select count(*)::int as n from public.cities c
-  where not exists (select 1 from public.foundations f where f.city_id = c.id)`);
-check(
-  "Un municipio puede seguir sin fundación, que es como nace",
-  withoutFoundation.n === 8,
-  `n=${withoutFoundation.n}`,
-);
-
-// Y la restricción es por municipio y no global: cada pueblo tiene la suya.
-const oneEach = await one(`select count(*)::int as n, count(distinct city_id)::int as cities
-  from public.foundations`);
-check(
-  "Dos municipios distintos tienen cada uno la suya",
-  oneEach.n === 2 && oneEach.cities === 2,
-  JSON.stringify(oneEach),
-);
-
-const uniqueIndex = await one(
-  "select count(*)::int as n from pg_indexes where tablename = 'foundations' and indexname = 'foundations_city_idx'",
-);
-check(
-  "El índice por municipio de 0001 lo sustituye el único, no se acumulan los dos",
-  uniqueIndex.n === 0,
-  `n=${uniqueIndex.n}`,
-);
-
-// --- La migración se niega antes que elegir por nadie --------------------
-//
-// Se retira la restricción para poder construir el estado que la migración tiene
-// que encontrarse en la base de datos del viaje: dos fundaciones en un municipio,
-// cargadas a mano cuando todavía no había regla que lo impidiera. Cada una lleva
-// su propio enlace de donación, así que descartar una es decidir a dónde va el
-// dinero de ese municipio.
+// «Uno» no es una costumbre del panel: lo garantiza el tipo. Sin esto, «el canal
+// general» sería «el primero que devuelva la consulta», que es el destino del
+// dinero decidido por un orden —lo mismo que hubo que arreglar en 0004—.
 await asPostgres();
-await sql("alter table public.foundations drop constraint if exists foundations_one_per_city");
-await sql(`insert into public.foundations (city_id, name, donation_url)
-  select id, 'Fundación de la esquina', 'https://laotra.example/donar'
-  from public.cities where slug = 'quibdo'`);
-
-let guardMessage = "";
-try {
-  await sql(migration("migrations/0004_una_fundacion_por_municipio.sql"));
-} catch (error) {
-  guardMessage = String(error.message ?? error);
-}
-check(
-  "Con dos fundaciones en un municipio, la migración se niega a aplicarse",
-  guardMessage.includes("más de una fundación"),
-  guardMessage.slice(0, 90),
+await expectError(
+  "No cabe un segundo canal general: la fila es única por construcción",
+  "insert into public.donation_channel (singleton, donation_key) values (false, '@paralelo')",
+  "donation_channel_one_row",
 );
 
-// Un «hay duplicados» a secas obliga a escribir la consulta a mano para saber
-// dónde, y esto se lee con prisa.
-check(
-  "El aviso dice en qué municipio están las dos",
-  guardMessage.includes("Quibdó"),
-  guardMessage.slice(0, 90),
+await expectError(
+  "Ni repitiendo la única fila que cabe",
+  "insert into public.donation_channel (singleton, donation_key) values (true, '@paralelo')",
+  "duplicate key",
 );
 
-const survivors = await db.query(`select name, donation_url from public.foundations
-  where city_id = (select id from public.cities where slug = 'quibdo') order by name`);
-check(
-  "La migración que se niega no borra ninguna de las dos ni les cambia el enlace",
-  survivors.rows.length === 2 &&
-    survivors.rows[0].donation_url === "https://atratovive.org/donar" &&
-    survivors.rows[1].donation_url === "https://laotra.example/donar",
-  JSON.stringify(survivors.rows),
+// Y sigue siendo una llave, un enlace o un número: con dos puestos, cuál recibe
+// volvería a decidirlo el orden en que los mire la página.
+await expectError(
+  "El canal general tampoco puede ser una llave y un enlace a la vez",
+  `update public.donation_channel
+     set donation_key = '@soschoco', donation_url = 'https://ejemplo.org/donar'`,
+  "donation_channel_one_kind",
 );
 
-// Y con el municipio arreglado a mano —que es lo que pide el aviso— entra sin
-// quejarse y deja la restricción puesta.
-await sql("delete from public.foundations where name = 'Fundación de la esquina'");
-try {
-  await sql(migration("migrations/0004_una_fundacion_por_municipio.sql"));
-  check("Resuelto el municipio a mano, la migración entra sin quejarse", true);
-} catch (error) {
-  check("Resuelto el municipio a mano, la migración entra sin quejarse", false, String(error.message));
-}
-
-const constraintBack = await one(
-  "select count(*)::int as n from pg_constraint where conname = 'foundations_one_per_city'",
+// --- Quien documenta no lo toca ------------------------------------------
+//
+// Es la sesión que va a existir en los teléfonos del equipo. Sobre el canal
+// general basta la política —esta tabla no tiene ninguna otra escritura
+// legítima—, al contrario que en `public.cases`, donde hace falta además un
+// disparador porque el canal viaja dentro de la ficha entera.
+await asUser("documenta@test.com");
+const generalEdit = await db.exec(
+  "update public.donation_channel set donation_key = '@ladron'",
 );
 check(
-  "Después de entrar, la restricción queda puesta",
-  constraintBack.n === 1,
-  `n=${constraintBack.n}`,
+  "Quien documenta no cambia el canal general, que es el destino de más alcance del portal",
+  generalEdit[0].affectedRows === 0,
+  `filas=${generalEdit[0].affectedRows}`,
+);
+
+await expectError(
+  "Quien documenta tampoco puede crear otro canal general por su cuenta",
+  "insert into public.donation_channel (singleton, donation_key) values (false, '@ladron')",
+  "permission denied",
+);
+
+// --- El público lo lee y no lo toca --------------------------------------
+//
+// Leerlo es para lo que está: sin lectura pública, un caso sin canal propio se
+// quedaría sin nada que enseñar. Escribirlo no llega ni a las políticas, porque
+// `anon` no tiene el permiso de tabla.
+await asAnon();
+const publicGeneral = await one("select donation_key from public.donation_channel");
+check(
+  "El público lee el canal general entero, que es justo para lo que está",
+  publicGeneral.donation_key === "@soschoco",
+  JSON.stringify(publicGeneral),
+);
+
+await expectError(
+  "El público no puede cambiar el canal general",
+  "update public.donation_channel set donation_key = '@ladron'",
+  "permission denied",
+);
+
+await expectError(
+  "Ni borrarlo, que dejaría sin destino a todos los casos sin canal propio",
+  "delete from public.donation_channel",
+  "permission denied",
+);
+
+// Borrarlo tampoco es del equipo: no hay política de delete y tampoco permiso de
+// tabla, que son dos cierres que no dependen el uno del otro.
+await asUser("charlie@test.com");
+await expectError(
+  "Ni coordinación puede borrarlo: se cambia, no se vacía",
+  "delete from public.donation_channel",
+  "permission denied",
+);
+
+// --- Y coordinación sí, con su rastro ------------------------------------
+await sql("update public.donation_channel set donation_key = '@soschoco-nuevo'");
+const stamped = await one(
+  "select donation_key, updated_by from public.donation_channel",
+);
+check(
+  "Coordinación cambia el canal general y queda escrito desde qué sesión",
+  stamped.donation_key === "@soschoco-nuevo" && stamped.updated_by === "charlie@test.com",
+  JSON.stringify(stamped),
+);
+
+// El rastro sale del token y no de lo que mande quien llama: es la columna que se
+// lee el día que el dinero aparezca en otra cuenta, así que no puede ser un campo
+// más del formulario.
+await sql(
+  "update public.donation_channel set donation_key = '@soschoco', updated_by = 'otra@persona.com'",
+);
+const stampWins = await one("select updated_by from public.donation_channel");
+check(
+  "El rastro lo escribe la base de datos: mandarlo desde fuera no lo cambia",
+  stampWins.updated_by === "charlie@test.com",
+  JSON.stringify(stampWins),
 );
 
 await asUser("documenta@test.com");
@@ -1962,44 +2150,56 @@ check(
 );
 
 // ===========================================================================
-// El canal de donación: uno por municipio y uno por caso
+// El canal de donación de un caso, y el general cuando no tiene el suyo
 //
-// Aquí vivía la llave global del portal, que 0011 retira. `@soschoco` nunca fue
-// «la llave del Chocó»: es el canal del caso de Quibdó y de nadie más. Cada
-// municipio va a tener el suyo y cada caso el suyo, y el destino del dinero pasa
-// a ser una columna de la fila de quien lo recibe.
+// Aquí vivía la llave global que 0011 retiró, y después el reparto de 0011:
+// un canal por municipio y uno por caso. Hoy hay canales de caso y un canal
+// general, y ninguno de municipio (0015). El cambio de fondo es que un caso sin
+// canal propio YA NO se queda sin nada: usa el general.
 //
-// Eso cambia lo que hay que demostrar, y las cuatro cosas son distintas de las
-// de antes:
+// Eso invierte la regla que este bloque defendía —«sin canal propio, no hay
+// canal»— y por eso hay que decir con precisión qué se conserva de ella. Se
+// conserva entera la preocupación: que nadie mande dinero a un destino que no
+// es el que cree. Lo que cambia es cómo se cumple. Antes callando; ahora
+// diciéndolo. Y la mitad que se puede demostrar aquí es que el esquema NO
+// mezcla los dos: el canal general vive en su propia tabla y la columna del
+// caso sigue vacía cuando está vacía, así que ninguna consulta puede confundir
+// uno con otro. Que la ficha lo escriba con palabras es de `caseDonation()` y
+// de `GeneralChannelNote`, y eso no se ve desde aquí.
 //
-//   1. Que la llave global no exista ya en ninguna forma, ni vuelva pegando otra
-//      vez las migraciones en orden.
-//   2. Que un canal sea una llave O un enlace, nunca los dos. Con los dos
-//      puestos, «el canal» volvería a ser «el que la página mire primero», que es
-//      el destino del dinero decidido por un orden que 0004 tuvo que arreglar en
-//      las fundaciones. Y en terreno el fallo real es cambiar de destino con
-//      prisa y olvidar borrar el anterior.
-//   3. Que solo coordinación lo escriba, y esto es lo que no se parece a nada de
+// Cinco cosas:
+//
+//   1. Que la llave global de 0010 no exista ya en ninguna forma, ni vuelva
+//      pegando otra vez las migraciones en orden. El canal general de 0015 es
+//      otra tabla, con otro nombre, y esa distinción es lo que hace que
+//      reconstruir el histórico no deje dos.
+//   2. Que el municipio ya no tenga canal, ni columna donde volver a tenerlo.
+//   3. Que un canal sea una llave, un enlace o un número, nunca dos.
+//   4. Que solo coordinación lo escriba, y esto es lo que no se parece a nada de
 //      lo de arriba: quien documenta SÍ puede escribir en el caso entero de su
 //      municipio —es su trabajo—, así que la política de la tabla lo deja pasar y
 //      quien lo para es el disparador. Por eso se prueba con la sesión de
 //      documentación DE ESE MISMO MUNICIPIO, que es la única que llega hasta ahí,
 //      y se prueba también que sigue pudiendo guardar el resto de la ficha.
-//   4. Que no haya herencia. Un caso sin canal propio lee vacío aunque su
-//      municipio tenga uno: el dinero no puede acabar en un sitio que nadie
-//      eligió para esa persona.
+//   5. Que la columna del caso sin canal siga leyendo vacía, que es lo que
+//      permite a la página distinguir «el suyo» de «el general».
 // ===========================================================================
 
 await asPostgres();
 
 // --- La llave global no está, y no vuelve --------------------------------
+//
+// Sigue en pie después de 0015, y ahí está el detalle que evita una sorpresa al
+// reconstruir el histórico: el canal general nuevo NO resucita
+// `public.donation_key`. Son dos tablas con dos nombres, y solo la segunda
+// sobrevive a su migración siguiente.
 const globalKeyGone = await one(`select
   (select count(*)::int from information_schema.tables
      where table_schema = 'public' and table_name = 'donation_key')            as tabla,
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'private' and p.proname = 'stamp_donation_key')         as sello`);
 check(
-  "La llave global del portal ya no existe, ni la tabla ni su disparador",
+  "La llave global de 0010 ya no existe, ni la tabla ni su disparador",
   globalKeyGone.tabla === 0 && globalKeyGone.sello === 0,
   JSON.stringify(globalKeyGone),
 );
@@ -2007,27 +2207,53 @@ check(
 const channelColumns = await one(`select
   (select count(*)::int from information_schema.columns
      where table_schema = 'public' and table_name = 'cities'
-       and column_name in ('donation_key','donation_url','donation_app','donation_holder')) as municipio,
+       and column_name like 'donation%')                                       as municipio,
   (select count(*)::int from information_schema.columns
      where table_schema = 'public' and table_name = 'cases'
-       and column_name in ('donation_key','donation_url','donation_app','donation_holder')) as caso`);
+       and column_name in ('donation_key','donation_url','donation_phone',
+                           'donation_app','donation_holder'))                  as caso,
+  (select count(*)::int from information_schema.columns
+     where table_schema = 'public' and table_name = 'donation_channel'
+       and column_name in ('donation_key','donation_url','donation_phone',
+                           'donation_app','donation_holder'))                  as general`);
 check(
-  "Los dos niveles tienen las cuatro columnas del canal, así que los dos admiten llave y enlace",
-  channelColumns.municipio === 4 && channelColumns.caso === 4,
+  "El caso y el canal general tienen las cinco columnas del destino, y el municipio ninguna",
+  channelColumns.municipio === 0 &&
+    channelColumns.caso === 5 &&
+    channelColumns.general === 5,
   JSON.stringify(channelColumns),
+);
+
+// Que la columna no esté es lo que hace que no pueda volver a llenarse por la
+// Data API sin que ninguna pantalla lo enseñe, que es la peor forma de tener un
+// destino de dinero: uno que nadie mira.
+await expectError(
+  "Un municipio ya no puede recibir un canal ni por la puerta de atrás",
+  "update public.cities set donation_key = '@quibdo-alcaldia' where slug = 'quibdo'",
+  "donation_key",
+);
+
+const cityGuardGone = await one(`select count(*)::int as n from pg_trigger
+  where tgname = 'cities_guard_donation_channel'`);
+check(
+  "Sin columna que vigilar, el disparador del municipio se va con ella",
+  cityGuardGone.n === 0,
+  `n=${cityGuardGone.n}`,
+);
+
+// Y el del caso se queda, que es donde de verdad hace falta.
+const caseGuardStays = await one(`select count(*)::int as n from pg_trigger
+  where tgname = 'cases_guard_donation_channel'`);
+check(
+  "El disparador del caso sigue en pie: es la escritura que hay que vigilar",
+  caseGuardStays.n === 1,
+  `n=${caseGuardStays.n}`,
 );
 
 // --- Una llave o un enlace, nunca los dos --------------------------------
 //
 // Como propietario, así que el disparador no interviene: lo que se comprueba
 // aquí es la restricción de la tabla, que aguanta venga de donde venga.
-await expectError(
-  "Un municipio no puede tener a la vez una llave y un enlace",
-  `update public.cities set donation_key = '@quibdo', donation_url = 'https://ejemplo.org/donar'
-     where slug = 'quibdo'`,
-  "cities_donation_one_channel",
-);
-
 await expectError(
   "Un caso no puede tener a la vez una llave y un enlace",
   `update public.cases set donation_key = '@familia', donation_url = 'https://ejemplo.org/donar'
@@ -2041,42 +2267,24 @@ await asUser("charlie@test.com");
 // poder comprobar más abajo que lee su canal, y sin consentimiento no se puede
 // publicar (`cases_publish_requires_consent`).
 await sql(`
-update public.cities set donation_key = '@quibdo-alcaldia', donation_app = 'Bre-B',
-  donation_holder = 'Alcaldía de Quibdó' where slug = 'quibdo';
-update public.cases set donation_key = '@soschoco', consent_to_publish = true, published = true
+update public.cases set donation_key = '@familia-renteria', donation_app = 'Bre-B',
+  donation_holder = 'Rentería Mosquera', consent_to_publish = true, published = true
   where display_name = 'Familia Rentería';
 `);
 
 await asPostgres();
 const written = await one(`select
-  (select donation_key    from public.cities where slug = 'quibdo')                      as ciudad_llave,
-  (select donation_holder from public.cities where slug = 'quibdo')                      as ciudad_titular,
-  (select donation_key    from public.cases  where display_name = 'Familia Rentería')    as caso_llave,
-  (select donation_url    from public.cases  where display_name = 'Familia Mosquera')    as caso_enlace`);
+  (select donation_key    from public.cases where display_name = 'Familia Rentería') as caso_llave,
+  (select donation_holder from public.cases where display_name = 'Familia Rentería') as caso_titular,
+  (select donation_url    from public.cases where display_name = 'Familia Mosquera') as caso_enlace,
+  (select donation_key    from public.donation_channel)                              as general`);
 check(
-  "Coordinación pone el canal del municipio y el del caso, en llave y en enlace",
-  written.ciudad_llave === "@quibdo-alcaldia" &&
-    written.ciudad_titular === "Alcaldía de Quibdó" &&
-    written.caso_llave === "@soschoco" &&
-    written.caso_enlace === "https://vaki.co/vaki/mosquera",
+  "Coordinación pone el canal de un caso en llave y el de otro en enlace, y el general sigue aparte",
+  written.caso_llave === "@familia-renteria" &&
+    written.caso_titular === "Rentería Mosquera" &&
+    written.caso_enlace === "https://vaki.co/vaki/mosquera" &&
+    written.general === "@soschoco",
   JSON.stringify(written),
-);
-
-// --- Un municipio sin fundación también puede tener canal ----------------
-//
-// Es el motivo de que el canal del municipio no viva en `foundations`: Quibdó no
-// tiene fundación y es el único municipio real publicado. Si el canal colgara de
-// la fundación, el único pueblo con una persona documentada esperando sería
-// justo el que no puede tener a dónde recibir.
-await sql(`update public.cities set donation_key = '@sin-fundacion' where slug = 'condoto'`);
-const cityWithoutFoundation = await one(`select
-  (select donation_key from public.cities where slug = 'condoto')     as llave,
-  (select count(*)::int from public.foundations f
-     join public.cities c on c.id = f.city_id where c.slug = 'condoto') as fundaciones`);
-check(
-  "Un municipio sin fundación tiene canal propio, que es por lo que el canal no vive en la fundación",
-  cityWithoutFoundation.llave === "@sin-fundacion" && cityWithoutFoundation.fundaciones === 0,
-  JSON.stringify(cityWithoutFoundation),
 );
 
 // --- Quien documenta ese mismo municipio, no ------------------------------
@@ -2110,12 +2318,6 @@ await expectError(
 );
 
 await expectError(
-  "Tampoco el canal de su propio municipio",
-  "update public.cities set donation_key = '@desviada' where slug = 'quibdo'",
-  "canal de donación",
-);
-
-await expectError(
   "Ni puede crear un caso que ya venga con canal dentro",
   `insert into public.cases (city_id, display_name, donation_key)
      select id, 'Familia con llave', '@colada' from public.cities where slug = 'quibdo'`,
@@ -2134,25 +2336,24 @@ const stillWorking = await one(`select story, donation_key
 check(
   "Quien documenta sigue guardando el resto del caso, con el canal puesto y sin tocarlo",
   stillWorking.story === "Se apuntaló el muro esta semana." &&
-    stillWorking.donation_key === "@soschoco",
+    stillWorking.donation_key === "@familia-renteria",
   JSON.stringify(stillWorking),
 );
 
-// Lo mismo en el municipio, que es lo primero que se edita al llegar a un pueblo.
-// El disparador es el mismo, pero la fila no: aquí conviven el canal con el
-// resumen que quien documenta escribe desde el móvil.
+// Y el municipio, que es lo primero que se edita al llegar a un pueblo. Aquí ya
+// no hay canal que esquivar —0015 se llevó las columnas—, así que lo que se
+// comprueba es que quitarlas no le haya quitado a nadie el trabajo de siempre.
 await asUser("documenta@test.com");
 await sql(`update public.cities set summary = 'Se documentó el barrio de la ribera.'
   where slug = 'quibdo'`);
 
 await asPostgres();
-const cityStillWorking = await one(`select summary, donation_key, donation_holder
-  from public.cities where slug = 'quibdo'`);
+const cityStillWorking = await one(
+  "select summary from public.cities where slug = 'quibdo'",
+);
 check(
-  "Quien documenta sigue guardando el resumen del municipio con su canal puesto",
-  cityStillWorking.summary === "Se documentó el barrio de la ribera." &&
-    cityStillWorking.donation_key === "@quibdo-alcaldia" &&
-    cityStillWorking.donation_holder === "Alcaldía de Quibdó",
+  "Quien documenta sigue guardando el resumen del municipio",
+  cityStillWorking.summary === "Se documentó el barrio de la ribera.",
   JSON.stringify(cityStillWorking),
 );
 
@@ -2174,99 +2375,263 @@ check(
 // --- El público lo lee y no lo toca --------------------------------------
 await asAnon();
 const publicChannels = await one(`select
-  (select donation_key    from public.cities where slug = 'quibdo')                   as ciudad,
-  (select donation_app    from public.cities where slug = 'quibdo')                   as app,
-  (select donation_holder from public.cities where slug = 'quibdo')                   as titular,
-  (select donation_key    from public.cases  where display_name = 'Familia Rentería') as caso`);
+  (select donation_key    from public.cases where display_name = 'Familia Rentería') as caso,
+  (select donation_app    from public.cases where display_name = 'Familia Rentería') as app,
+  (select donation_holder from public.cases where display_name = 'Familia Rentería') as titular,
+  (select donation_key    from public.donation_channel)                              as general`);
 check(
-  "El público lee los canales enteros, con su app y su titular: es justo para lo que están",
-  publicChannels.ciudad === "@quibdo-alcaldia" &&
+  "El público lee el canal del caso y el general enteros, con su app y su titular",
+  publicChannels.caso === "@familia-renteria" &&
     publicChannels.app === "Bre-B" &&
-    publicChannels.titular === "Alcaldía de Quibdó" &&
-    publicChannels.caso === "@soschoco",
+    publicChannels.titular === "Rentería Mosquera" &&
+    publicChannels.general === "@soschoco",
   JSON.stringify(publicChannels),
 );
 
-// Ni llega a las políticas: `anon` solo tiene `select` en las dos tablas (0008).
-await expectError(
-  "El público no puede cambiar el canal de un municipio",
-  "update public.cities set donation_key = '@ladron' where slug = 'quibdo'",
-  "permission denied",
-);
-
+// Ni llega a las políticas: `anon` solo tiene `select` sobre los casos (0008).
 await expectError(
   "El público no puede cambiar el canal de un caso",
   "update public.cases set donation_key = '@ladron'",
   "permission denied",
 );
 
-// --- Sin canal propio, no hay canal --------------------------------------
+// --- Sin canal propio, el general, y la columna sigue vacía --------------
 //
-// De la regla entera, aquí se puede demostrar la mitad: que la fila de un caso
-// sin canal lee vacía aunque su municipio tenga uno. La otra mitad —que la ficha
-// no rellene ese hueco con el del municipio y lo diga con palabras— vive en la
-// página y no en el esquema, y es donde estaba el fallo que 0011 viene a
-// arreglar.
+// La regla que había aquí era «sin canal propio, no hay canal», y 0015 la
+// invierte a propósito. De la nueva, lo que se puede demostrar en el esquema es
+// que los dos destinos NO se mezclan: la columna del caso lee vacía y el general
+// vive en otra tabla, de modo que la página puede distinguir siempre cuál está
+// enseñando. Que lo diga con palabras —«este caso usa el canal general del
+// portal»— es de `caseDonation()` y de `GeneralChannelNote`, y ahí es donde
+// sigue viva la preocupación de 0011: lo que no se puede es dejar creer que el
+// general es el suyo.
 await asUser("documenta@test.com");
 await sql(`insert into public.cases (city_id, display_name, story, consent_to_publish, published)
-  select id, 'Familia sin canal', 'Todavía no hay a dónde enviarle nada.', true, true
+  select id, 'Familia sin canal', 'Recibe por el canal general.', true, true
   from public.cities where slug = 'quibdo'`);
 
 await asAnon();
 const noInheritance = await one(`select
-  (select donation_key || donation_url || donation_app || donation_holder
-     from public.cases where display_name = 'Familia sin canal')  as caso,
-  (select donation_key from public.cities where slug = 'quibdo')  as ciudad`);
+  (select donation_key || donation_url || donation_phone || donation_app || donation_holder
+     from public.cases where display_name = 'Familia sin canal') as caso,
+  (select donation_key from public.donation_channel)             as general`);
 check(
-  "Un caso sin canal propio lee vacío aunque su municipio tenga uno: no hay herencia",
-  noInheritance.caso === "" && noInheritance.ciudad === "@quibdo-alcaldia",
+  "Un caso sin canal propio lee vacío: el general está en otra tabla y no se cuela en la suya",
+  noInheritance.caso === "" && noInheritance.general === "@soschoco",
   JSON.stringify(noInheritance),
 );
 
-// El enlace de la fundación es otra cosa y sigue siendo suyo: sale dentro de su
-// tarjeta y bajo su nombre. Que las dos convivan sin mezclarse es lo que permite
-// que el canal del municipio no tuviera que sustituir a nada.
+// --- «Comprobado» no es «editado», y no se hereda ------------------------
 //
-// Se mira como propietario y no como público porque Istmina está sin publicar:
-// aquí la pregunta es cómo está guardado el dato, no quién lo ve.
-await asPostgres();
+// `donation_verified_on` (0016) es lo que sustituye a la insignia de «donación
+// protegida» que aquí sería mentira: el dinero no pasa por el portal, así que no
+// hay nada que el portal proteja. Lo que sí se puede afirmar es que alguien de
+// coordinación llamó a ese número o mandó mil pesos a esa llave, tal día.
+//
+// De eso, dos cosas se pueden demostrar en el esquema y las dos son la razón de
+// que la columna exista: que la fecha esté en el mismo círculo pequeño que el
+// destino, y que NO SOBREVIVA a un cambio de destino. Lo segundo es el fallo
+// silencioso: la ficha diciendo «Comprobado el 3 de agosto» debajo de una llave
+// que se cambió el 12 de septiembre. Que envejezca a la vista pasados 60 días es
+// de lib/donation-channel.ts, que es donde se lee.
+await asUser("charlie@test.com");
+await sql(`update public.cases
+  set donation_verified_on = current_date - 5
+  where display_name = 'Familia Rentería'`);
 
-// `f.donation_url` va con su tabla delante y no a secas: desde 0011 la columna
-// existe también en `cities`, así que un `donation_url` suelto dentro del join
-// es ambiguo. Escribirlo entero es lo que impide que esta comprobación acabe
-// mirando el canal del municipio y dando por buena la separación que quiere
-// demostrar.
-const foundationApart = await one(`select
-  (select f.donation_url from public.foundations f
-     join public.cities c on c.id = f.city_id where c.slug = 'istmina' limit 1) as fundacion,
-  (select donation_key from public.cities where slug = 'istmina')               as municipio`);
+await asAnon();
+const verifiedRead = await one(`select donation_verified_on is not null as puesta
+  from public.cases where display_name = 'Familia Rentería'`);
 check(
-  "El enlace de una fundación y el canal de su municipio son dos datos distintos",
-  foundationApart.fundacion === "https://legitima.org/donar" && foundationApart.municipio === "",
-  JSON.stringify(foundationApart),
+  "Coordinación anota cuándo comprobó el canal de un caso, y el público lo lee",
+  verifiedRead.puesta === true,
+  JSON.stringify(verifiedRead),
+);
+
+// Sexta columna del guardián de 0011. Sin ella, quien documenta podría escribir
+// «Comprobado hoy» sobre un canal que no ha comprobado, y esa frase es justo la
+// que el portal pone para que alguien se fíe.
+await asUser("documenta@test.com");
+await expectError(
+  "Quien documenta ese municipio no puede afirmar que el canal está comprobado",
+  `update public.cases set donation_verified_on = current_date
+     where display_name = 'Familia Rentería'`,
+  "canal de donación",
+);
+
+// Y lo que sigue pudiendo hacer, que es la mitad de por qué el guardián mira el
+// cambio y no el valor: guardar la ficha entera con la fecha ya puesta dentro.
+await sql(`update public.cases set story = 'Llegaron las tejas el jueves.'
+  where display_name = 'Familia Rentería'`);
+
+await asPostgres();
+const storyWithVerification = await one(`select story, donation_verified_on is not null as puesta
+  from public.cases where display_name = 'Familia Rentería'`);
+check(
+  "Quien documenta guarda la ficha con la comprobación ya puesta, sin tropezar con ella",
+  storyWithVerification.story === "Llegaron las tejas el jueves." &&
+    storyWithVerification.puesta === true,
+  JSON.stringify(storyWithVerification),
+);
+
+// El corazón de 0016: mover el destino borra la comprobación sola. Se prueba
+// sobre el caso del enlace para no tocar la llave que las comprobaciones de más
+// abajo esperan encontrar intacta.
+await asUser("charlie@test.com");
+await sql(`update public.cases set donation_verified_on = current_date - 2
+  where display_name = 'Familia Mosquera'`);
+await sql(`update public.cases set donation_url = 'https://vaki.co/vaki/mosquera-2'
+  where display_name = 'Familia Mosquera'`);
+
+await asPostgres();
+const stale = await one(`select donation_url, donation_verified_on
+  from public.cases where display_name = 'Familia Mosquera'`);
+check(
+  "Cambiar el destino borra la comprobación: no se hereda de la cuenta anterior",
+  stale.donation_url === "https://vaki.co/vaki/mosquera-2" &&
+    stale.donation_verified_on === null,
+  JSON.stringify(stale),
+);
+
+// Y el caso normal, que no es una excepción: coordinación cambia la llave y en la
+// misma pantalla anota que acaba de comprobar la nueva. Se distingue igual que en
+// el guardián, comparando con la fila vieja.
+await asUser("charlie@test.com");
+await sql(`update public.cases
+  set donation_url = 'https://vaki.co/vaki/mosquera-3', donation_verified_on = current_date
+  where display_name = 'Familia Mosquera'`);
+
+await asPostgres();
+const reverified = await one(`select donation_url, donation_verified_on = current_date as hoy
+  from public.cases where display_name = 'Familia Mosquera'`);
+check(
+  "Cambiar el destino y comprobarlo en la misma escritura sí deja la fecha nueva",
+  reverified.donation_url === "https://vaki.co/vaki/mosquera-3" && reverified.hoy === true,
+  JSON.stringify(reverified),
+);
+
+// Una comprobación fechada en el futuro es la frase de fiarse, estirada para que
+// aguante dos meses más de los que le tocan.
+await asUser("charlie@test.com");
+await expectError(
+  "Una comprobación del canal no puede estar fechada en el futuro",
+  `update public.cases set donation_verified_on = current_date + 30
+     where display_name = 'Familia Rentería'`,
+  "fecha futura",
+);
+
+// Lo mismo en el canal general, y hay que comprobarlo aparte: son dos tablas con
+// dos disparadores, así que una puede quedarse sin la regla sin que la otra lo
+// note. Es el destino con más alcance del portal, o sea donde una comprobación
+// heredada de una cuenta vieja alcanza a más gente a la vez.
+await sql("update public.donation_channel set donation_verified_on = current_date - 10");
+await sql("update public.donation_channel set donation_key = '@soschoco-2'");
+
+await asPostgres();
+const staleGeneral = await one(
+  "select donation_key, donation_verified_on from public.donation_channel",
+);
+check(
+  "En el canal general, cambiar la llave borra también su comprobación",
+  staleGeneral.donation_key === "@soschoco-2" && staleGeneral.donation_verified_on === null,
+  JSON.stringify(staleGeneral),
+);
+
+// Se devuelve la llave general a su valor, que es el que espera la comprobación
+// de la reconciliación de más abajo.
+await sql("update public.donation_channel set donation_key = '@soschoco'");
+
+// --- Qué es la causa, y la frase que viaja por WhatsApp ------------------
+//
+// Las dos columnas de 0016 que SÍ escribe quien documenta, al contrario que la
+// comprobación del canal: son lo que se ve en terreno. Y las dos tienen una
+// restricción en la base de datos porque las dos se pueden saltar desde un móvil
+// —un `maxlength` no viaja en una llamada a la API— y lo que hay al otro lado no
+// es un texto feo, es una vista previa de WhatsApp con media frase.
+await asUser("documenta@test.com");
+await sql(`update public.cases
+  set case_kind = 'colegio', summary = 'La escuela del barrio Niño Jesús perdió el techo de dos salones.'
+  where display_name = 'Familia Mosquera'`);
+
+await asPostgres();
+const kindWritten = await one(`select case_kind, summary
+  from public.cases where display_name = 'Familia Mosquera'`);
+check(
+  "Quien documenta registra qué es la causa y su resumen, que es su trabajo",
+  kindWritten.case_kind === "colegio" && kindWritten.summary.startsWith("La escuela"),
+  JSON.stringify(kindWritten),
+);
+
+// Por omisión, persona: las causas que ya estaban escritas lo son todas, y un
+// campo obligatorio nuevo habría dejado sin poder guardarse la ficha de la mujer
+// de Quibdó hasta que alguien contestara una pregunta cuya respuesta ya se sabe.
+const kindDefault = await one(`select case_kind
+  from public.cases where display_name = 'Familia Rentería'`);
+check(
+  "Una causa que nadie ha clasificado es una persona, que es lo que son todas hoy",
+  kindDefault.case_kind === "persona",
+  kindDefault.case_kind,
+);
+
+await expectError(
+  "Un tipo de causa que no está en la lista no entra",
+  `update public.cases set case_kind = 'empresa' where display_name = 'Familia Rentería'`,
+  "cases_kind_valid",
+);
+
+await expectError(
+  "Un resumen más largo de lo que cabe en una vista previa no entra",
+  `update public.cases set summary = repeat('x', 121) where display_name = 'Familia Rentería'`,
+  "cases_summary_len",
 );
 
 // --- Volver a pegar las migraciones no devuelve la llave global ----------
 //
 // Todas las migraciones de este proyecto se vuelven a pegar cuando hay que
 // reconstruir algo, y 0010 sigue en la carpeta con `@soschoco` escrita dentro.
-// Pegadas en orden, 0011 la retira otra vez y los canales se quedan donde
-// estaban. Pegar 0010 suelta sí devolvería la llave global: está dicho en su
-// propio archivo.
+// Pegadas en orden, 0011 la retira otra vez, 0015 crea el canal general en su
+// propia tabla y los canales de caso se quedan donde estaban. El estado final es
+// UN canal general y ninguna llave global, que es la sorpresa que había que
+// evitar: pegar el histórico entero no puede dejar dos destinos con el mismo
+// valor y distinto nombre.
 await asPostgres();
 await sql(migration("migrations/0010_llave_de_transferencia.sql"));
 await sql(migration("migrations/0011_canal_de_donacion.sql"));
+await sql(migration("migrations/0015_canal_general.sql"));
 const afterRerun = await one(`select
   (select count(*)::int from information_schema.tables
-     where table_schema = 'public' and table_name = 'donation_key')            as llave_global,
-  (select donation_key from public.cities where slug = 'quibdo')               as ciudad,
-  (select donation_key from public.cases where display_name = 'Familia Rentería') as caso`);
+     where table_schema = 'public' and table_name = 'donation_key')                  as llave_global,
+  (select count(*)::int from public.donation_channel)                                as generales,
+  (select donation_key from public.donation_channel)                                 as general,
+  (select donation_key from public.cases where display_name = 'Familia Rentería')    as caso`);
 check(
-  "Volver a pegar 0010 y 0011 en orden deja fuera la llave global y los canales donde estaban",
+  "Pegar 0010, 0011 y 0015 en orden deja un canal general, ninguna llave global y los casos intactos",
   afterRerun.llave_global === 0 &&
-    afterRerun.ciudad === "@quibdo-alcaldia" &&
-    afterRerun.caso === "@soschoco",
+    afterRerun.generales === 1 &&
+    afterRerun.general === "@soschoco" &&
+    afterRerun.caso === "@familia-renteria",
   JSON.stringify(afterRerun),
+);
+
+// Y la reconciliación del caso real: 0015 vacía el canal propio de los casos cuya
+// llave ERA la general, porque repetirla en la ficha diría que es suya. El
+// destino no se mueve —la misma llave, la misma cuenta—; lo que cambia es lo que
+// la ficha afirma. Se comprueba con un caso puesto a mano en ese estado, que es
+// exactamente el de Quibdó en la base real.
+await sql(`update public.cases set donation_key = '@soschoco', donation_app = 'Bre-B',
+  donation_holder = 'Alguien' where display_name = 'Familia sin canal'`);
+await sql(migration("migrations/0015_canal_general.sql"));
+const reconciled = await one(`select
+  (select donation_key || donation_app || donation_holder
+     from public.cases where display_name = 'Familia sin canal')                  as caso,
+  (select donation_key from public.cases where display_name = 'Familia Rentería') as otro,
+  (select donation_key from public.donation_channel)                              as general`);
+check(
+  "Un caso cuyo canal propio era la llave general se queda sin canal propio, y ningún otro se toca",
+  reconciled.caso === "" &&
+    reconciled.otro === "@familia-renteria" &&
+    reconciled.general === "@soschoco",
+  JSON.stringify(reconciled),
 );
 
 // ===========================================================================
@@ -2919,6 +3284,428 @@ check(
 await asPostgres();
 await sql("delete from public.offers where offerer_contact like '300111%'");
 
+// ===========================================================================
+// El contador de aportes
+//
+// `public.offer_tally` (0015) es el número que sale en «Quiero ayudar». Es un
+// agregado y no expone a nadie —dos enteros, sin fecha, sin municipio y sin
+// categoría—, así que lo que hay que demostrar no es privacidad: es que cuente
+// lo que dice que cuenta. De aquí ya salió un fallo publicado con las
+// necesidades abiertas (ver lib/needs.ts), y un contador de aportes con el mismo
+// defecto le diría a quien llega que hay más ayuda de la que hay.
+//
+// Se mide por diferencia y no en absoluto: así estas comprobaciones no dependen
+// de cuántas ofertas hayan dejado por el camino las secciones de arriba, que es
+// justo la clase de acoplamiento que hace que un arnés se vuelva frágil.
+// ===========================================================================
+
+await asAnon();
+const tallyBefore = await one("select ofrecidos, entregados from public.offer_tally");
+
+await asPostgres();
+await sql(`
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category, status)
+  select id, 'Cuenta pendiente', '3009990001', 'Dos mercados', 'alimentos', 'pendiente'
+  from public.cities where slug = 'quibdo';
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category, status, delivered_on)
+  select id, 'Cuenta entregada', '3009990002', 'Tejas', 'techo', 'aceptada', current_date
+  from public.cities where slug = 'quibdo';
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category, status)
+  select id, 'Cuenta rechazada', '3009990003', 'Ropa usada mojada', 'ropa', 'rechazada'
+  from public.cities where slug = 'quibdo';
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category, status)
+  select id, 'Cuenta retirada', '3009990004', 'Duplicado', 'otro', 'retirada'
+  from public.cities where slug = 'quibdo';
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category, status)
+  select id, 'Cuenta sin publicar', '3009990005', 'Bidones', 'agua', 'pendiente'
+  from public.cities where slug = 'istmina';
+`);
+
+await asAnon();
+const tallyAfter = await one("select ofrecidos, entregados from public.offer_tally");
+
+// Cinco ofertas nuevas y el contador sube dos: la pendiente y la entregada. Lo
+// rechazado y lo retirado no cuentan —un contador que sume el spam y lo que el
+// equipo descartó afirma una participación que no existe— y lo de un municipio
+// sin publicar tampoco, por la cascada.
+check(
+  "El contador suma lo que sigue en pie y no lo rechazado, lo retirado ni lo de un municipio sin publicar",
+  tallyAfter.ofrecidos - tallyBefore.ofrecidos === 2,
+  JSON.stringify({ tallyBefore, tallyAfter }),
+);
+
+check(
+  "Y cuenta como entregado solo lo que ya llegó, que es un subconjunto de lo ofrecido",
+  tallyAfter.entregados - tallyBefore.entregados === 1 &&
+    tallyAfter.entregados <= tallyAfter.ofrecidos,
+  JSON.stringify(tallyAfter),
+);
+
+// La comprobación que sostiene la condición repetida: `entregados` y el largo de
+// /ayudas tienen que ser el mismo número. La vista no puede contar `aid_log`
+// directamente —0005 empieza con un `drop view` y una dependencia lo rompería al
+// volver a pegar las migraciones—, así que la regla está escrita dos veces y esto
+// es lo que impide que se separen.
+const tallyVsLog = await one(`select
+  (select entregados from public.offer_tally) as contador,
+  (select count(*)::int from public.aid_log)  as registro`);
+check(
+  "El contador de entregados dice exactamente lo mismo que el largo del registro de ayudas",
+  tallyVsLog.contador === tallyVsLog.registro,
+  JSON.stringify(tallyVsLog),
+);
+
+// El público lee el agregado y no la tabla del fondo, igual que con los dos
+// registros: el contador no es una puerta nueva a las ofertas.
+await expectError(
+  "El contador no le abre al público la tabla de ofertas",
+  "select offerer_contact from public.offers",
+  "permission denied",
+);
+
+// ===========================================================================
+// El correo de avisos
+//
+// Es dato personal en un portal que ya maneja información sensible, y la promesa
+// es corta: el público lo deja y no lo lee nadie salvo coordinación. Ni la lista,
+// ni el recuento, ni por la API.
+//
+// Se comprueban las dos barreras por separado, que es lo que 0008 dejó escrito
+// para el contacto de quien ofrece: el permiso de tabla y la política. Con una
+// sola, el día que alguien añada una política de lectura para depurar algo, la
+// lista de correos sale por la API sin que falle nada más que avise.
+// ===========================================================================
+
+await asAnon();
+await sql("insert into public.newsletter_signups (email) values ('vecina@quibdo.co')");
+check("Cualquiera puede dejar su correo para los avisos", true);
+
+await expectError(
+  "El público no puede leer la lista de correos: no tiene permiso de tabla",
+  "select email from public.newsletter_signups",
+  "permission denied",
+);
+
+// El recuento es una lectura como cualquier otra, y en la API se pide igual de
+// fácil que la lista (`Prefer: count=exact`). Sin `select` no hay número, y eso
+// importa: «cuántas personas se han apuntado» ya es un dato del portal que no le
+// corresponde a nadie de fuera.
+await expectError(
+  "Ni el recuento, que por la API se pide igual de fácil que la lista",
+  "select count(*) from public.newsletter_signups",
+  "permission denied",
+);
+
+// Apuntarse dos veces tiene que responder lo mismo que apuntarse una. Con el
+// índice único a secas, el error de duplicado convertiría el formulario en una
+// forma de preguntar si un correo está en la lista.
+await sql("insert into public.newsletter_signups (email) values ('vecina@quibdo.co')");
+check("Repetir el correo no da error, así que el formulario no dice quién está dentro", true);
+
+// Y en mayúsculas es la misma persona: dos filas serían dos avisos.
+await sql("insert into public.newsletter_signups (email) values ('Vecina@Quibdo.co')");
+
+await asPostgres();
+const signups = await one("select count(*)::int as n from public.newsletter_signups");
+check(
+  "De los tres intentos con el mismo correo queda una sola fila",
+  signups.n === 1,
+  `n=${signups.n}`,
+);
+
+// La forma se comprueba en la base de datos y no solo en el formulario: la Data
+// API acepta un insert de cualquiera, así que un campo vacío o un teclazo
+// entrarían igual.
+await asAnon();
+await expectError(
+  "Un correo sin forma de correo no entra, venga de donde venga",
+  "insert into public.newsletter_signups (email) values ('no-es-un-correo')",
+  "newsletter_email_shape",
+);
+
+// Quien documenta tampoco la lee: no es una lista de nadie en particular, así
+// que no hay municipio asignado que la haga suya.
+await asUser("documenta@test.com");
+const documentaSignups = await one("select count(*)::int as n from public.newsletter_signups");
+check(
+  "Quien documenta no ve ningún correo: la política es de coordinación, no de todo el equipo",
+  documentaSignups.n === 0,
+  `n=${documentaSignups.n}`,
+);
+
+await asUser("charlie@test.com");
+const coordinationSignups = await one(
+  "select count(*)::int as n, min(email) as correo from public.newsletter_signups",
+);
+check(
+  "Coordinación sí la lee, que es la única excepción",
+  coordinationSignups.n === 1 && coordinationSignups.correo === "vecina@quibdo.co",
+  JSON.stringify(coordinationSignups),
+);
+
+// ===========================================================================
+// Las donaciones en pesos: un importe no entra desde el navegador
+//
+// La pasarela no existe todavía y esta tabla está vacía, así que aquí no se
+// comprueba ningún flujo de pago. Se comprueba la única cosa de 0017 que hay que
+// dejar cerrada ANTES de que exista: quién puede escribir un importe.
+//
+// Son tres barreras que no dependen la una de la otra, y cada una se prueba sin
+// las otras dos. Es el mismo trato que 0008 le da al contacto de quien ofrece, y
+// por la misma razón: la que se cae es la que nadie estaba mirando.
+//
+//   1. El permiso de tabla. Ni `anon` ni `authenticated` tienen `insert`.
+//   2. La política. No hay ninguna de escritura, así que con RLS puesta la
+//      operación está negada aunque alguien conceda el permiso.
+//   3. El disparador, que mira el rol de la CONEXIÓN. Es el que queda cuando
+//      alguien desarma las dos primeras, y es el que se prueba abajo con las dos
+//      primeras desarmadas a mano.
+//
+// Que coordinación tampoco pueda escribir un importe no es desconfianza: un
+// importe no es un dato que alguien decida, es un hecho que el banco confirma.
+// Teclearlo a mano produciría una barra de recaudado que no cuadra con ningún
+// extracto y que nadie podría auditar después.
+// ===========================================================================
+
+await asAnon();
+await expectError(
+  "El público no puede registrar una donación: no tiene permiso de tabla",
+  `insert into public.donations (case_id, amount_cop, provider, payment_ref)
+     select id, 50000, 'pasarela', 'pago-del-publico' from public.cases limit 1`,
+  "permission denied",
+);
+
+await expectError(
+  "Ni leer lo que ha entrado, que sería el historial de quién dona a quién",
+  "select count(*) from public.donations",
+  "permission denied",
+);
+
+// La sesión que importa, y la que sí existe hoy en los teléfonos del equipo.
+// Coordinación puede escribir en todas las tablas del portal menos en esta.
+await asUser("charlie@test.com");
+await expectError(
+  "Coordinación tampoco escribe un importe, y es la comprobación que da sentido a la tabla",
+  `insert into public.donations (case_id, amount_cop, provider, payment_ref)
+     select id, 50000, 'pasarela', 'pago-a-mano' from public.cases limit 1`,
+  "permission denied",
+);
+
+// El webhook sí, que es el único. Entra como `service_role`, con una clave que
+// solo existe en el servidor y que nunca baja al HTML.
+await asService();
+await sql(`insert into public.donations
+  (case_id, amount_cop, status, provider, payment_ref, donor_name, publish_name, settled_at)
+  select id, 120000, 'confirmada', 'pasarela', 'pago-001', 'Marta Palacios', true, now()
+  from public.cases where display_name = 'Familia Rentería'`);
+
+await asPostgres();
+const donationWritten = await one(`select amount_cop, status, payment_ref, case_id is not null as con_causa
+  from public.donations where payment_ref = 'pago-001'`);
+check(
+  "El webhook registra el importe, su estado, la referencia del pago y su causa",
+  Number(donationWritten.amount_cop) === 120000 &&
+    donationWritten.status === "confirmada" &&
+    donationWritten.con_causa === true,
+  JSON.stringify(donationWritten),
+);
+
+// Un aviso repetido del proveedor no suma dos veces. Es la primera caída de red
+// del webhook convertida en una cifra que no cuadra con el extracto, y con el
+// índice único es un error en vez de un pago inventado.
+await asService();
+await expectError(
+  "El mismo aviso del proveedor llegando dos veces no cuenta dos donaciones",
+  `insert into public.donations (case_id, amount_cop, provider, payment_ref)
+     select id, 120000, 'pasarela', 'pago-001' from public.cases where display_name = 'Familia Rentería'`,
+  "donations_payment_unique",
+);
+
+await expectError(
+  "Un importe de cero o negativo no es una donación",
+  `insert into public.donations (case_id, amount_cop, provider, payment_ref)
+     select id, 0, 'pasarela', 'pago-002' from public.cases where display_name = 'Familia Rentería'`,
+  "donations_amount_positive",
+);
+
+// --- Quién lo lee ---------------------------------------------------------
+//
+// Coordinación, para conciliar. Quien documenta un municipio no: lo que necesita
+// de esa ficha es qué falta y qué ha pasado, y ya lo tiene. Es el mismo círculo
+// que la lista de correos de avisos (0015).
+await asUser("charlie@test.com");
+const coordinationDonations = await one("select count(*)::int as n from public.donations");
+check(
+  "Coordinación lee las donaciones, que es lo que hace falta para conciliar",
+  coordinationDonations.n === 1,
+  `n=${coordinationDonations.n}`,
+);
+
+await asUser("documenta@test.com");
+const documentationDonations = await one("select count(*)::int as n from public.donations");
+check(
+  "Quien documenta no ve ningún importe: la política es de coordinación",
+  documentationDonations.n === 0,
+  `n=${documentationDonations.n}`,
+);
+
+// --- La tercera barrera, con las dos primeras desarmadas a mano ----------
+//
+// Esto es lo que va a pasar de verdad algún día: alguien concede un permiso para
+// probar algo y añade una política de `insert` porque la aplicación «necesita
+// registrar la intención de pago». Las dos líneas parecen razonables escritas. Lo
+// que tiene que seguir en pie después de las dos es el disparador.
+await asPostgres();
+await sql(`
+grant insert on public.donations to authenticated;
+create policy donaciones_de_prueba on public.donations
+  for insert to authenticated with check (true);
+`);
+
+await asUser("charlie@test.com");
+await expectError(
+  "Con el permiso concedido y una política puesta, el disparador sigue rechazando el importe",
+  `insert into public.donations (case_id, amount_cop, provider, payment_ref)
+     select id, 99000, 'pasarela', 'pago-por-la-web' from public.cases where display_name = 'Familia Rentería'`,
+  "webhook",
+);
+
+await asPostgres();
+await sql(`
+drop policy if exists donaciones_de_prueba on public.donations;
+revoke insert on public.donations from authenticated;
+`);
+
+// Y que el desarme se deshizo: si esta línea falla, todas las de arriba sobre los
+// permisos de esta tabla dejan de significar nada.
+const donationPrivsRestored = (await publicTablePrivileges()).donations;
+check(
+  "Deshecho el desarme, las donaciones vuelven a conceder solo lectura con sesión",
+  JSON.stringify(donationPrivsRestored) === JSON.stringify({ authenticated: "SELECT" }),
+  JSON.stringify(donationPrivsRestored),
+);
+
+// ===========================================================================
+// El tablero: el recado del momento y el movimiento hacia un pueblo
+// ===========================================================================
+
+await asPostgres();
+const focusRows = await one("select count(*)::int as n from public.campaign_focus");
+check("Hay un foco del momento y solo uno", focusRows.n === 1, `n=${focusRows.n}`);
+
+await expectError(
+  "No cabe un segundo foco: la fila es única por construcción",
+  "insert into public.campaign_focus (singleton) values (false)",
+  "campaign_focus_one_row",
+);
+
+await asUser("documenta@test.com");
+const focusEdit = await db.exec("update public.campaign_focus set note = 'ladron'");
+check(
+  "Quien documenta no cambia el foco del momento",
+  focusEdit[0].affectedRows === 0,
+  `filas=${focusEdit[0].affectedRows}`,
+);
+
+await asAnon();
+const publicFocus = await one("select city_id, note from public.campaign_focus");
+check(
+  "El público lee el foco",
+  publicFocus !== null && publicFocus.note === "",
+  JSON.stringify(publicFocus),
+);
+
+await expectError(
+  "El público no escribe el foco",
+  "update public.campaign_focus set note = 'ladron'",
+  "permission denied",
+);
+
+await asUser("charlie@test.com");
+await sql(`
+update public.campaign_focus
+   set city_id = (select id from public.cities where slug = 'quibdo'),
+       note = 'Techo'
+`);
+const setFocus = await one("select note, updated_by from public.campaign_focus");
+check(
+  "Coordinación marca el foco y la base de datos firma quién lo tocó",
+  setFocus.note === "Techo" && setFocus.updated_by === "charlie@test.com",
+  JSON.stringify(setFocus),
+);
+
+await sql(`
+update public.campaign_focus
+   set case_id = (select id from public.cases where display_name = 'Familia Rentería')
+`);
+const caseFocus = await one(`
+select city_id = (select city_id from public.cases where display_name = 'Familia Rentería') as ok
+  from public.campaign_focus
+`);
+check(
+  "Si el recado es de una causa, el pueblo es el de esa causa",
+  caseFocus.ok === true,
+  JSON.stringify(caseFocus),
+);
+
+await sql("update public.campaign_focus set city_id = null, case_id = null, note = ''");
+
+await asAnon();
+const activityBefore = await one(
+  "select coalesce(sum(en_camino), 0)::int as n from public.city_offer_activity",
+);
+
+await asPostgres();
+await sql(`
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category, status)
+  select id, 'Tablero pendiente', '3008880001', 'Mercados', 'alimentos', 'pendiente'
+  from public.cities where slug = 'quibdo';
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category, status, delivered_on)
+  select id, 'Tablero entregado', '3008880002', 'Tejas', 'techo', 'aceptada', current_date
+  from public.cities where slug = 'quibdo';
+insert into public.offers (city_id, offerer_name, offerer_contact, resource, category, status)
+  select id, 'Tablero rechazado', '3008880003', 'Ropa mojada', 'ropa', 'rechazada'
+  from public.cities where slug = 'quibdo';
+`);
+
+await asAnon();
+const activityAfter = await one(
+  "select coalesce(sum(en_camino), 0)::int as n from public.city_offer_activity",
+);
+check(
+  "El tablero cuenta lo que va de camino y no lo entregado ni lo rechazado",
+  activityAfter.n - activityBefore.n === 1,
+  JSON.stringify({ activityBefore, activityAfter }),
+);
+
+const activityLeak = await one(`
+select count(*)::int as n
+  from information_schema.columns
+ where table_schema = 'public'
+   and table_name = 'city_offer_activity'
+   and column_name in ('offerer_name', 'offerer_contact', 'message', 'resource')
+`);
+check(
+  "El movimiento del tablero no expone contacto ni lo que se ofreció",
+  activityLeak.n === 0,
+  `n=${activityLeak.n}`,
+);
+
+await asPostgres();
+
+// --- Una causa que recibió dinero no se borra de un botón ----------------
+//
+// `on delete restrict` y no `cascade`, al contrario que el resto del portal: la
+// fila que se llevaría por delante es el rastro de lo que alguien mandó para esa
+// familia, y hace falta para conciliar con el banco aunque la ficha ya no esté
+// publicada. CUANDO HAYA PASARELA, esto hará fallar «Borrar caso» en el panel y
+// habrá que darle un mensaje que lo explique.
+await expectError(
+  "Borrar una causa que ha recibido dinero lo rechaza la base de datos",
+  "delete from public.cases where display_name = 'Familia Rentería'",
+  "donations",
+);
+
 // --- Despublicar un municipio esconde todo su contenido -----------------
 await asUser("charlie@test.com");
 await sql("update public.cities set published = false where slug = 'quibdo'");
@@ -2929,7 +3716,6 @@ const afterUnpublish = await one(`select
   (select count(*) from public.cases)         as cases,
   (select count(*) from public.needs)         as needs,
   (select count(*) from public.photos)        as photos,
-  (select count(*) from public.foundations)   as foundations,
   (select count(*) from public.case_updates)  as updates`);
 check(
   "Al despublicar el municipio se esconde todo su contenido",
@@ -2961,21 +3747,49 @@ check(
   JSON.stringify(offerAfterUnpublish),
 );
 
-// Los canales se van con la cascada, y eso es lo que antes no pasaba: la llave
-// global seguía publicada con el portal entero despublicado, porque no era de
-// nadie. Ahora el destino del dinero es una columna de la fila de quien lo
-// recibe, así que despublicar a esa gente se lleva también a dónde enviarles.
-// Se comprueba aquí, donde desaparece todo lo demás, porque es la prueba de que
-// el canal pertenece de verdad a alguien.
-const channelsAfterUnpublish = await one(`select
-  (select count(*)::int from public.cities
-     where donation_key <> '' or donation_url <> '') as ciudades,
-  (select count(*)::int from public.cases
-     where donation_key <> '' or donation_url <> '') as casos`);
+// Y el contador es una tercera copia de la misma cascada, así que hay que
+// mirarlo aparte por lo mismo: puede quedarse sin ella sin que las otras dos lo
+// noten, y entonces el número de la portada diría que hay aportes donde el
+// portal ya no enseña ninguno. Lo que tiene que seguir cuadrando es la igualdad
+// con el registro, que aquí queda vacío.
+const tallyAfterUnpublish = await one(`select
+  (select entregados from public.offer_tally) as contador,
+  (select count(*)::int from public.aid_log)  as registro`);
 check(
-  "Al despublicar el municipio, sus canales de donación desaparecen con él",
-  channelsAfterUnpublish.ciudades === 0 && channelsAfterUnpublish.casos === 0,
+  "El contador también sigue la cascada: despublicado el municipio, no cuenta lo que ya no se ve",
+  tallyAfterUnpublish.contador === 0 && tallyAfterUnpublish.registro === 0,
+  JSON.stringify(tallyAfterUnpublish),
+);
+
+// El canal de un caso se va con la cascada, y eso es lo que antes no pasaba: la
+// llave global de 0010 seguía publicada con el portal entero despublicado,
+// porque no era de nadie. El canal de un caso sí es de alguien, así que
+// despublicar a esa gente se lleva también a dónde enviarles.
+//
+// El general NO se va, y esa asimetría es la que hay que dejar escrita: no
+// pertenece a ningún municipio, así que no hay nada que despublicar con él y
+// tiene que seguir en pie para los casos de los pueblos que sí están publicados.
+// Es la misma condición `true` de su política, mirada desde el otro lado. Lo que
+// lo hace aceptable —y es lo que 0011 no podía decir de la llave global— es que
+// ninguna ficha lo presenta como el canal de nadie.
+const channelsAfterUnpublish = await one(`select
+  (select count(*)::int from public.cases
+     where donation_key <> '' or donation_url <> '' or donation_phone <> '') as casos,
+  (select count(*)::int from public.donation_channel
+     where donation_key <> '')                                              as general`);
+check(
+  "Al despublicar el municipio, el canal de sus casos desaparece con él y el general se queda",
+  channelsAfterUnpublish.casos === 0 && channelsAfterUnpublish.general === 1,
   JSON.stringify(channelsAfterUnpublish),
+);
+
+const activityAfterUnpublish = await one(
+  "select count(*)::int as n from public.city_offer_activity",
+);
+check(
+  "Al despublicar el municipio, su movimiento desaparece del tablero",
+  activityAfterUnpublish.n === 0,
+  `n=${activityAfterUnpublish.n}`,
 );
 
 // --- Informe -----------------------------------------------------------

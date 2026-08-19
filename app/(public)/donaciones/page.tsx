@@ -1,63 +1,63 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { DonationCauseCard } from "@/components/donations/DonationCauseCard";
-import { DonationCityCard } from "@/components/donations/DonationCityCard";
-import { DonationFoundationTile } from "@/components/donations/DonationFoundationTile";
-import { DonationTabs, parseDonationView } from "@/components/donations/DonationTabs";
+import { DonationChannelCard } from "@/components/donations/DonationChannelCard";
+import { GeneralChannelNote } from "@/components/donations/GeneralChannelNote";
 import { ScreenHeader } from "@/components/nav/ScreenHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { card, cardGrid, shell } from "@/components/ui/styles";
-import { getCaseCards, getCityDonationEntries } from "@/lib/data";
+import { card, cardGrid, screenTitle, shell } from "@/components/ui/styles";
+import { caseDonation } from "@/lib/donation-channel";
+import { plural } from "@/lib/format";
+import { getCaseCards, getGeneralChannel } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Donaciones",
   description:
-    "A dónde va el dinero: el canal de donación de cada municipio del Chocó y de las familias documentadas. Cada canal es de quien lo recibe y ninguno pasa por este portal.",
+    "A dónde va el dinero: el canal general del portal y el de cada causa documentada en el Chocó. Cada canal es de quien lo recibe y ninguno pasa por este portal.",
 };
-
-type Props = { searchParams: Promise<{ ver?: string }> };
 
 /**
  * A dónde va el dinero.
  *
- * Esta pantalla existe para decir una cosa con claridad: el portal no recibe
- * donaciones. Cada canal es de quien lo recibe —un municipio, una fundación, una
- * familia— y el dinero va directo allí.
+ * Tenía tres pestañas —municipios, fundaciones y causas— y ahora es una sola
+ * lista. No es una simplificación de forma: donar a un municipio no significaba
+ * nada, porque un municipio no recibe nada, y donar «a una fundación» mandaba a
+ * la gente al canal del pueblo con el nombre de la fundación encima. Las dos
+ * pestañas contestaban una pregunta que nadie hace.
  *
- * Tres pestañas, y cada una es una rejilla: los pueblos con su foto, las
- * fundaciones con el botón hacia la gente de ese pueblo, las causas con la
- * primera imagen de esa familia. «Donar» abre un pop-up con la llave o el enlace;
- * «Ver más» entra en la ficha.
+ * Lo que queda es lo que sí se puede responder: el canal general del portal, y
+ * después cada causa con el suyo o con el general. Las causas con canal propio
+ * van primero, y eso también es una decisión: quien busca a quién ayudar debería
+ * encontrar antes a las que alguien abrió una cuenta para ellas.
  */
-export default async function DonationsPage({ searchParams }: Props) {
-  const { ver } = await searchParams;
-  const view = parseDonationView(ver);
+export default async function DonationsPage() {
+  const [general, cases] = await Promise.all([getGeneralChannel(), getCaseCards()]);
 
-  const [cities, cases] = await Promise.all([getCityDonationEntries(), getCaseCards()]);
-  const foundations = cities.filter((entry) => entry.foundation);
-  const channelBySlug = Object.fromEntries(cities.map((entry) => [entry.city.slug, entry.channel]));
+  const own = cases.filter((row) => caseDonation(row, general).source === "propio");
+  const viaGeneral = cases.filter((row) => caseDonation(row, general).source !== "propio");
+  const ordered = [...own, ...viaGeneral];
 
   return (
     <>
       <div className={`${shell} pt-4 lg:pt-10`}>
         <ScreenHeader
           title="Donaciones"
-          subtitle="A un municipio, a su gente o a una familia. Cada canal es de quien lo recibe y el dinero va directo allí."
+          subtitle="A una causa concreta o al canal general, que reparte entre todas. El dinero va directo a quien lo recibe."
           backHref="/"
           backLabel="Volver al inicio"
         />
 
         <div className={`${card} enters enters-1 mt-5 max-w-[68ch] p-4`}>
           <p className="text-[14px] leading-relaxed text-body">
-            Nada de lo que dones pasa por este portal. Cada canal lo abrió quien lo recibe y no hay
-            ninguno común: si una ficha no enseña canal es que todavía no tiene, y no hay otro que
-            valga en su lugar.
+            Nada de lo que dones pasa por este portal. Cada causa enseña a dónde va lo que le
+            mandes: unas tienen un canal abierto a su nombre y otras reciben por el canal general,
+            y su ficha lo dice con esas palabras.
           </p>
           <p className="mt-3 text-[13px] leading-relaxed text-muted">
-            De lo que sí pasa por el portal —los recursos que la gente ofrece— hay constancia pública
-            en el{" "}
+            De lo que sí pasa por el portal —los recursos que la gente ofrece— hay constancia
+            pública en el{" "}
             <Link href="/ayudas" className="text-accent hover:underline">
               registro de ayudas
             </Link>
@@ -65,72 +65,50 @@ export default async function DonationsPage({ searchParams }: Props) {
           </p>
         </div>
 
-        <div className="enters enters-2 mt-6">
-          <DonationTabs
-            active={view}
-            cityCount={cities.length}
-            foundationCount={foundations.length}
-            caseCount={cases.length}
-          />
-        </div>
+        {/* El canal general va arriba y entero, no escondido detrás de un botón.
+            Es el destino con más alcance del portal —lo usan todas las causas sin
+            canal propio— y quien llega aquí desde un WhatsApp tiene que poder
+            copiarlo sin abrir nada. Cuando no hay, se dice: un hueco callado se
+            leería como que la página se quedó a medias. */}
+        <section className="enters enters-2 mt-8 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start lg:gap-x-12">
+          <div>
+            <h2 className={screenTitle}>Canal general</h2>
+            <GeneralChannelNote className="mt-2" />
+          </div>
+          <div className="mt-5 lg:mt-0 lg:max-w-md">
+            {general ? (
+              <DonationChannelCard channel={general} featured />
+            ) : (
+              <p className={`${card} p-5 text-[14px] leading-relaxed text-muted`}>
+                Ahora mismo no hay canal general registrado, así que las causas que no tienen el
+                suyo no pueden recibir dinero todavía. No enseñamos ninguno en su lugar.
+              </p>
+            )}
+          </div>
+        </section>
 
-        {view === "municipios" ? (
-          <section className="mt-6">
-            {cities.length === 0 ? (
-              <p className={`${card} mt-4 max-w-[68ch] p-5 text-[14px] leading-relaxed text-muted`}>
-                Todavía no hay municipios publicados.
-              </p>
-            ) : (
-              <ul className={`enters enters-3 ${cardGrid}`}>
-                {cities.map((entry) => (
-                  <li key={entry.city.id}>
-                    <DonationCityCard entry={entry} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : view === "fundaciones" ? (
-          <section className="mt-6">
-            {foundations.length === 0 ? (
-              <p className={`${card} max-w-[68ch] p-5 text-[14px] leading-relaxed text-muted`}>
-                Todavía no hay fundaciones registradas en los municipios publicados.
-              </p>
-            ) : (
-              <ul className={`enters enters-3 ${cardGrid}`}>
-                {foundations.map((entry) => (
-                  <li key={entry.foundation!.id}>
-                    <DonationFoundationTile
-                      foundation={entry.foundation!}
-                      cityName={entry.city.name}
-                      cityChannel={entry.channel}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : (
-          <section className="mt-6">
-            {cases.length === 0 ? (
-              <p className={`${card} max-w-[68ch] p-5 text-[14px] leading-relaxed text-muted`}>
-                Todavía no hay casos publicados. Cuando una familia dé su consentimiento, aparecerá
-                aquí.
-              </p>
-            ) : (
-              <ul className={`enters enters-3 ${cardGrid}`}>
-                {cases.map((caseCard) => (
-                  <li key={caseCard.id}>
-                    <DonationCauseCard
-                      caseCard={caseCard}
-                      cityChannel={channelBySlug[caseCard.citySlug] ?? null}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
+        <section className="mt-12">
+          <h2 className={screenTitle}>Causas documentadas</h2>
+          <p className="mt-2 max-w-[68ch] text-[14px] leading-relaxed text-muted">
+            {cases.length === 0
+              ? "Todavía no hay ninguna publicada. Solo publicamos una causa cuando la persona da su consentimiento."
+              : `${plural(cases.length, "causa publicada", "causas publicadas")}, ${
+                  own.length === 0
+                    ? "todas por el canal general"
+                    : `${own.length} con canal propio y el resto por el general`
+                }. Una causa puede ser una persona, un colegio, un animal o una fundación.`}
+          </p>
+
+          {ordered.length > 0 && (
+            <ul className={`enters enters-3 mt-6 ${cardGrid}`}>
+              {ordered.map((caseCard) => (
+                <li key={caseCard.id}>
+                  <DonationCauseCard caseCard={caseCard} generalChannel={general} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
 
       <SiteFooter />

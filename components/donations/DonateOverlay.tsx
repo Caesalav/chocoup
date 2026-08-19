@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
+import { ChannelCheckNote } from "@/components/donations/ChannelCheckNote";
 import { DonationChannelCard } from "@/components/donations/DonationChannelCard";
 import { button } from "@/components/ui/styles";
 import type { DonationChannel } from "@/lib/donation-channel";
@@ -12,6 +13,12 @@ const DonateOpen = createContext<(() => void) | null>(null);
  * El botón que abre el pop-up. Tiene que vivir dentro de `DonateOverlay` para
  * que dos «Donar» de la misma tarjeta —el de encima de la foto y el de abajo—
  * compartan un solo diálogo y no se pisen.
+ *
+ * Es un botón de verdad y no un enlace porque en la rejilla de /donaciones no hay
+ * ningún sitio de la propia página al que llevar: la llave de esa causa está en su
+ * ficha, a un enlace de aquí («Ver más»), y un `<a>` que no lleve a ninguna parte
+ * sin JavaScript sería peor que un botón que no hace nada. Donde SÍ hay sitio
+ * —dentro de la ficha, con la sección del dinero escrita más abajo— va `DonateLink`.
  */
 export function DonateButton({
   className,
@@ -32,16 +39,66 @@ export function DonateButton({
   );
 }
 
+/**
+ * El mismo pop-up, abierto desde un enlace de verdad.
+ *
+ * Es el patrón de `ShareLink` y de `CopyKeyButton` aplicado al dinero: primero el
+ * camino que funciona con el navegador apagado, y el JavaScript encima como mejora.
+ * El `href` apunta a la sección «Enviar dinero» de la propia ficha, donde el canal
+ * está escrito entero; con JavaScript, el toque no salta a ningún sitio y abre el
+ * diálogo, que es la misma información sin perder el sitio del scroll.
+ *
+ * Esto es lo que permite que «Donar» esté en la barra fija de una causa. Un botón
+ * ahí arriba sería un botón muerto para quien abre el portal desde un WhatsApp con
+ * mala señal y el JavaScript a medio cargar, y el muerto sería justo el que promete
+ * lo que más importa de la pantalla.
+ *
+ * No mira las teclas modificadoras. Abrir en otra pestaña un ancla de la misma
+ * página no lleva a ninguna parte nueva, así que no hay nada que respetar; es la
+ * misma decisión que `ShareLink`, que también corta el enlace en seco cuando el
+ * navegador trae hoja de compartir.
+ */
+export function DonateLink({
+  href,
+  className,
+  children,
+}: {
+  href: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const open = useContext(DonateOpen);
+  if (!open) {
+    throw new Error("DonateLink tiene que ir dentro de DonateOverlay");
+  }
+
+  return (
+    <a
+      href={href}
+      className={className}
+      onClick={(event) => {
+        event.preventDefault();
+        open();
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 type Props = {
   title: string;
   channel: DonationChannel | null;
   /**
-   * Cuando el canal no es el de quien retrata la tarjeta —una causa que usa el
-   * del municipio, una fundación que manda a la gente del pueblo— hay que
-   * decirlo antes de enseñar la llave. Callarse haría creer que el dinero va a
-   * otro sitio.
+   * Cuando el canal no es el de quien retrata la tarjeta —una causa que recibe
+   * por el canal general— hay que decirlo antes de enseñar la llave. Callarse
+   * haría creer que el dinero va a otro sitio.
+   *
+   * Es un nodo y no una cadena para que la frase pueda venir del componente que
+   * la escribe una sola vez (`GeneralChannelNote`) en vez de repetirse aquí con
+   * otras palabras.
    */
-  note?: string;
+  note?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -50,8 +107,14 @@ type Props = {
  *
  * Las pestañas de /donaciones siguen siendo enlaces en la dirección. Este
  * diálogo es lo único que pide JavaScript, y solo para no salir de la rejilla
- * al mirar a dónde va el dinero. Sin él, «Ver más» sigue llevando a la ficha,
- * donde el canal está escrito entero.
+ * al mirar a dónde va el dinero.
+ *
+ * Y SIN JAVASCRIPT NO SE PIERDE NADA, que es la condición con la que existe. Lo
+ * que hay debajo no es el mismo camino en los dos sitios donde se abre, y por eso
+ * hay dos formas de abrirlo: en la rejilla, «Ver más» lleva a la ficha, donde el
+ * canal está escrito entero (`DonateButton`); en la ficha, el «Donar» de la barra
+ * fija es un ancla a la sección del dinero de esa misma página (`DonateLink`).
+ * Ninguna de las dos pantallas deja el destino del dinero dentro de un diálogo.
  */
 export function DonateOverlay({ title, channel, note, children }: Props) {
   const [open, setOpen] = useState(false);
@@ -100,13 +163,21 @@ export function DonateOverlay({ title, channel, note, children }: Props) {
                 </button>
               </div>
 
-              {note && (
-                <p className="mt-3 text-[13px] leading-relaxed text-muted">{note}</p>
-              )}
+              {note && <div className="mt-3">{note}</div>}
 
+              {/* La antigüedad de la comprobación se pinta aquí y no la pasa
+                  quien abre el diálogo: aquí es donde acaba el pulgar —dos toques
+                  desde la rejilla, uno desde la barra fija de una ficha— y es el
+                  último sitio donde alguien puede enterarse antes de copiar una
+                  llave. Pasada como prop, la pantalla nueva que se olvidara de
+                  pasarla se quedaría sin ella y nadie lo notaría mirando.
+                  Ver components/donations/ChannelCheckNote.tsx. */}
               <div className="mt-4">
                 {channel ? (
-                  <DonationChannelCard channel={channel} featured />
+                  <>
+                    <DonationChannelCard channel={channel} featured />
+                    <ChannelCheckNote channel={channel} className="mt-3" />
+                  </>
                 ) : (
                   <p className="text-[14px] leading-relaxed text-muted">
                     Todavía no hay llave, enlace ni número publicado para este destino. El

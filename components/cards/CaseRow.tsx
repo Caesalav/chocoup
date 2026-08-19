@@ -17,8 +17,8 @@ import type { CaseCard } from "@/lib/types";
  * existe para romper: la primera foto de una visita es la casa —la pared caída, el
  * techo sobre la viga partida—, así que /casos y /buscar enseñaban un recorte de
  * escombros donde va una persona. Ahora es el retrato que el equipo eligió en el
- * panel, y cuando no hay ninguno son sus iniciales, igual que en la tarjeta grande
- * de la ficha de su municipio.
+ * panel, y cuando no hay ninguno son sus iniciales —o la palabra del tipo de causa,
+ * que para eso le llega—, igual que en la tarjeta grande de la ficha de su municipio.
  *
  * El hueco es cuadrado porque es el único encuadre que sobrevive a cualquier
  * original —vertical de móvil o apaisada— sin decidir por dónde recortar. Redondeado
@@ -37,6 +37,7 @@ export function CaseRow({ caseCard }: { caseCard: CaseCard }) {
       <div className="flex items-center gap-3.5">
         <CasePortrait
           name={caseCard.display_name}
+          caseKind={caseCard.case_kind}
           path={caseCard.portraitPath}
           frame={caseCard.portraitFrame}
           className="size-[84px] rounded-2xl text-[28px]"

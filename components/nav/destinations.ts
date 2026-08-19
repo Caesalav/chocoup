@@ -2,6 +2,7 @@ import {
   CasesIcon,
   CheckIcon,
   DonationIcon,
+  FeedbackIcon,
   HomeIcon,
   MapIcon,
   NeedsIcon,
@@ -100,6 +101,19 @@ export const AID_LOG: Destination = {
   href: "/ayudas",
   label: "Ayudas que llegaron",
   Icon: CheckIcon,
+};
+
+/**
+ * El buzón: reportar un error o pedir una función.
+ *
+ * No es una sección ni una pestaña. Va en el pie, donde caben los destinos que
+ * no son ni material ni acción de ayuda, y además como botón suelto en el
+ * portal porque el inicio y el mapa no montan pie.
+ */
+export const FEEDBACK: Destination = {
+  href: "/sugerencias",
+  label: "Sugerencias",
+  Icon: FeedbackIcon,
 };
 
 /**

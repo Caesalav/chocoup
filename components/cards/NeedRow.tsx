@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CategoryChip, NeedStatusChip, UrgentChip } from "@/components/ui/Chip";
 import { card } from "@/components/ui/styles";
+import { isCoveredNeed } from "@/lib/needs";
 import type { Need } from "@/lib/types";
 
 /** Lo que hace falta saber de dónde sale una necesidad fuera de su municipio. */
@@ -27,7 +28,10 @@ export function NeedRow({
   origin?: Origin;
   compact?: boolean;
 }) {
-  const covered = need.status === "cubierta";
+  // Lo cubierto se queda sin «Puedo aportar esto» y sin «Urgente», así que esta
+  // línea decide qué se puede ofrecer: es la misma definición que cuenta los
+  // números de la cabecera. Ver lib/needs.ts.
+  const covered = isCoveredNeed(need);
 
   // La tarjeta ocupa el alto de su fila y el botón se ancla abajo. En una
   // rejilla las necesidades tienen textos de largos muy distintos —una lleva

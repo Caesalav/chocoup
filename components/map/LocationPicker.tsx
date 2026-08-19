@@ -8,6 +8,7 @@ import {
   viewBoxAttr,
 } from "@/lib/choco-map";
 import { button, field } from "@/components/ui/styles";
+import { PaletteFillDefs } from "@/components/ui/PaletteFillDefs";
 
 type Props = {
   initialLat?: number | null;
@@ -83,6 +84,7 @@ export function LocationPicker({ initialLat = null, initialLng = null }: Props) 
           className="mx-auto h-auto w-full max-w-64 cursor-crosshair"
           role="presentation"
         >
+          <PaletteFillDefs />
           <path
             d={CHOCO_PATH}
             className="fill-land stroke-contour"

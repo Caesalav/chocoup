@@ -1,4 +1,5 @@
 import { BottomNav } from "@/components/nav/BottomNav";
+import { FeedbackButton } from "@/components/FeedbackButton";
 import { SiteHeader } from "@/components/SiteHeader";
 
 /**
@@ -16,12 +17,15 @@ import { SiteHeader } from "@/components/SiteHeader";
  *
  * El pie no está aquí a propósito: lo montan las páginas que son documento
  * —municipio, caso, secciones—, y no el inicio ni el mapa, que son pantallas.
+ * El botón de sugerencias sí está, porque esas dos pantallas no tienen pie y
+ * la barra de abajo ya está llena.
  */
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <SiteHeader className="hidden lg:block" />
       <main className="flex-1 pb-[var(--nav-h)] lg:pb-0">{children}</main>
+      <FeedbackButton />
       <BottomNav />
     </>
   );

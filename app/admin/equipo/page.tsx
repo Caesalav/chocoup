@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { removeTeamMember, saveTeamMember } from "@/app/admin/actions";
 import { DangerSubmitButton, SubmitButton } from "@/components/admin/SubmitButton";
 import { eyebrow, field, panel } from "@/components/ui/styles";
@@ -32,7 +33,10 @@ export default async function TeamPage() {
   if (session?.role !== "coordinacion") {
     return (
       <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
-        <h1 className="font-display text-3xl text-ink">Esta pantalla es de coordinación</h1>
+        <Link href="/admin" className="text-sm text-muted hover:text-ink hover:underline">
+          ← Panel del equipo
+        </Link>
+        <h1 className="mt-6 font-display text-3xl text-ink">Esta pantalla es de coordinación</h1>
         <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
           Tu cuenta documenta municipios. Los permisos del equipo los reparte quien coordina; si
           necesitas un municipio más, pídelo por ahí.
@@ -45,12 +49,22 @@ export default async function TeamPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-      <p className={eyebrow}>Panel del equipo</p>
+      <Link href="/admin" className="text-sm text-muted hover:text-ink hover:underline">
+        ← Panel del equipo
+      </Link>
+
+      <p className={`${eyebrow} mt-4`}>Panel del equipo</p>
       <h1 className="mt-1 font-display text-3xl text-ink">Quién documenta qué</h1>
       <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
         Quien coordina puede con todo el portal. Quien documenta sube fotos, escribe casos y
         registra necesidades <span className="text-ink">solo en los municipios que le asignes</span>
-        , y no publica municipios ni toca los canales de donación.
+        , y no publica municipios ni toca los canales de donación —ni el destino ni la fecha en que
+        se comprobó—.
+      </p>
+      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
+        Hay dos listas que tampoco ve: los correos apuntados a los avisos, que no pertenecen a
+        ningún municipio, y el repaso de todos los destinos de dinero. Las dos son de coordinación
+        en la base de datos, no solo en la pantalla.
       </p>
       <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
         Puedes invitar a alguien antes de que entre por primera vez: basta su correo, y la primera

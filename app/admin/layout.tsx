@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { AdminNav } from "./AdminNav";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getOffers } from "@/lib/admin-data";
+import { getFeedback, getOffers } from "@/lib/admin-data";
 import { createSupabaseServerClient, getSessionEmail, getTeamSession } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/env";
 import { demoTeamSession } from "@/lib/demo-data";
@@ -18,7 +18,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // Con datos de muestra no hay sesión que comprobar: el panel se puede recorrer
   // para ver cómo es, y cualquier intento de guardar avisa de que no persiste.
   if (isDemoMode()) {
-    const pending = (await getOffers("pendiente")).length;
+    const [pendingOffers, inbox] = await Promise.all([
+      getOffers("pendiente"),
+      getFeedback(),
+    ]);
     const team = demoTeamSession();
     return (
       <>
@@ -26,7 +29,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             panel es una web y no una app, y no tiene barra inferior de la que
             tirar. Debajo va la del equipo, con lo que solo existe aquí. */}
         <SiteHeader />
-        <AdminNav email={team.email} role={team.role} pendingOffers={pending} />
+        <AdminNav
+          email={team.email}
+          role={team.role}
+          pendingOffers={pendingOffers.length}
+          feedbackCount={inbox.length}
+        />
         <main className="flex-1">{children}</main>
       </>
     );
@@ -57,19 +65,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
-  // Las ofertas que cuenta este contador son las que las políticas dejan ver: en
-  // documentación, solo las de sus municipios. El número de la barra no puede
-  // decir "3" y la bandeja mostrar una.
+  // Los dos contadores que la barra lleva desde siempre, colgados de donde vive
+  // ahora cada cosa: las ofertas sin revisar en «Recursos ofrecidos» y el buzón en
+  // «Sugerencias». Se cuentan aquí, en el layout, porque la barra se pinta en todas
+  // las pantallas del panel y si cada una los pidiera por su cuenta habría un
+  // número distinto según por dónde se entrara.
+  //
+  // Las ofertas que cuenta son las que las políticas dejan ver: en documentación,
+  // solo las de sus municipios. El número de la barra no puede decir "3" y la
+  // bandeja mostrar una.
   const supabase = await createSupabaseServerClient();
-  const { count } = await supabase
-    .from("offers")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pendiente");
+  const [{ count }, { count: inbox }] = await Promise.all([
+    supabase.from("offers").select("id", { count: "exact", head: true }).eq("status", "pendiente"),
+    supabase.from("feedback").select("id", { count: "exact", head: true }),
+  ]);
 
   return (
     <>
       <SiteHeader />
-      <AdminNav email={email} role={team.role} pendingOffers={count ?? 0} />
+      <AdminNav
+        email={email}
+        role={team.role}
+        pendingOffers={count ?? 0}
+        feedbackCount={inbox ?? 0}
+      />
       <main className="flex-1">{children}</main>
     </>
   );

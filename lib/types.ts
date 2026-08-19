@@ -15,6 +15,22 @@ export type NeedCategory =
 export type NeedStatus = "abierta" | "parcial" | "cubierta";
 
 /**
+ * Qué es una causa del portal.
+ *
+ * El portal ya lo decía con palabras desde 0015 —/donaciones y la ficha de un
+ * municipio lo escriben en una frase— pero no lo sabía el modelo, así que todo lo
+ * que la interfaz decidía sobre una causa lo decidía como si fuera una persona.
+ * Hay una decisión donde eso se nota: la reserva del retrato. Las iniciales del
+ * nombre son una respuesta para una persona y un error de bulto para un colegio,
+ * y con un animal no significan nada. Ver `CasePortrait`.
+ *
+ * Los valores los impone la base de datos (`cases_kind_valid`,
+ * supabase/migrations/0016_ficha_de_causa.sql) y las palabras con las que se
+ * escriben en pantalla están en lib/constants.ts, no aquí.
+ */
+export type CaseKind = "persona" | "colegio" | "animal" | "fundacion";
+
+/**
  * El estado de una oferta dentro de la bandeja del equipo.
  *
  * `retirada` no es un sinónimo de `rechazada` y por eso son dos palabras.
@@ -68,15 +84,19 @@ export type TeamMemberEntry = TeamSession & {
 };
 
 /**
- * Las columnas del canal de donación, iguales en el municipio y en el caso.
- * Se escriben una vez aquí porque los dos niveles tienen que admitir los
- * mismos formatos: si uno solo aceptara enlaces, el pueblo o la familia que
- * tenga una llave o un teléfono se quedaría sin poder recibir.
+ * Las columnas del canal de donación, iguales en el caso y en el canal general.
+ * Se escriben una vez aquí porque los dos tienen que admitir los mismos
+ * formatos: si el general solo aceptara llaves, el día que sea una Vaki habría
+ * que cambiar el esquema en vez de un campo.
+ *
+ * El municipio ya no las tiene. Los canales por ciudad se fueron con
+ * supabase/migrations/0015_canal_general.sql: el dinero va a un caso, y el caso
+ * que no tiene canal propio usa el general.
  *
  * Nunca se leen sueltas: `donationChannel()` (lib/donation-channel.ts) las
  * convierte en un canal o en nulo, y es quien sabe que llave, enlace y
- * teléfono se excluyen. Ver supabase/migrations/0011_canal_de_donacion.sql
- * y 0013_canal_de_telefono.sql.
+ * teléfono se excluyen. Ver supabase/migrations/0011_canal_de_donacion.sql,
+ * 0013_canal_de_telefono.sql y 0015_canal_general.sql.
  */
 export type DonationColumns = {
   donation_key: string;
@@ -84,9 +104,21 @@ export type DonationColumns = {
   donation_phone: string;
   donation_app: string;
   donation_holder: string;
+  /**
+   * El día en que alguien de coordinación comprobó de verdad este destino:
+   * llamó al número, o mandó mil pesos a la llave y miró qué nombre salía.
+   *
+   * Nulo es el estado normal y no un hueco que rellenar: significa que nadie lo ha
+   * comprobado, que es la verdad de casi todos los canales el día que se
+   * registran. No se hereda de un destino anterior —la base de datos la borra sola
+   * cuando el destino cambia— y envejece a la vista pasados 60 días. Ver
+   * `channelCheck()` en lib/donation-channel.ts y
+   * supabase/migrations/0016_ficha_de_causa.sql.
+   */
+  donation_verified_on: string | null;
 };
 
-export type City = DonationColumns & {
+export type City = {
   id: string;
   name: string;
   slug: string;
@@ -98,36 +130,30 @@ export type City = DonationColumns & {
   updated_at: string;
 };
 
-/**
- * La fundación de un municipio: una y solo una.
- *
- * Aquí había una marca de «es la madre» porque la tabla admitía varias. Ya no: la
- * base de datos garantiza una fila por municipio (`foundations_one_per_city`, ver
- * supabase/migrations/0004_una_fundacion_por_municipio.sql), así que no hay nada
- * que desempatar y `donation_url` no puede depender de qué fila devuelva antes
- * una consulta.
- */
-export type Foundation = {
-  id: string;
-  city_id: string;
-  name: string;
-  description: string;
-  contact_name: string;
-  phone: string;
-  whatsapp: string;
-  email: string;
-  website: string;
-  /** Enlace oficial de donación. El botón "Donar dinero" abre esto. */
-  donation_url: string;
-  address: string;
-  created_at: string;
-};
-
 export type Case = DonationColumns & {
   id: string;
   city_id: string;
   display_name: string;
+  /**
+   * Una persona, un colegio, un animal o una fundación. Ver `CaseKind`.
+   *
+   * Nunca llega vacío: la base de datos pone 'persona' por omisión, que es lo que
+   * son todas las causas escritas hasta hoy.
+   */
+  case_kind: CaseKind;
   household: string;
+  /**
+   * Una frase, y es LA frase: la que sale en la vista previa de WhatsApp cuando
+   * alguien comparte el enlace, que es como se mueve este portal.
+   *
+   * Vacío es válido y es como nacen todas. Sin resumen, la tarjeta y la vista
+   * previa siguen recortando la historia con `excerpt()`, y ese corte cae donde
+   * cae: a mitad de frase. Exigirlo para publicar dejaría a una familia sin
+   * publicar por un asunto de redacción, así que no se exige; lo que hace es que
+   * se pueda escribir bien cuando haya un minuto. Máximo 120 caracteres, y lo
+   * impone la base de datos porque un `maxlength` no viaja en una llamada a la API.
+   */
+  summary: string;
   story: string;
   consent_to_publish: boolean;
   published: boolean;
@@ -345,8 +371,29 @@ export type CityCardData = City & {
   coverPath: string | null;
   coverFrame: PhotoFrame | null;
   openNeeds: number;
+  /**
+   * Casos con algo sin cubrir, que no es lo mismo que `caseCount`. El mapa
+   * enseña este al lado del color: uno dice a cuánta gente le falta algo y el
+   * color dice cuánto falta. Ver `countOpenCases` en lib/needs.ts.
+   */
+  openCases: number;
   caseCount: number;
   needs: NeedFacet[];
+  /**
+   * El avance del pueblo, sobre el montón de sus necesidades. De aquí sale el
+   * color del mapa y la barra de la tarjeta. Ver `cityProgress`.
+   */
+  progress: {
+    total: number;
+    covered: number;
+    partial: number;
+    ratio: number;
+  };
+  /**
+   * Aportes en pie que todavía no han llegado. Es movimiento, no cobertura:
+   * no pinta el mapa. Ver lib/city-activity.ts.
+   */
+  standingOffers: number;
 };
 
 export type CaseSummary = Case & {
@@ -426,13 +473,14 @@ export type SearchResults = {
  * es de esa persona —la sacó ella o la sacaron en su casa, y su consentimiento va
  * con ella—, y amontonadas fuera de su ficha se convertían en un muestrario de
  * daños sin dueño. Cada una vive ahora dentro de la tarjeta de quien es.
+ *
+ * Aquí había también una `foundation`. Se fue con 0015: las fundaciones no son
+ * una entidad del portal y un municipio no tiene canal propio. La ficha del
+ * municipio dejó de ser una pantalla de dinero y volvió a ser lo que describe,
+ * que es lo que pasa en ese pueblo y quién está documentado allí.
  */
 export type CityPage = {
   city: City;
-  /** La fundación del municipio, o nula mientras nadie la haya registrado —que es
-   *  como nace cada municipio, antes de la visita. Una, no una lista: lo garantiza
-   *  la base de datos. */
-  foundation: Foundation | null;
   /** Fotos del municipio, no de una familia. */
   photos: Photo[];
   zoneNeeds: Need[];
@@ -447,28 +495,34 @@ export type CasePage = {
   needs: Need[];
   updates: CaseUpdate[];
   /**
-   * La fundación del municipio, que aquí ya no es el recaudo por omisión de esta
-   * familia: si el caso no trae canal propio, no hay canal. Sigue haciendo falta
-   * para decir quién responde por el caso en terreno y para escribirle por
-   * WhatsApp, que es una conversación y no un destino de dinero.
+   * El canal general del portal, que es lo que recibe este caso si no trae uno
+   * propio.
+   *
+   * Viaja dentro de la ficha y no se pide aparte para que no haya ninguna forma
+   * de pintar esta pantalla sin él: `caseDonation()` necesita los dos —el de la
+   * fila y este— para poder decir de quién es el que se enseña, y eso es lo que
+   * la ficha tiene que escribir con palabras.
    */
-  foundation: Foundation | null;
-};
-
-/**
- * Un municipio en /donaciones: su foto de portada, su canal y su fundación.
- *
- * Sale aunque todavía no tenga canal. El pop-up de «Donar» lo dice, y no listarlo
- * dejaría un pueblo documentado fuera de la única pantalla que existe para darle
- * dinero. La fundación va dentro porque es de ese municipio, y la pestaña de
- * fundaciones se arma filtrando las que hay.
- */
-export type CityDonationEntry = {
-  city: City;
-  channel: DonationChannel | null;
-  foundation: Foundation | null;
-  coverPath: string | null;
-  coverFrame: PhotoFrame | null;
+  generalChannel: DonationChannel | null;
+  /**
+   * El día del último avance del diario, o nulo si todavía no hay ninguno.
+   *
+   * Es lo que la ficha escribe como «Actualizado el …», y sustituye a
+   * `cases.updated_at`, que decía otra cosa: esa columna se mueve cuando alguien
+   * corrige una errata en la historia, así que la ficha afirmaba que había noticias
+   * de esta familia el día en que se arregló una tilde. Lo que quien lee necesita
+   * saber es cuándo pasó algo, y eso es `max(case_updates.happened_on)`.
+   *
+   * Se resuelve aquí y no en la plantilla para que no haya dos formas de
+   * contestarlo. Y sale de los avances que las políticas dejan ver, que es lo
+   * correcto: la fecha tiene que ser la del último avance que quien lee puede leer,
+   * no la de uno que está escondido.
+   *
+   * Nulo es frecuente —un caso recién documentado no tiene diario— y no se rellena
+   * con `updated_at` para taparlo: la ficha dice entonces cuándo se documentó, que
+   * es cierto y es otra frase.
+   */
+  lastUpdateOn: string | null;
 };
 
 /** Contexto de una necesidad, caso o ciudad para el formulario de oferta. */
@@ -495,4 +549,38 @@ export type NeedOption = {
   title: string;
   cityName: string;
   caseName: string | null;
+};
+
+/**
+ * Una nota del buzón público: un error del portal o una idea para mejorarlo.
+ *
+ * No se publica. El contacto es opcional y solo lo ve el equipo.
+ */
+export type FeedbackKind = "error" | "idea";
+
+export type FeedbackNote = {
+  id: string;
+  kind: FeedbackKind;
+  body: string;
+  contact: string;
+  page_path: string;
+  created_at: string;
+};
+
+/**
+ * Un correo apuntado a los avisos del portal desde «Quiero ayudar».
+ *
+ * Solo existe en el panel y solo lo ve coordinación: no hay ninguna consulta
+ * pública que devuelva esta forma, ni siquiera para contarla. Lo garantiza la
+ * base de datos por dos vías que no dependen la una de la otra —el permiso de
+ * tabla y la política—, ver supabase/migrations/0015_canal_general.sql.
+ *
+ * No lleva de qué página vino ni con qué oferta, y eso es a propósito: el
+ * consentimiento que dio esa persona fue para recibir novedades, no para quedar
+ * asociada a nada más. Un correo y una fecha.
+ */
+export type NewsletterSignup = {
+  id: string;
+  email: string;
+  created_at: string;
 };

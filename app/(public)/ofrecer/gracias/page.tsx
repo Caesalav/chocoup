@@ -22,8 +22,11 @@ export default function ThanksPage() {
       </h1>
       <p className="enters enters-2 mt-4 text-[15px] leading-relaxed text-muted">
         El equipo revisa las ofertas a diario y te escribe al contacto que dejaste. Si es algo
-        urgente y prefieres no esperar, en la página del municipio está el WhatsApp de la fundación
-        que trabaja allí.
+        urgente y prefieres no esperar, escríbelo en{" "}
+        <Link href="/sugerencias" className="text-accent hover:underline">
+          sugerencias
+        </Link>{" "}
+        y lo vemos antes.
       </p>
       {/* Se dice aquí, recién enviada la oferta, porque es cuando importa saber qué
           se va a publicar de esto y qué no. */}

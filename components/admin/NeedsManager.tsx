@@ -3,6 +3,7 @@ import { DangerSubmitButton, SubmitButton } from "./SubmitButton";
 import { CategoryChip, NeedStatusChip, UrgentChip } from "@/components/ui/Chip";
 import { field } from "@/components/ui/styles";
 import { NEED_CATEGORIES, NEED_STATUSES } from "@/lib/constants";
+import { isOpenNeed } from "@/lib/needs";
 import type { Need } from "@/lib/types";
 
 export function NeedsManager({
@@ -75,7 +76,7 @@ export function NeedsManager({
               <div className="flex flex-wrap items-center gap-2">
                 <CategoryChip category={need.category} />
                 <NeedStatusChip status={need.status} />
-                {need.urgent && need.status !== "cubierta" && <UrgentChip />}
+                {need.urgent && isOpenNeed(need) && <UrgentChip />}
               </div>
 
               <h4 className="mt-2 font-display text-lg leading-tight text-ink">{need.title}</h4>

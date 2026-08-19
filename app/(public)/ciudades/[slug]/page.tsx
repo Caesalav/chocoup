@@ -4,8 +4,7 @@ import type { Metadata } from "next";
 import { CaseBigCard } from "@/components/cards/CaseBigCard";
 import { parseCitySection, SectionTabs } from "@/components/city/SectionTabs";
 import { CityLead } from "@/components/city/CityLead";
-import { DonationChannelCard } from "@/components/donations/DonationChannelCard";
-import { FoundationCard } from "@/components/FoundationCard";
+import { CaseProgressBar } from "@/components/case/CaseProgressBar";
 import { ChocoMap } from "@/components/map/ChocoMap";
 import { NeedsList } from "@/components/NeedsList";
 import { PhotoGrid } from "@/components/PhotoGrid";
@@ -23,8 +22,9 @@ import {
   shell,
 } from "@/components/ui/styles";
 import { getCityPage } from "@/lib/data";
-import { donationChannel } from "@/lib/donation-channel";
 import { excerpt, formatDate, plural } from "@/lib/format";
+import { countCoveredNeeds, countOpenNeeds } from "@/lib/needs";
+import { cityProgress, progressPercent } from "@/lib/case-progress";
 import { savedFrame } from "@/lib/photo-frame";
 import { absoluteUrl } from "@/lib/site";
 
@@ -51,10 +51,28 @@ export default async function CityPage({ params, searchParams }: Props) {
   const data = await getCityPage(slug);
   if (!data) notFound();
 
-  const { city, foundation, photos, zoneNeeds, caseNeeds, cases } = data;
-  const channel = donationChannel(city);
-  const openNeeds = zoneNeeds.filter((need) => need.status !== "cubierta").length;
+  const { city, photos, zoneNeeds, caseNeeds, cases } = data;
+
+  /**
+   * Todo lo que hace falta en el municipio, de la zona y de cada caso, junto.
+   *
+   * `getCityPage` las trae separadas porque el panel edita las de la zona en su
+   * propio formulario, y de ahí salía el fallo: la cabecera contaba solo esa
+   * mitad. Con Quibdó eso daba «0 necesidades abiertas» —no tiene ninguna de
+   * zona— mientras /municipios y el mapa decían diez del mismo municipio.
+   */
   const listedNeeds = [...zoneNeeds, ...caseNeeds];
+
+  /**
+   * El número de la cabecera, y el que viaja en el título al compartir por
+   * WhatsApp. Sale de `countOpenNeeds` sobre el municipio entero, que es la
+   * misma cuenta exacta que hace `getCityCards` para la tarjeta de /municipios.
+   * El color del mapa sale del avance (`cityProgress`) sobre este mismo montón.
+   */
+  const openNeeds = countOpenNeeds(listedNeeds);
+  const coveredNeeds = countCoveredNeeds(listedNeeds);
+  const progress = cityProgress(listedNeeds);
+  const percent = progressPercent(progress.ratio);
   const section = parseCitySection(ver);
 
   const cover = photos[0]?.storage_path ?? null;
@@ -82,7 +100,11 @@ export default async function CityPage({ params, searchParams }: Props) {
 
               <ShareLink
                 url={shareUrl}
-                title={`${city.name}, Chocó · ${plural(openNeeds, "necesidad abierta", "necesidades abiertas")}`}
+                title={`${city.name}, Chocó · ${
+                  progress.total > 0
+                    ? `${percent} % cubierto`
+                    : plural(openNeeds, "necesidad abierta", "necesidades abiertas")
+                }`}
                 className={iconOnPhoto}
               >
                 <ShareIcon className="size-5" />
@@ -95,20 +117,21 @@ export default async function CityPage({ params, searchParams }: Props) {
                 {city.name}, <span className="text-paper/65">Chocó</span>
               </h1>
               <p className="mt-2.5 text-[14px] text-paper/85">
+                {progress.total > 0 && `${percent} % cubierto · `}
                 {plural(openNeeds, "necesidad abierta", "necesidades abiertas")}
                 {cases.length > 0 && ` · ${plural(cases.length, "caso", "casos")}`}
               </p>
+              {progress.total > 0 && (
+                <div className="mt-4 max-w-sm">
+                  <CaseProgressBar needs={listedNeeds} compact tone="photo" />
+                </div>
+              )}
               {!city.published && (
                 <p className="mt-3">
                   <span className={pillOnPhoto}>Sin publicar</span>
                 </p>
               )}
-              <CityLead
-                summary={city.summary}
-                cityName={city.name}
-                foundation={foundation}
-                onPhoto
-              />
+              <CityLead summary={city.summary} onPhoto />
               <p className="mt-4 text-[12px] text-paper/70">
                 Actualizado el {formatDate(city.updated_at)}
               </p>
@@ -133,7 +156,11 @@ export default async function CityPage({ params, searchParams }: Props) {
 
             <ShareLink
               url={shareUrl}
-              title={`${city.name}, Chocó · ${plural(openNeeds, "necesidad abierta", "necesidades abiertas")}`}
+              title={`${city.name}, Chocó · ${
+                progress.total > 0
+                  ? `${percent} % cubierto`
+                  : plural(openNeeds, "necesidad abierta", "necesidades abiertas")
+              }`}
               className={iconOnPaper}
             >
               <ShareIcon className="size-5" />
@@ -146,19 +173,21 @@ export default async function CityPage({ params, searchParams }: Props) {
               {city.name}, <span className="text-faint">Chocó</span>
             </h1>
             <p className="mt-2.5 text-[14px] text-muted">
+              {progress.total > 0 && `${percent} % cubierto · `}
               {plural(openNeeds, "necesidad abierta", "necesidades abiertas")}
               {cases.length > 0 && ` · ${plural(cases.length, "caso", "casos")}`}
             </p>
+            {progress.total > 0 && (
+              <div className="mt-4 max-w-sm">
+                <CaseProgressBar needs={listedNeeds} compact />
+              </div>
+            )}
             {!city.published && (
               <p className="mt-3">
                 <DraftChip label="Sin publicar" />
               </p>
             )}
-            <CityLead
-              summary={city.summary}
-              cityName={city.name}
-              foundation={foundation}
-            />
+            <CityLead summary={city.summary} />
             <p className="mt-4 text-[12px] text-faint">
               Actualizado el {formatDate(city.updated_at)}
             </p>
@@ -207,6 +236,14 @@ export default async function CityPage({ params, searchParams }: Props) {
               <p className="mt-2 text-[13px] leading-relaxed text-muted lg:text-[15px]">
                 Las personas de {city.name} y lo que hace falta, de la zona y de cada caso.
               </p>
+              {/* El número de la pestaña es cuántas filas hay en su lista, no
+                  cuántas están abiertas, y por eso puede ser mayor que el de la
+                  cabecera: la lista enseña también las cubiertas, marcadas y al
+                  final. Es el mismo criterio que /necesidades, donde ya se
+                  probó lo contrario: un contador de abiertas encima de una
+                  lista más larga hace que quien cuenta lo que ve encuentre otra
+                  cosa. Lo que no puede pasar es que la diferencia no se
+                  explique, y de eso se encarga el renglón de debajo. */}
               <div className="mt-5">
                 <SectionTabs
                   slug={city.slug}
@@ -239,6 +276,21 @@ export default async function CityPage({ params, searchParams }: Props) {
                 </div>
               ) : (
                 <div className="mt-6">
+                  {/* El renglón que cuadra los dos números de arriba. Sin él la
+                      cabecera dice una cifra, la pestaña dice otra mayor y nada
+                      en la pantalla explica por qué; con él la resta está
+                      escrita. Solo aparece cuando hay algo cubierto, que es
+                      cuando las dos cifras se separan. */}
+                  {coveredNeeds > 0 && (
+                    <p className="mb-5 max-w-[68ch] text-[13px] leading-relaxed text-muted">
+                      Las {listedNeeds.length} registradas en {city.name}:{" "}
+                      {plural(openNeeds, "sigue abierta", "siguen abiertas")} y{" "}
+                      {coveredNeeds === 1
+                        ? "1 ya está cubierta, que va al final"
+                        : `${coveredNeeds} ya están cubiertas, que van al final`}
+                      .
+                    </p>
+                  )}
                   <NeedsList
                     needs={listedNeeds.map((need) => ({
                       ...need,
@@ -258,59 +310,27 @@ export default async function CityPage({ params, searchParams }: Props) {
           </div>
 
           <div className="mt-14 lg:col-start-2 lg:row-start-1 lg:mt-0">
-            {/* Una fundación, y aquí ya no hay que elegirla: la base de datos
-                garantiza que hay una o ninguna (0004). Debajo iba una lista de
-                «organizaciones aliadas», que era la otra mitad de la misma
-                confusión: dos tarjetas con botón de donar en la misma columna y
-                nada en la pantalla que dijera cuál recibe. */}
-            {foundation && (
-              <section id="fundacion">
-                <FoundationCard foundation={foundation} cityName={city.name} featured />
-              </section>
-            )}
+            {/* Aquí estaba la tarjeta de la fundación madre y, debajo, el canal
+                del municipio. Los dos se fueron con 0015 y esta columna dejó de
+                ser una pantalla de dinero.
 
-            {/* El canal del municipio va debajo de la fundación cuando la hay, y
-                ocupa su sitio cuando no. Son dos destinos distintos y los dos
-                legítimos: el de la fundación es suyo y sale dentro de su tarjeta
-                bajo su nombre; este lo abrió coordinación para el pueblo y no
-                pertenece a ninguna organización. Cada uno va rotulado con de quién
-                es, que es lo que faltaba cuando dos tarjetas con botón de donar
-                convivían sin decir cuál recibía.
-
-                Vive en la fila del municipio y no en la de su fundación, y el
-                motivo se ve aquí mismo: Quibdó no tiene fundación y es el único
-                municipio real publicado. Ver 0011_canal_de_donacion.sql. */}
-            {channel && (
-              <section
-                className={foundation ? "mt-6" : ""}
-                aria-label={`Canal de donación de ${city.name}`}
-              >
-                <DonationChannelCard channel={channel} featured={!foundation} />
-                <p className="mt-3 text-[13px] leading-relaxed text-muted">
-                  Es el canal de {city.name} y lo que entre por ahí se reparte aquí.
-                  {foundation
-                    ? ` Si prefieres que entre por ${foundation.name}, usa su enlace de arriba.`
-                    : ` ${city.name} todavía no tiene fundación registrada, así que por ahora es la única vía.`}
+                No se sustituyen por un canal del pueblo con otro nombre, y ese es
+                el fondo del cambio: el dinero va a una causa concreta —una
+                persona, un colegio, un animal, una fundación—, y se pide en su
+                ficha, con su historia delante. Un botón de donar aquí volvería a
+                pedir para «Quibdó», que no es nadie a quien se le pueda entregar
+                nada. Lo que queda en esta columna es lo que sí se puede hacer
+                mirando un municipio entero: situarlo, ofrecer un recurso y ver lo
+                que ya llegó. */}
+            <section aria-label={`Cómo ayudar en ${city.name}`}>
+              <div className={`${card} p-5`}>
+                <p className="text-[12px] text-accent-strong">Cómo ayudar aquí</p>
+                <p className="mt-2 text-[14px] leading-relaxed text-muted">
+                  El dinero no se envía a un municipio: se envía a una causa concreta. Abre
+                  cualquiera de {city.name} y su ficha dice a dónde va lo que le mandes.
                 </p>
-              </section>
-            )}
-
-            {/* Sin ninguna de las dos se dice, en vez de dejar la columna muda.
-                Un municipio recién documentado no tiene a dónde recibir dinero y
-                eso es un estado normal; lo que no puede es parecer que la
-                pantalla se quedó a medias. */}
-            {!channel && !foundation && (
-              <section aria-label={`Canal de donación de ${city.name}`}>
-                <div className={`${card} p-5`}>
-                  <p className="text-[12px] text-accent-strong">Enviar dinero</p>
-                  <p className="mt-2 text-[14px] leading-relaxed text-muted">
-                    {city.name} todavía no tiene canal de donación propio ni fundación
-                    registrada, así que aquí no hay a dónde transferir. Lo que sí se puede hacer
-                    hoy es ofrecer un recurso concreto.
-                  </p>
-                </div>
-              </section>
-            )}
+              </div>
+            </section>
 
             <section className="mt-12">
               <h2 className={screenTitle}>Dónde queda</h2>

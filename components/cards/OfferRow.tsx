@@ -28,6 +28,21 @@ import type { OfferRecord } from "@/lib/types";
 const WEEKS_UNTIL_STALE = 3;
 
 /**
+ * El titular de una oferta que no publica su texto.
+ *
+ * `resource` llega nulo cuando la oferta iba dirigida a una familia: la frase la
+ * escribió alguien con su ficha delante y la vista no la publica —0012—, así que
+ * no hay nada que recortar ni nada que recuperar. Ver el comentario del `h3`, que
+ * es donde está el razonamiento de por qué esta frase y no otra.
+ *
+ * Se exporta porque lo escriben dos pantallas y son las dos caras del mismo
+ * botón: la fila donde se pulsa «Puedo completar esta oferta» y la tarjeta de
+ * /ofrecer donde se aterriza. Si cada una lo dijera con sus palabras, el mismo
+ * renglón cambiaría de nombre al pulsar y se leería como que se abrió otra cosa.
+ */
+export const OFFER_TO_A_CASE_HEADLINE = "Una oferta para una familia documentada";
+
+/**
  * Cuántas semanas enteras lleva esperando algo que se ofreció ese día.
  *
  * El reloj se lee aquí y no en la fila porque las páginas que la pintan son
@@ -66,9 +81,14 @@ function weeksWaiting(offeredOn: string): number {
  * primera por eso —antes que la categoría, al revés que en `NeedRow`—: el estado
  * es la advertencia y la categoría solo es el cajón.
  *
- * No lleva el botón de «puedo completar esto» todavía. El destino que necesita
- * —`getOfferTarget` con `completa`— no existe aún, y un enlace a un formulario que
- * no sabe a qué está respondiendo es peor que ninguno.
+ * Y abajo, el botón, que es lo que convierte la lista en algo que se puede usar:
+ * sin él, cruzar unas tejas sin transporte con un camión que sube vacío seguiría
+ * dependiendo de que una persona del equipo se acordara de las dos a la vez, que
+ * es exactamente lo que esta pantalla existe para no necesitar. Lleva a
+ * `/ofrecer?completa=<id>`, donde `getOfferTarget` resuelve el contexto contra la
+ * vista pública —nunca contra la tabla— y hereda el municipio y, si la necesidad
+ * es de zona, también la necesidad, de modo que las dos ofertas llegan
+ * emparejadas a la bandeja sin que nadie tenga que escribir un contacto.
  */
 export function OfferRow({ record }: { record: OfferRecord }) {
   const weeks = weeksWaiting(record.offered_on);
@@ -119,7 +139,7 @@ export function OfferRow({ record }: { record: OfferRecord }) {
       <h3
         className={`mt-3 font-display text-[17px] leading-snug ${waiting ? "text-muted" : "text-ink"}`}
       >
-        {record.resource ?? "Una oferta para una familia documentada"}
+        {record.resource ?? OFFER_TO_A_CASE_HEADLINE}
       </h3>
 
       <p className={`mt-1.5 text-[13px] leading-relaxed ${waiting ? "text-faint" : "text-muted"}`}>
@@ -159,6 +179,45 @@ export function OfferRow({ record }: { record: OfferRecord }) {
         Ofrecido el {formatDay(record.offered_on)}
         {waiting && ` · lleva ${plural(weeks, "semana", "semanas")} esperando respuesta`}
       </p>
+
+      {/* «Puedo completar esta oferta», y no «Puedo aportar esto», que es lo que
+          dice `NeedRow`. No son el mismo gesto: allí se cubre algo que falta, y
+          aquí se es la segunda mitad de lo que otro ya prometió —el transporte de
+          las tejas, el cupo del camión que sube vacío—, así que quien pulsa esto
+          no está ofreciendo lo que se lee arriba. Nombrar la oferta es además lo
+          que separa los dos botones en la única pantalla donde salen juntos, que
+          es /buscar: a solas, «aportar» y «completar» son una palabra distinta en
+          medio de dos frases con la misma forma, y ahí se leen como el mismo
+          botón repetido.
+
+          Va en todas las filas, y la que hay que justificar es la atenuada. Es
+          justo la que más lo necesita: quien viene a completar algo busca lo que
+          lleva semanas parado, que es lo que la propia pantalla dice al explicar
+          su filtro de estado. Quitárselo dejaría sin salida a media lista y
+          convertiría la atenuación en lo que el comentario de arriba dice que no
+          es: esconder. Lo que se le debe a quien pulsa es saber a qué se suma, y
+          eso ya está dicho en el renglón de encima —«lleva N semanas esperando
+          respuesta»—, que se lee antes que el botón y no después.
+
+          También va en las filas sin texto. Una oferta dirigida a una familia es
+          material prometido sin forma de llegar hasta ella, o sea de las que más
+          les falta alguien que ponga el resto; lo que no se publica es la frase,
+          no la posibilidad de completarla.
+
+          El botón baja un escalón de tono con la fila, como los demás renglones.
+          El punto no: mide 6 px, es lo único que dice que esto se pulsa, y lo que
+          envejece es la promesa, no la posibilidad de completarla. */}
+      <div className="mt-3.5">
+        <Link
+          href={`/ofrecer?completa=${record.id}`}
+          className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-[13px] font-medium transition-[border-color,color,scale] duration-150 hover:border-accent hover:text-ink active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+            waiting ? "border-line text-muted" : "border-line-strong text-body"
+          }`}
+        >
+          <span aria-hidden className="size-1.5 rounded-full bg-accent" />
+          Puedo completar esta oferta
+        </Link>
+      </div>
     </article>
   );
 }

@@ -196,7 +196,7 @@ export const shell = "mx-auto w-full max-w-[1400px] px-5 sm:px-8";
  *
  * La rejilla estira sus celdas, pero eso no basta: quien tiene que ocupar el
  * alto de la fila es la tarjeta de dentro, y por eso las que se usan aquí
- * (CaseRow, CityRow, NeedRow, FoundationCard) llevan `h-full`. Con alturas
+ * (CaseRow, CityRow, NeedRow, DonationCauseCard) llevan `h-full`. Con alturas
  * naturales, una fila de tarjetas con filete y sombra termina en escalera y se
  * lee como una rejilla rota; las que tienen una acción al final la anclan abajo
  * para que el hueco caiga entre bloques y no dentro.

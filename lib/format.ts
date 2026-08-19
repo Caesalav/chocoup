@@ -157,6 +157,43 @@ export function excerpt(text: string, max = 160): string {
   return `${clean.slice(0, max).trimEnd()}…`;
 }
 
+/**
+ * La primera frase de una causa: la escrita a mano si la hay, y si no el recorte
+ * de su historia.
+ *
+ * Es la misma decisión en los tres sitios donde esa frase se lee, y por eso está
+ * escrita una vez: la tarjeta de /donaciones, la tarjeta grande de la ficha de un
+ * municipio, y —la que de verdad importa— la descripción de la página, que es lo
+ * que WhatsApp enseña en la vista previa cuando alguien pega el enlace.
+ *
+ * `cases.summary` (0016) existe justamente por ese tercer sitio. El recorte
+ * automático corta donde cae, a mitad de frase o de palabra, y da igual dentro de
+ * una lista pero no cuando esa media oración es el primer contacto de alguien con
+ * una familia del Chocó.
+ *
+ * El resumen se recorta también, aunque la base de datos lo limite a 120: los
+ * huecos donde se pinta son de 140 y de 150, así que sin este recorte un resumen de
+ * 120 caracteres desbordaría el sitio más estrecho de los tres. Recortar algo que
+ * ya cabe no hace nada, y es lo que hace que este hueco no dependa de que el límite
+ * de la columna y el de la tarjeta no se separen nunca.
+ */
+export function caseLead(row: { summary: string; story: string }, max: number): string {
+  // El `?? ""` no es un adorno defensivo: es el hueco de la ventana en la que el
+  // código va por delante de la base. `cases.summary` la crea 0016, y si este
+  // código llega a producción antes de que se pegue esa migración, la fila que
+  // vuelve de Supabase no trae la columna y aquí `row.summary` es `undefined`. Se
+  // midió: `.trim()` a secas convertía eso en un 500 en la ficha de Quibdó, o sea
+  // el municipio con casos reales caído por una columna que aún no existía.
+  //
+  // Con esto, ese rato degrada a lo que el portal hacía ayer —el recorte de la
+  // historia— y nadie se queda sin leer a una familia. El tipo dice `string`
+  // porque en la base ya migrada lo es, y no se relaja a `string | undefined`
+  // para que quien escriba un formulario nuevo siga teniendo que mandarlo.
+  const written = (row.summary ?? "").trim();
+  if (written) return excerpt(written, max);
+  return row.story ? excerpt(row.story, max) : "";
+}
+
 /** Pluralización mínima en español, suficiente para los contadores del portal. */
 export function plural(count: number, singular: string, plural_: string): string {
   return `${count} ${count === 1 ? singular : plural_}`;

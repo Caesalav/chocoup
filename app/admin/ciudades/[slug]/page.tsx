@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createCase, deleteCity, saveCityDonationChannel, updateCity } from "@/app/admin/actions";
-import { DonationChannelForm } from "@/components/admin/DonationChannelForm";
-import { FoundationForm } from "@/components/admin/FoundationForm";
+import { createCase, deleteCity, updateCity } from "@/app/admin/actions";
 import { NeedsManager } from "@/components/admin/NeedsManager";
 import { PhotoManager } from "@/components/admin/PhotoManager";
 import { DangerSubmitButton, SubmitButton } from "@/components/admin/SubmitButton";
 import { LocationPicker } from "@/components/map/LocationPicker";
 import { DraftChip } from "@/components/ui/Chip";
 import { eyebrow, field, panel } from "@/components/ui/styles";
+import { CASE_KINDS } from "@/lib/constants";
 import { getCityPage } from "@/lib/data";
 import { plural } from "@/lib/format";
 import { canWriteCity, currentTeam } from "@/lib/team";
@@ -26,7 +25,7 @@ export default async function AdminCityPage({ params }: Props) {
   ]);
   if (!data) notFound();
 
-  const { city, foundation, photos, zoneNeeds, cases } = data;
+  const { city, photos, zoneNeeds, cases } = data;
 
   // Quien no tiene este municipio asignado lo puede leer —hace falta, para no
   // duplicar el trabajo de otra persona— pero no se le ofrece ningún formulario:
@@ -155,77 +154,13 @@ export default async function AdminCityPage({ params }: Props) {
         </div>
       </section>
 
-      {/* El canal del municipio, aparte de la fundación y aparte de la ficha.
-          Son tres cosas distintas: el canal es del pueblo, el enlace de abajo es
-          de la fundación, y el resto de esta pantalla lo escribe también quien
-          documenta. Vive en el municipio y no en su fundación porque un municipio
-          existe siempre y una fundación es opcional —Quibdó no tiene—, y porque
-          inventar una fundación para colgar de ella una llave sería publicar el
-          nombre de una organización que no existe. */}
-      <section className="mt-10">
-        <h2 className="font-display text-2xl text-ink">A dónde va el dinero de {city.name}</h2>
-        {isCoordination ? (
-          <>
-            <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted">
-              El canal del municipio, que sale en su ficha pública. Puede ser una llave de
-              transferencia, un enlace de recaudación o un número de contacto. No lo heredan
-              sus casos: cada familia tiene el suyo o no tiene ninguno.
-            </p>
-            <div className="mt-4">
-              <DonationChannelForm
-                action={saveCityDonationChannel}
-                id={city.id}
-                row={city}
-                owner={city.name}
-              />
-            </div>
-          </>
-        ) : (
-          <div className={`${panel} mt-4 p-4`}>
-            <p className="text-sm text-ink">
-              {city.donation_key || city.donation_url || city.donation_phone || "Todavía sin canal"}
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              A dónde va el dinero de este municipio lo registra coordinación, porque quien
-              edita ese campo puede desviar las donaciones del pueblo entero. Manda el dato por
-              el grupo. Todo lo demás de esta pantalla sí lo puedes guardar tú.
-            </p>
-          </div>
-        )}
-      </section>
-
-      <section className="mt-10">
-        <h2 className="font-display text-2xl text-ink">Fundación madre</h2>
-        <p className="mt-1 text-sm text-muted">
-          Una por municipio: es el canal de donación que aparece en la página pública. Para cambiar
-          de fundación, quita esta y registra la nueva.
-        </p>
-
-        {/* Un solo formulario, y antes había uno más por cada «otra
-            organización». No es una lista más corta: es que la base de datos ya no
-            admite dos (0004), y ofrecer un formulario que guardara una segunda
-            sería ofrecer un botón que devuelve un error de restricción con la
-            familia delante.
-
-            El enlace de donación es a dónde va el dinero de quien pulsa "Donar":
-            el campo más delicado del portal, y por eso lo edita solo
-            coordinación. Los datos de la fundación se levantan en terreno y se
-            pasan por WhatsApp; registrarlos es un gesto de dos minutos y una
-            responsabilidad de otro tamaño. */}
-        {isCoordination ? (
-          <div className="mt-4">
-            <FoundationForm cityId={city.id} foundation={foundation ?? undefined} />
-          </div>
-        ) : (
-          <div className={`${panel} mt-4 p-4`}>
-            <p className="text-sm text-ink">{foundation?.name ?? "Todavía sin registrar"}</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              La fundación y su enlace de donación los registra coordinación, porque de ahí sale el
-              dinero. Manda los datos y el número de contacto por el grupo.
-            </p>
-          </div>
-        )}
-      </section>
+      {/* Aquí estaban el canal del municipio y el formulario de la fundación
+          madre. Los dos se fueron con 0015 y no se sustituyen por nada en esta
+          pantalla: el destino del dinero es de una causa, y se edita en su ficha,
+          con su nombre y su historia delante. El general se cambia en el repaso de
+          todos los destinos, que desde la reforma del panel cuelga de Casos
+          (`MONEY_REVIEW_PATH`) y es la única pantalla desde la que se puede ver a
+          la vez todo lo que el portal publica como destino. */}
 
       <section className="mt-10">
         <h2 className="font-display text-2xl text-ink">Necesidades de la zona</h2>
@@ -241,8 +176,14 @@ export default async function AdminCityPage({ params }: Props) {
         <h2 className="font-display text-2xl text-ink">Casos</h2>
         <p className="mt-1 text-sm text-muted">
           {cases.length === 0
-            ? "Todavía no hay casos en este municipio."
+            ? "Todavía no hay casos en este municipio"
             : plural(cases.length, "caso registrado", "casos registrados")}
+          {". "}
+          Los de todos los municipios están en{" "}
+          <Link href="/admin/casos" className="text-accent hover:underline">
+            Casos
+          </Link>
+          , que es por donde se vuelve a uno sin pasar por su pueblo.
         </p>
 
         {cases.length > 0 && (
@@ -276,8 +217,24 @@ export default async function AdminCityPage({ params }: Props) {
 
           <h3 className="font-medium text-ink">Nuevo caso</h3>
 
+          {/* Qué es, antes del nombre, porque cambia lo que hay que escribir en el
+              campo siguiente. Se puede dejar en «Persona o familia», que es lo que
+              son casi todas, y cambiarlo después en la ficha. Lo que decide de
+              verdad es el hueco del retrato mientras no haya foto: las iniciales de
+              un nombre no significan nada en un colegio ni en un animal (0016). */}
           <label className="block">
-            <span className={field.label}>Nombre de la persona o familia</span>
+            <span className={field.label}>¿Qué es?</span>
+            <select name="case_kind" defaultValue="persona" className={field.select}>
+              {CASE_KINDS.map((kind) => (
+                <option key={kind.value} value={kind.value}>
+                  {kind.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className={field.label}>El nombre con el que aparece</span>
             <input
               name="display_name"
               required
@@ -285,8 +242,8 @@ export default async function AdminCityPage({ params }: Props) {
               placeholder="Ej.: Daniela, madre soltera reconstruye sola su casa"
             />
             <span className={field.hint}>
-              Usa el nombre con el que la persona acepta aparecer. Si prefiere no dar su nombre
-              completo, pon solo el primero.
+              De una persona, el nombre con el que acepta aparecer: si prefiere no dar el completo,
+              pon solo el primero. De un colegio o un animal, cómo se le llama en el pueblo.
             </span>
           </label>
 
@@ -349,8 +306,11 @@ export default async function AdminCityPage({ params }: Props) {
 function CityHeader({ city, readOnly = false }: { city: City; readOnly?: boolean }) {
   return (
     <>
-      <Link href="/admin" className="text-sm text-muted hover:text-ink hover:underline">
-        ← Panel
+      {/* A la lista de municipios y no a la puerta: es de donde se viene, y la
+          puerta está a un toque en la barra. Antes esta pantalla y la lista eran la
+          misma cosa, así que «← Panel» valía para las dos. */}
+      <Link href="/admin/ciudades" className="text-sm text-muted hover:text-ink hover:underline">
+        ← Ciudades
       </Link>
 
       <header className="mt-4 flex flex-wrap items-end justify-between gap-3">

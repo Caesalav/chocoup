@@ -11,6 +11,7 @@ import {
 } from "@/lib/choco-map";
 import { plural } from "@/lib/format";
 import { paintMunicipalities, TIER_FILL } from "@/lib/needs-scale";
+import { PaletteFillDefs } from "@/components/ui/PaletteFillDefs";
 
 type Props = {
   pins: MapPin[];
@@ -33,8 +34,8 @@ type Props = {
 const GAP = 3;
 
 /**
- * El Chocó como mosaico de sus 30 municipios, coloreados por necesidades
- * abiertas.
+ * El Chocó como mosaico de sus 30 municipios, coloreados por cuánto falta
+ * por cubrir.
  *
  * Sin JavaScript y sin servicio de mapas: es SVG renderizado en el servidor y
  * los enlaces son <a>, así que /mapa funciona con la señal del Chocó y
@@ -65,6 +66,7 @@ export function ChocoMap({ pins, hrefFor, activeSlug, bare = false, className }:
           : `Mapa del Chocó con ${plural(pins.length, "municipio documentado", "municipios documentados")}`
       }
     >
+      <PaletteFillDefs />
       {bare ? (
         <path
           d={CHOCO_PATH}

@@ -141,6 +141,22 @@ export function ShareIcon(props: IconProps) {
 }
 
 /**
+ * El buzón de sugerencias: un recuadro con líneas, no la burbuja de WhatsApp.
+ *
+ * `ChatIcon` ya significa escribir por WhatsApp a quien recibe. Reutilizarlo haría
+ * que el botón de «Sugerencias» se leyera como otro chat, y no lo es: es un
+ * recado al equipo sobre el portal.
+ */
+export function FeedbackIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M5.2 4.6h13.6A1.6 1.6 0 0 1 20.4 6.2v8.4a1.6 1.6 0 0 1-1.6 1.6H10L5.2 20.2V6.2A1.6 1.6 0 0 1 6.8 4.6H5.2z" />
+      <path d="M8.4 8.8h7.2M8.4 12h4.8" />
+    </Glyph>
+  );
+}
+
+/**
  * Escribir por WhatsApp. Es una burbuja de conversación y no el logotipo de la
  * marca: a 20 px el auricular dentro del globo se convierte en una mancha, y la
  * referencia usa exactamente esta burbuja en el mismo sitio de su barra.

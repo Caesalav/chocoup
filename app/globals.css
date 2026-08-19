@@ -104,7 +104,12 @@
 
      `-strong` es la versión de más peso, y en claro eso quiere decir más
      oscura: el hover no puede ir hacia la luz cuando el fondo ya es lo más
-     claro de la página. `-soft` es el relleno de una pastilla. */
+     claro de la página. `-soft` es el relleno de una pastilla.
+
+     El plano sigue aquí porque el texto, el filete y `::selection` no pueden
+     ser un degradado. El volumen de un relleno —botón, pastilla, barra, mapa—
+     lo pintan `--fill-*` más abajo: el tope es un verde vivo y el pie el bosque,
+     la misma familia, sin un segundo nombre. */
   --color-accent: #1b7a4c;
   --color-accent-strong: #145c39;
   --color-accent-soft: oklch(0.55 0.13 155 / 14%);
@@ -141,6 +146,148 @@
      destinos se muda a una cabecera. Nunca están las dos: la barra desaparece a
      partir de `lg` y la cabecera no existe por debajo. */
   --head-h: 72px;
+
+  /* Volumen de los rellenos. La luz viene de arriba a la izquierda. El tope es
+     un verde vivo —más croma, más hoja— y el pie es el bosque de siempre: sin
+     ese salto el degradado no se leía. La letra de los botones cae a mitad de
+     pastilla, donde ya manda `--color-accent` (4,8:1 con papel); el vivo es el
+     brillo del borde de arriba, no el fondo del texto.
+
+     La escala cálida abre igual: el mapa no lleva letra encima, y «Urgente»
+     arranca en un rojo vivo; la letra de la pastilla cae sobre `--color-need-high`. */
+  --accent-lit: #2bbd68;
+  --accent-deep: #0c4530;
+  --accent-press: #083324;
+  --need-low-lit: #ffc090;
+  --need-low-deep: #d47838;
+  --need-mid-lit: #ff8a45;
+  --need-mid-deep: #a84818;
+  --need-high-lit: #e24a32;
+  --need-high-deep: #6e140c;
+  --need-blank-lit: #f3efe8;
+  --need-blank-deep: #d4cdc2;
+  --need-none-lit: #e4dcd0;
+  --need-none-deep: #b8afa1;
+
+  --fill-accent: linear-gradient(
+    145deg,
+    var(--accent-lit) 0%,
+    var(--color-accent) 46%,
+    var(--accent-deep) 100%
+  );
+  --fill-accent-strong: linear-gradient(
+    145deg,
+    #1a9b54 0%,
+    var(--accent-deep) 48%,
+    var(--accent-press) 100%
+  );
+  --fill-accent-soft: linear-gradient(
+    145deg,
+    oklch(0.72 0.18 148 / 32%) 0%,
+    oklch(0.52 0.12 158 / 10%) 100%
+  );
+  --fill-need-low: linear-gradient(
+    145deg,
+    var(--need-low-lit) 0%,
+    var(--color-need-low) 46%,
+    var(--need-low-deep) 100%
+  );
+  --fill-need-mid: linear-gradient(
+    145deg,
+    var(--need-mid-lit) 0%,
+    var(--color-need-mid) 46%,
+    var(--need-mid-deep) 100%
+  );
+  --fill-need-high: linear-gradient(
+    145deg,
+    var(--need-high-lit) 0%,
+    var(--color-need-high) 46%,
+    var(--need-high-deep) 100%
+  );
+  --fill-need-mid-soft: linear-gradient(
+    145deg,
+    oklch(0.78 0.16 48 / 42%) 0%,
+    oklch(0.62 0.14 38 / 14%) 100%
+  );
+  --fill-need-high-soft: linear-gradient(
+    145deg,
+    oklch(0.62 0.19 32 / 32%) 0%,
+    oklch(0.42 0.16 28 / 10%) 100%
+  );
+  --fill-need-blank: linear-gradient(
+    145deg,
+    var(--need-blank-lit) 0%,
+    var(--need-blank-deep) 100%
+  );
+  --fill-need-none: linear-gradient(
+    145deg,
+    var(--need-none-lit) 0%,
+    var(--need-none-deep) 100%
+  );
+}
+
+@layer utilities {
+  .bg-accent {
+    background-color: var(--color-accent);
+    background-image: var(--fill-accent);
+  }
+  .bg-accent-strong,
+  .hover\:bg-accent-strong:hover {
+    background-color: var(--color-accent-strong);
+    background-image: var(--fill-accent-strong);
+  }
+  .bg-accent-soft {
+    background-color: var(--color-accent-soft);
+    background-image: var(--fill-accent-soft);
+  }
+  .bg-need-low {
+    background-color: var(--color-need-low);
+    background-image: var(--fill-need-low);
+  }
+  .bg-need-mid {
+    background-color: var(--color-need-mid);
+    background-image: var(--fill-need-mid);
+  }
+  .bg-need-high {
+    background-color: var(--color-need-high);
+    background-image: var(--fill-need-high);
+  }
+  .bg-need-mid-soft {
+    background-color: var(--color-need-mid-soft);
+    background-image: var(--fill-need-mid-soft);
+  }
+  .bg-need-high-soft,
+  .hover\:bg-need-high-soft:hover {
+    background-color: var(--color-need-high-soft);
+    background-image: var(--fill-need-high-soft);
+  }
+  .bg-need-blank {
+    background-color: var(--color-need-blank);
+    background-image: var(--fill-need-blank);
+  }
+  .bg-need-none {
+    background-color: var(--color-need-none);
+    background-image: var(--fill-need-none);
+  }
+
+  .fill-accent {
+    fill: url(#fill-accent);
+  }
+  .fill-need-blank {
+    fill: url(#fill-need-blank);
+  }
+  .fill-need-none {
+    fill: url(#fill-need-none);
+  }
+  .fill-need-low {
+    fill: url(#fill-need-low);
+  }
+  .fill-need-mid {
+    fill: url(#fill-need-mid);
+  }
+  .fill-need-high {
+    fill: url(#fill-need-high);
+  }
 }
 .has-strip {
   --strip-h: 76px;

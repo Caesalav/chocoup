@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Photo } from "@/components/ui/Photo";
 import { cardLink } from "@/components/ui/styles";
+import { progressPercent } from "@/lib/case-progress";
 import { plural } from "@/lib/format";
 import { needsTier, TIER_DOT } from "@/lib/needs-scale";
 import type { CityCardData } from "@/lib/types";
@@ -13,6 +14,9 @@ import type { CityCardData } from "@/lib/types";
  * por el nombre.
  */
 export function CityRow({ city }: { city: CityCardData }) {
+  const percent = progressPercent(city.progress.ratio);
+  const hasBar = city.progress.total > 0;
+
   return (
     <Link
       href={`/ciudades/${city.slug}`}
@@ -30,7 +34,7 @@ export function CityRow({ city }: { city: CityCardData }) {
         <div className="flex items-center gap-2">
           <span
             aria-hidden
-            className={`size-2.5 shrink-0 rounded-full ${TIER_DOT[needsTier(city.openNeeds)]}`}
+            className={`size-2.5 shrink-0 rounded-full ${TIER_DOT[needsTier(city.progress)]}`}
           />
           <h3 className="min-w-0 truncate font-display text-[18px] leading-tight text-ink">
             {city.name}
@@ -38,10 +42,14 @@ export function CityRow({ city }: { city: CityCardData }) {
         </div>
 
         <p className="mt-1.5 text-[13px] text-muted">
-          {plural(city.openNeeds, "necesidad abierta", "necesidades abiertas")}
+          {hasBar
+            ? `${percent} % cubierto · ${plural(city.openNeeds, "necesidad abierta", "necesidades abiertas")}`
+            : plural(city.openNeeds, "necesidad abierta", "necesidades abiertas")}
         </p>
         <p className="mt-0.5 text-[12px] text-faint">
           {plural(city.caseCount, "caso documentado", "casos documentados")}
+          {city.standingOffers > 0 &&
+            ` · ${plural(city.standingOffers, "aporte en camino", "aportes en camino")}`}
         </p>
       </div>
     </Link>

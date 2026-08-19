@@ -2,19 +2,29 @@ import { createSupabaseServerClient } from "./supabase/server";
 import { isDemoMode } from "./supabase/env";
 import {
   demoAdminCities,
+  demoCaseUpdates,
+  demoCases,
+  demoCities,
+  demoFeedback,
   demoMoneyDestinations,
   demoNeedOptions,
+  demoNeeds,
+  demoNewsletterSignups,
   demoOffersFor,
   demoTeamDirectory,
 } from "./demo-data";
-import { embeddedFoundation } from "./data";
-import { moneyDestinationsOf, type MoneyDestination } from "./donation-channel";
+import { getGeneralChannel } from "./data";
+import { donationChannel, moneyDestinationsOf, type MoneyDestination } from "./donation-channel";
+import { countOpenNeeds, OPEN_STATUSES } from "./needs";
 import type {
   AdminCityRow,
   Case,
+  CaseKind,
   City,
-  Foundation,
+  FeedbackNote,
+  Need,
   NeedOption,
+  NewsletterSignup,
   OfferStatus,
   OfferWithContext,
   TeamMemberEntry,
@@ -41,7 +51,10 @@ export async function getAdminCities(): Promise<AdminCityRow[]> {
 
   type Row = City & {
     cases: { id: string }[];
-    needs: { id: string; status: string }[];
+    // `status` va tipado y no como texto libre porque de aquí sale un conteo:
+    // así el contador compartido de lib/needs.ts entra sin conversiones, y un
+    // estado que no exista falla al compilar en vez de contarse como abierto.
+    needs: Pick<Need, "id" | "status">[];
     photos: { id: string }[];
     offers: { id: string; status: string }[];
   };
@@ -49,26 +62,187 @@ export async function getAdminCities(): Promise<AdminCityRow[]> {
   return ((data ?? []) as Row[]).map((city) => ({
     ...city,
     caseCount: city.cases.length,
-    openNeeds: city.needs.filter((need) => need.status !== "cubierta").length,
+    // La misma cuenta que el portal público, con una diferencia que no está
+    // aquí: al equipo las RLS le dejan ver también las necesidades de los casos
+    // sin publicar, así que este número puede ser mayor que el de /municipios.
+    // Es correcto —el panel es el inventario, no el escaparate— y por eso la
+    // definición se comparte y lo que cambia es quién pregunta. Ver lib/needs.ts.
+    openNeeds: countOpenNeeds(city.needs),
     photoCount: city.photos.length,
     pendingOffers: city.offers.filter((offer) => offer.status === "pendiente").length,
   }));
 }
 
 /**
+ * Una causa en la lista de /admin/casos, reducida a lo que hace falta para
+ * elegirla de un vistazo.
+ *
+ * El tipo vive aquí y no en lib/types.ts porque no lo consume nadie más: es la
+ * forma de una pantalla del panel, como `AdminCityRow`, y aquélla está allí solo
+ * porque nació antes de que hubiera un archivo de consultas del panel.
+ *
+ * Lo que lleva y lo que no está decidido por una sola pregunta: ¿esto ayuda a
+ * saber en qué causa hay que entrar? El municipio y el tipo la identifican; sin
+ * publicar y sin consentimiento dicen qué le falta para salir; el canal dice si
+ * el dinero es suyo o del general; las necesidades abiertas dicen cuánto le
+ * queda; y el último avance es el dato por el que existe esta pantalla —quien
+ * vuelve el jueves a escribir un avance busca la que lleva más tiempo sin
+ * ninguno—.
+ *
+ * No lleva el destino del dinero escrito ni su fecha de comprobación. Eso se
+ * repasa entero en `MONEY_REVIEW_PATH`, que es de coordinación, y esta lista la
+ * ve también quien documenta: una columna de llaves aquí sería publicar catorce
+ * destinos en una pantalla que no existe para eso.
+ */
+export type AdminCaseRow = {
+  id: string;
+  displayName: string;
+  kind: CaseKind;
+  cityId: string;
+  cityName: string;
+  citySlug: string;
+  cityPublished: boolean;
+  published: boolean;
+  consent: boolean;
+  /** Con canal propio, o recibiendo por el general. Ver `caseDonation()`. */
+  ownChannel: boolean;
+  openNeeds: number;
+  /**
+   * El día del último avance del diario, o nulo si todavía no hay ninguno.
+   *
+   * Es `max(case_updates.happened_on)` y no `cases.updated_at`, por lo mismo que
+   * en `CasePage.lastUpdateOn`: esa columna se mueve al corregir una tilde, así
+   * que la lista diría que hay noticias de una familia el día en que alguien
+   * arregló una errata. Nulo es frecuente y es una respuesta —esta causa está
+   * documentada y todavía no ha pasado nada— y no un hueco.
+   */
+  lastUpdateOn: string | null;
+};
+
+/**
+ * Las causas de todos los municipios, en una lista.
+ *
+ * Hasta aquí a una causa solo se llegaba entrando por su municipio, que es el
+ * recorrido de quien la documenta por primera vez y no el de quien vuelve: el
+ * jueves siguiente hay que escribir un avance de la familia Klinger y pasar por
+ * la ficha de Bahía Solano para encontrarla son dos pantallas de más y una
+ * decisión —«¿en qué pueblo estaba?»— que el panel puede contestar solo.
+ *
+ * Trae los borradores y las causas sin consentimiento, igual que el resto del
+ * panel: aquí el material se ve completo y lo que cambia es dónde se puede
+ * escribir. Quien documenta ve las de todos los municipios y no solo las suyas,
+ * por lo mismo que la lista de municipios: hace falta saber qué escribió otra
+ * persona esta mañana para no duplicar el trabajo. Lo que recorta de verdad es
+ * `canWriteCity`, y la pantalla lo dice fila por fila.
+ *
+ * El último avance se cuenta desde los avances que las políticas dejan ver, que
+ * es lo correcto por la misma razón que en la ficha pública: la fecha tiene que
+ * ser la del último avance que quien mira puede leer.
+ */
+export async function getAdminCases(): Promise<AdminCaseRow[]> {
+  /**
+   * Por municipio y dentro de él por nombre, que es como se busca: quien abre esto
+   * viene con un nombre en la cabeza y el pueblo es lo que reduce la lista a un
+   * puñado. No por fecha del último avance, aunque sea el dato más interesante de
+   * cada fila: una lista que se reordena sola cada vez que alguien escribe algo es
+   * una lista donde no se vuelve a encontrar lo que estaba a media pantalla.
+   *
+   * Se ordena aquí y no en la consulta porque el criterio de fuera es el nombre del
+   * municipio, que llega embebido: `order` no alcanza las columnas de una tabla
+   * anidada, así que ordenarlo en Postgres pediría una vista o un segundo viaje. Con
+   * `localeCompare` en español, además, la eñe y las tildes caen donde las espera
+   * quien lee.
+   */
+  const byCityThenName = (a: AdminCaseRow, b: AdminCaseRow) =>
+    a.cityName.localeCompare(b.cityName, "es") || a.displayName.localeCompare(b.displayName, "es");
+
+  if (isDemoMode()) {
+    return demoCases
+      .map((row) => {
+        const city = demoCities.find((entry) => entry.id === row.city_id)!;
+        return {
+          id: row.id,
+          displayName: row.display_name,
+          kind: row.case_kind,
+          cityId: city.id,
+          cityName: city.name,
+          citySlug: city.slug,
+          cityPublished: city.published,
+          published: row.published,
+          consent: row.consent_to_publish,
+          ownChannel: donationChannel(row) !== null,
+          openNeeds: countOpenNeeds(demoNeeds.filter((need) => need.case_id === row.id)),
+          lastUpdateOn: lastHappenedOn(
+            demoCaseUpdates.filter((update) => update.case_id === row.id),
+          ),
+        };
+      })
+      .sort(byCityThenName);
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  // Las necesidades y los avances viajan dentro de la misma consulta y no en dos
+  // vueltas más: son dos números por fila, y pedirlos por separado en una lista
+  // de cuarenta causas es cómo esta pantalla dejaría de abrirse con la señal del
+  // Chocó. De los avances se pide solo el día, que es lo único que se cuenta.
+  const { data } = await supabase
+    .from("cases")
+    .select("*, cities(name, slug, published), needs(id, status), case_updates(happened_on)")
+    .order("display_name");
+
+  type Row = Case & {
+    cities: Pick<City, "name" | "slug" | "published"> | null;
+    needs: Pick<Need, "id" | "status">[];
+    case_updates: { happened_on: string }[];
+  };
+
+  return ((data ?? []) as Row[])
+    // Una causa sin municipio no existe —`cases.city_id` es obligatorio— pero el
+    // embebido puede llegar nulo si la política del municipio no lo deja leer, y
+    // entonces la fila no se puede situar en ninguna parte. Se cae de la lista en
+    // vez de inventarle un «Sin municipio» que no llevaría a ningún sitio.
+    .filter((row) => row.cities)
+    .map((row) => ({
+      id: row.id,
+      displayName: row.display_name,
+      kind: row.case_kind,
+      cityId: row.city_id,
+      cityName: row.cities!.name,
+      citySlug: row.cities!.slug,
+      cityPublished: row.cities!.published,
+      published: row.published,
+      consent: row.consent_to_publish,
+      ownChannel: donationChannel(row) !== null,
+      openNeeds: countOpenNeeds(row.needs),
+      lastUpdateOn: lastHappenedOn(row.case_updates),
+    }))
+    .sort(byCityThenName);
+}
+
+/** El día del avance más reciente, o nulo si esa causa no tiene ninguno. */
+function lastHappenedOn(updates: { happened_on: string }[]): string | null {
+  return updates.reduce<string | null>(
+    (latest, update) =>
+      latest === null || update.happened_on > latest ? update.happened_on : latest,
+    null,
+  );
+}
+
+/**
  * Todos los destinos de dinero que publica el portal, en una lista.
  *
- * Existe por lo que se perdió al quitar la llave global: antes había un solo
- * sitio donde mirar a dónde iba el dinero, y ahora hay uno por municipio, uno por
- * caso y el de cada fundación. Eso es correcto —cada uno pertenece a alguien—
- * pero deja de haber una pantalla que conteste «¿qué destinos estamos
- * publicando?», y esa pregunta hay que poder hacerla de un vistazo: es la que
- * detecta el canal que no debería estar ahí.
+ * Existe porque el destino del dinero está repartido: uno general y uno por cada
+ * caso que tenga el suyo. Eso es correcto —cada uno pertenece a alguien— pero
+ * deja de haber una pantalla que conteste «¿qué destinos estamos publicando?», y
+ * esa pregunta hay que poder hacerla de un vistazo: es la que detecta el canal
+ * que no debería estar ahí.
  *
- * No se edita desde aquí. Cada destino se cambia en la ficha de quien lo recibe,
- * que es donde está su nombre, su historia y su municipio delante; esta pantalla
- * solo enseña y enlaza. Un formulario aquí sería un sitio más donde cambiar lo
- * mismo, que es cómo se cambia el que no se quería cambiar.
+ * No se edita desde aquí, salvo el general, que no tiene ficha propia donde
+ * vivir. El de cada caso se cambia en la ficha de quien lo recibe, con su nombre
+ * y su historia delante; esta pantalla enseña y enlaza. Un segundo formulario
+ * para lo mismo sería un sitio más donde cambiar el canal que no se quería
+ * cambiar.
  *
  * Se listan también los que no se ven todavía —un municipio sin publicar, un caso
  * en borrador—, marcados como tales: un destino escrito en una ficha que aún no
@@ -78,23 +252,46 @@ export async function getMoneyDestinations(): Promise<MoneyDestination[]> {
   if (isDemoMode()) return demoMoneyDestinations();
   const supabase = await createSupabaseServerClient();
 
-  const { data } = await supabase
-    .from("cities")
-    .select("*, foundations(name, donation_url), cases(*)")
-    .order("name");
+  // Se pide desde los casos y no desde los municipios, que es como se pedía
+  // antes: ahora el municipio no tiene canal, así que colgar la consulta de él
+  // obligaría a recorrer pueblos vacíos para llegar a lo único que hay.
+  const [general, { data }] = await Promise.all([
+    getGeneralChannel(),
+    supabase.from("cases").select("*, cities(name, slug, published)").order("display_name"),
+  ]);
 
-  type EmbeddedFoundation = Pick<Foundation, "name" | "donation_url">;
-  type Row = City & {
-    foundations: EmbeddedFoundation | EmbeddedFoundation[] | null;
-    cases: Case[];
-  };
+  type Row = Case & { cities: Pick<City, "name" | "slug" | "published"> | null };
 
-  // `foundations` llega como objeto y no como lista: la restricción de una
-  // fundación por municipio hace que PostgREST lea la relación como de uno a uno.
-  // Ver `embeddedFoundation`, que acepta las dos formas.
-  return ((data ?? []) as Row[]).flatMap((city) =>
-    moneyDestinationsOf(city, embeddedFoundation(city.foundations), city.cases),
+  return moneyDestinationsOf(
+    general,
+    ((data ?? []) as Row[])
+      .filter((row) => row.cities)
+      .map((row) => ({
+        ...row,
+        cityName: row.cities!.name,
+        citySlug: row.cities!.slug,
+        cityPublished: row.cities!.published,
+      })),
   );
+}
+
+/**
+ * Los correos apuntados a los avisos del portal.
+ *
+ * Solo coordinación, y no por costumbre: es la única lista de datos personales
+ * que no pertenece a ningún municipio, así que no hay asignación que la haga de
+ * nadie. La política de la base de datos dice lo mismo
+ * (`newsletter_coordination_read`, 0015) y es la que manda; esto devolvería una
+ * lista vacía para cualquier otra sesión.
+ */
+export async function getNewsletterSignups(): Promise<NewsletterSignup[]> {
+  if (isDemoMode()) return demoNewsletterSignups();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("newsletter_signups")
+    .select("id, email, created_at")
+    .order("created_at", { ascending: false });
+  return (data ?? []) as NewsletterSignup[];
 }
 
 export async function getOffers(status?: OfferStatus): Promise<OfferWithContext[]> {
@@ -150,10 +347,14 @@ export async function getNeedOptions(): Promise<NeedOption[]> {
   if (isDemoMode()) return demoNeedOptions();
   const supabase = await createSupabaseServerClient();
 
+  // El desplegable ofrece lo que se puede cubrir, así que el filtro se escribe
+  // con la misma lista que cuenta el portal y no como un «distinto de cubierta»
+  // suelto: es la única de estas cuentas que viaja a Postgres, y era la que se
+  // quedaría atrás el día que la lista de estados cambie. Ver lib/needs.ts.
   const { data } = await supabase
     .from("needs")
     .select("id, title, status, cities(name), cases(display_name)")
-    .neq("status", "cubierta")
+    .in("status", [...OPEN_STATUSES])
     .order("created_at", { ascending: false });
 
   type Row = {
@@ -206,4 +407,20 @@ export async function getTeamDirectory(): Promise<TeamMemberEntry[]> {
         ? row.cityIds.filter((id): id is string => typeof id === "string")
         : [],
     }));
+}
+
+/**
+ * El buzón: lo que el público escribió sobre el portal, no sobre las familias.
+ *
+ * Lo lee todo el equipo. Borrarlo es de coordinación, igual que las ofertas
+ * que no apuntan a ningún municipio: no hay un pueblo asignado al que recortar.
+ */
+export async function getFeedback(): Promise<FeedbackNote[]> {
+  if (isDemoMode()) return demoFeedback();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("feedback")
+    .select("id, kind, body, contact, page_path, created_at")
+    .order("created_at", { ascending: false });
+  return (data ?? []) as FeedbackNote[];
 }

@@ -2,18 +2,39 @@ import { createSupabaseServerClient } from "./supabase/server";
 import { isDemoMode } from "./supabase/env";
 import {
   demoAidRecords,
+  demoCampaignFocus,
   demoCasePage,
   demoCaseCards,
   demoCityCards,
-  demoCityDonationEntries,
+  demoContributionTally,
+  demoGeneralChannel,
   demoCityPage,
   demoNeedCards,
   demoOfferRecords,
   demoOfferTarget,
   demoPortalTotals,
 } from "./demo-data";
+import { EMPTY_FOCUS, type CampaignFocusRow } from "./campaign";
 import { situationPhotos, withUpdatePhotos } from "./case-photos";
-import { donationChannel } from "./donation-channel";
+import { lastUpdateOn } from "./case-updates";
+import { cityProgress } from "./case-progress";
+import {
+  CITY_OFFER_ACTIVITY_VIEW,
+  type CityOfferActivity,
+} from "./city-activity";
+import {
+  CONTRIBUTION_TALLY_VIEW,
+  EMPTY_TALLY,
+  type ContributionTally,
+} from "./contributions";
+import { donationChannel, type DonationChannel } from "./donation-channel";
+import {
+  countCoveredNeeds,
+  countOpenCases,
+  countOpenNeeds,
+  isCoveredNeed,
+  isOpenNeed,
+} from "./needs";
 import { savedFrame, type PhotoFrame } from "./photo-frame";
 import type {
   AidRecord,
@@ -21,11 +42,10 @@ import type {
   CaseCard,
   CasePage,
   CityCardData,
-  CityDonationEntry,
   CityPage,
   City,
   CaseUpdate,
-  Foundation,
+  DonationColumns,
   Need,
   NeedCard,
   NeedCategory,
@@ -104,30 +124,93 @@ function bySortOrder<T extends Pick<Photo, "sort_order">>(photos: T[]): T[] {
 }
 
 /**
- * La fundación de un municipio. Una, no la primera de una lista.
+ * El canal general del portal, o nulo si no hay ninguno registrado.
  *
- * Se pide con `maybeSingle`, que es una afirmación y no una comodidad: la base de
- * datos garantiza una fila por municipio (`foundations_one_per_city`, 0004), de
- * modo que aquí no hay nada que desempatar. Antes se pedía la lista ordenada por
- * la marca de «madre» y se cogía la primera, y eso convertía el destino del dinero
- * en el resultado de un orden.
+ * Es una fila y solo una, garantizado por la base de datos
+ * (`donation_channel_one_row`, 0015). Se pide con `maybeSingle`, que aquí es una
+ * afirmación y no una comodidad: si algún día hubiera dos, devuelve error y esto
+ * devuelve nulo, o sea «no hay canal general». Ante la ambigüedad sobre a dónde
+ * va el dinero, callar es la respuesta correcta, y las fichas de los casos sin
+ * canal propio pasan a decir que todavía no hay a dónde enviarles. Es la misma
+ * decisión que tomaba `donationChannel()` con dos columnas llenas.
  *
- * Y si algún día hubiera dos —una base sin la migración aplicada—, `maybeSingle`
- * devuelve error y esto devuelve nulo, o sea «sin fundación»: la ficha se queda sin
- * botón de donar en vez de mandar el dinero a un enlace elegido al azar. Con la
- * ambigüedad delante, no publicar es la respuesta correcta.
+ * Nulo es un estado que se puede provocar en un minuto y a propósito: si el
+ * destino general se compromete, coordinación lo vacía desde el panel y el portal
+ * deja de enseñarlo sin esperar a tener el siguiente.
  */
-async function foundationOf(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  cityId: string,
-): Promise<Foundation | null> {
-  const { data } = await supabase
-    .from("foundations")
-    .select("*")
-    .eq("city_id", cityId)
-    .maybeSingle<Foundation>();
+export async function getGeneralChannel(): Promise<DonationChannel | null> {
+  if (isDemoMode()) return demoGeneralChannel();
+  const supabase = await createSupabaseServerClient();
 
-  return data ?? null;
+  const { data } = await supabase
+    .from("donation_channel")
+    .select(
+      "donation_key, donation_url, donation_phone, donation_app, donation_holder, donation_verified_on",
+    )
+    .maybeSingle<DonationColumns>();
+
+  return data ? donationChannel(data) : null;
+}
+
+/**
+ * El foco que coordinación ha marcado, o vacío si no hay ninguno.
+ *
+ * Vacío no es un error: entonces el aviso del inicio cae en el pueblo más
+ * atrasado. `maybeSingle` ante dos filas (que la base de datos impide) también
+ * devuelve vacío, y el mapa sigue hablando solo.
+ */
+export async function getCampaignFocusRow(): Promise<CampaignFocusRow> {
+  if (isDemoMode()) return demoCampaignFocus();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("campaign_focus")
+    .select("city_id, case_id, note")
+    .maybeSingle<CampaignFocusRow>();
+
+  return data ?? EMPTY_FOCUS;
+}
+
+function cityBoard(
+  needs: Pick<Need, "status" | "case_id">[],
+  standingOffers: number,
+) {
+  const progress = cityProgress(needs);
+  return {
+    openNeeds: countOpenNeeds(needs),
+    openCases: countOpenCases(needs),
+    progress: {
+      total: progress.total,
+      covered: progress.covered,
+      partial: progress.partial,
+      ratio: progress.ratio,
+    },
+    standingOffers,
+  };
+}
+
+/**
+ * Los dos números del contador de aportes.
+ *
+ * Es la ÚNICA lectura de `public.offer_tally` en todo el proyecto, y la regla
+ * `no-restricted-syntax` de eslint.config.mjs lo mantiene así: el número no puede
+ * entrar al portal por una segunda consulta que filtre a su manera, que es
+ * exactamente cómo se coló el descuadre de las necesidades abiertas. Qué cuenta
+ * cada uno está escrito en lib/contributions.ts y en la vista.
+ *
+ * Sin fila —no debería pasar, la vista siempre devuelve una— se enseñan ceros y
+ * no se esconde el contador: un cero es cierto y además es la verdad de un portal
+ * que acaba de abrir.
+ */
+export async function getContributionTally(): Promise<ContributionTally> {
+  if (isDemoMode()) return demoContributionTally();
+  const supabase = await createSupabaseServerClient();
+
+  const { data } = await supabase
+    .from(CONTRIBUTION_TALLY_VIEW)
+    .select("ofrecidos, entregados")
+    .maybeSingle<ContributionTally>();
+
+  return data ?? EMPTY_TALLY;
 }
 
 /**
@@ -135,37 +218,40 @@ async function foundationOf(
  * Son las etiquetas de la tarjeta de un caso: tres palabras que dicen qué falta.
  */
 export function openCategories(needs: Pick<Need, "category" | "status">[]): NeedCategory[] {
-  return [
-    ...new Set(
-      needs.filter((need) => need.status !== "cubierta").map((need) => need.category),
-    ),
-  ];
+  return [...new Set(needs.filter(isOpenNeed).map((need) => need.category))];
 }
 
 export async function getCityCards(): Promise<CityCardData[]> {
   if (isDemoMode()) return demoCityCards();
   const supabase = await createSupabaseServerClient();
 
-  const { data, error } = await supabase
-    .from("cities")
-    .select(
-      "*, needs(id, category, status, case_id), cases(id), photos(storage_path, thumb_path, sort_order, case_id, focus_x, focus_y, zoom)",
-    )
-    .order("name");
+  const [{ data, error }, activity] = await Promise.all([
+    supabase
+      .from("cities")
+      .select(
+        "*, needs(id, category, status, case_id), cases(id), photos(storage_path, thumb_path, sort_order, case_id, focus_x, focus_y, zoom)",
+      )
+      .order("name"),
+    supabase.from(CITY_OFFER_ACTIVITY_VIEW).select("city_id, en_camino"),
+  ]);
 
   if (error || !data) return [];
+
+  const onTheWay = new Map(
+    ((activity.data ?? []) as CityOfferActivity[]).map((row) => [row.city_id, row.en_camino]),
+  );
 
   return (data as NestedCityRow[]).map((city) => ({
     ...city,
     coverPath: coverOf(city.photos.filter((photo) => photo.case_id === null)),
     coverFrame: coverFrameOf(city.photos.filter((photo) => photo.case_id === null)),
-    openNeeds: city.needs.filter((need) => need.status !== "cubierta").length,
     caseCount: city.cases.length,
     needs: city.needs.map((need) => ({
       category: need.category,
       status: need.status,
       case_id: need.case_id,
     })),
+    ...cityBoard(city.needs, onTheWay.get(city.id) ?? 0),
   }));
 }
 
@@ -181,8 +267,7 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
 
   if (!city) return null;
 
-  const [foundation, photos, needs, cases, updateLinks] = await Promise.all([
-    foundationOf(supabase, city.id),
+  const [photos, needs, cases, updateLinks] = await Promise.all([
     supabase
       .from("photos")
       .select("*")
@@ -221,7 +306,6 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
 
   return {
     city,
-    foundation,
     photos: allPhotos.filter((photo) => photo.case_id === null),
     zoneNeeds: allNeeds.filter((need) => need.case_id === null),
     caseNeeds: allNeeds.filter((need) => need.case_id !== null),
@@ -241,7 +325,7 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
         coverFrame: coverFrameOf(casePhotos),
         portraitPath: portraitOf(row.portrait_photo_id, nestedPhotos),
         portraitFrame: portraitFrameOf(row.portrait_photo_id, nestedPhotos),
-        openNeeds: row.needs.filter((need) => need.status !== "cubierta").length,
+        openNeeds: countOpenNeeds(row.needs),
         categories: openCategories(row.needs),
       };
     }),
@@ -273,7 +357,7 @@ export async function getCasePage(
 
   if (!caseRecord) return null;
 
-  const [photos, needs, updateRows, foundation] = await Promise.all([
+  const [photos, needs, updateRows, generalChannel] = await Promise.all([
     supabase
       .from("photos")
       .select("*")
@@ -287,21 +371,25 @@ export async function getCasePage(
       .eq("case_id", caseRecord.id)
       .order("happened_on", { ascending: true })
       .order("created_at", { ascending: true }),
-    foundationOf(supabase, city.id),
+    // Va en la misma tanda y no en la página: la ficha no puede pintar la sección
+    // del dinero sin saber si el canal que enseña es de esta persona o el general.
+    getGeneralChannel(),
   ]);
 
   const allPhotos = (photos.data ?? []) as Photo[];
+  const updates = withUpdatePhotos(
+    (updateRows.data ?? []) as Omit<CaseUpdate, "photoPath" | "photoFrame">[],
+    allPhotos,
+  );
 
   return {
     city,
     caseRecord,
     photos: allPhotos,
     needs: (needs.data ?? []) as Need[],
-    updates: withUpdatePhotos(
-      (updateRows.data ?? []) as Omit<CaseUpdate, "photoPath" | "photoFrame">[],
-      allPhotos,
-    ),
-    foundation,
+    updates,
+    generalChannel,
+    lastUpdateOn: lastUpdateOn(updates),
   };
 }
 
@@ -322,14 +410,13 @@ export async function getPortalTotals(): Promise<PortalTotals> {
   const cities = await getCityCards();
 
   const needs = cities.flatMap((city) => city.needs);
-  const covered = needs.filter((need) => need.status === "cubierta").length;
 
   return {
     cities: cities.length,
     cases: cities.reduce((sum, city) => sum + city.caseCount, 0),
     needs: needs.length,
-    coveredNeeds: covered,
-    openNeeds: needs.length - covered,
+    coveredNeeds: countCoveredNeeds(needs),
+    openNeeds: countOpenNeeds(needs),
     updatedAt:
       cities.map((city) => city.updated_at).sort((a, b) => b.localeCompare(a))[0] ?? null,
   };
@@ -366,7 +453,7 @@ export async function getCaseCards(): Promise<CaseCard[]> {
         coverFrame: first ? savedFrame(first) : null,
         portraitPath: portraitOf(row.portrait_photo_id, row.photos),
         portraitFrame: portraitFrameOf(row.portrait_photo_id, row.photos),
-        openNeeds: row.needs.filter((need) => need.status !== "cubierta").length,
+        openNeeds: countOpenNeeds(row.needs),
         categories: openCategories(row.needs),
         cityName: row.cities!.name,
         citySlug: row.cities!.slug,
@@ -409,7 +496,7 @@ export async function getNeedCards(): Promise<NeedCard[]> {
 export function sortNeeds<T extends Pick<Need, "status" | "urgent" | "created_at">>(
   needs: T[],
 ): T[] {
-  const rank = (need: T) => (need.status === "cubierta" ? 2 : need.urgent ? 0 : 1);
+  const rank = (need: T) => (isCoveredNeed(need) ? 2 : need.urgent ? 0 : 1);
   return [...needs].sort(
     (a, b) => rank(a) - rank(b) || a.created_at.localeCompare(b.created_at),
   );
@@ -471,70 +558,6 @@ export async function getOfferRecords(): Promise<OfferRecord[]> {
     .order("id");
 
   return (data ?? []) as OfferRecord[];
-}
-
-/**
- * La fundación que viene anidada en una consulta de municipios, sea cual sea la
- * forma en que la sirva PostgREST.
- *
- * Y son dos formas distintas, que es lo que hace falta saber aquí. `foundations`
- * es una lista desde el lado del municipio, pero `foundations_one_per_city`
- * (0004) es una restricción de unicidad sobre `city_id`, así que PostgREST lee la
- * relación como de uno a uno y devuelve **un objeto o nulo**, no un array. Un
- * `.length` sobre eso revienta la página entera, y no en las pruebas: revienta en
- * producción, que es donde existe la restricción.
- *
- * Se aceptan las dos formas a propósito. La restricción se puede quitar o
- * renombrar sin que nadie se acuerde de esta línea, y `/donaciones` cayéndose no
- * es una degradación aceptable: es la pantalla que contesta a dónde va el dinero.
- * Con dos filas —que la base de datos no permite— devuelve nula, que es la misma
- * respuesta que da la ficha del municipio ante la ambigüedad.
- */
-export function embeddedFoundation<T>(value: T | T[] | null | undefined): T | null {
-  if (!value) return null;
-  if (!Array.isArray(value)) return value;
-  return value.length === 1 ? value[0] : null;
-}
-
-/**
- * Los municipios publicados, con foto, canal y fundación, para /donaciones.
- *
- * Salen todos, tengan o no canal: la pestaña de municipios es una rejilla de
- * pueblos, no un listado de cuentas. El pop-up de «Donar» enseña la llave o
- * dice que todavía no hay. Los no publicados no llegan: los esconden las RLS.
- */
-export async function getCityDonationEntries(): Promise<CityDonationEntry[]> {
-  if (isDemoMode()) return demoCityDonationEntries();
-  const supabase = await createSupabaseServerClient();
-
-  const { data } = await supabase
-    .from("cities")
-    .select(
-      "*, foundations(*), photos(storage_path, thumb_path, sort_order, case_id, focus_x, focus_y, zoom)",
-    )
-    .order("name");
-
-  type Row = City & {
-    foundations: Foundation | Foundation[] | null;
-    photos: Pick<
-      Photo,
-      "storage_path" | "thumb_path" | "sort_order" | "case_id" | "focus_x" | "focus_y" | "zoom"
-    >[];
-  };
-
-  return ((data ?? []) as Row[]).map((row) => {
-    const covers = (row.photos ?? []).filter((photo) => photo.case_id === null);
-    const first = [...covers].sort((a, b) => a.sort_order - b.sort_order)[0];
-    return {
-      city: row,
-      channel: donationChannel(row),
-      foundation: embeddedFoundation(row.foundations),
-      // La foto grande, no la miniatura: estas tarjetas ocupan casi el ancho de
-      // la columna y 400 px se notan blandos.
-      coverPath: first?.storage_path ?? null,
-      coverFrame: coverFrameOf(covers),
-    };
-  });
 }
 
 /**

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { CaseRow } from "@/components/cards/CaseRow";
 import { CityRailCard } from "@/components/cards/CityRailCard";
+import { HomeBoard } from "@/components/home/HomeBoard";
 import { ProgressCard } from "@/components/home/ProgressCard";
 import { SectionLinks } from "@/components/home/SectionLinks";
 import { Logo } from "@/components/Logo";
 import { screenTitle, shell } from "@/components/ui/styles";
+import { byCampaignPriority, resolveCampaign } from "@/lib/campaign";
 import { SITE_NAME } from "@/lib/constants";
-import { getCaseCards, getCityCards, getPortalTotals } from "@/lib/data";
+import { getCampaignFocusRow, getCaseCards, getCityCards, getPortalTotals } from "@/lib/data";
 import { relativeDays } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -15,11 +17,14 @@ export const dynamic = "force-dynamic";
 const CASES_ON_HOME = 4;
 
 export default async function HomePage() {
-  const [cities, cases, totals] = await Promise.all([
+  const [cities, cases, totals, focusRow] = await Promise.all([
     getCityCards(),
     getCaseCards(),
     getPortalTotals(),
+    getCampaignFocusRow(),
   ]);
+  const campaign = resolveCampaign(focusRow, cities, cases);
+  const ranked = byCampaignPriority(cities, campaign?.city.id ?? null);
 
   return (
     <div className={`${shell} pt-4 lg:pt-8`}>
@@ -73,18 +78,25 @@ export default async function HomePage() {
           A partir de `sm` deja de ser carrusel y se abre entero. Un carrusel es
           la manera de enseñar cinco cosas por un hueco de una, y en cuanto caben
           todas se convierte en lo contrario: esconder con un gesto lo que ya
-          cabía a la vista. */}
-      {cities.length > 0 && (
+          cabía a la vista.
+
+          El tablero va encima: el recado y el mapa. Las tarjetas son el
+          detalle de los pueblos que el mapa ya pintó. */}
+      <div className="enters enters-1 mt-5">
+        <HomeBoard cities={ranked} campaign={campaign} />
+      </div>
+
+      {ranked.length > 0 && (
         <ul
           aria-label="Municipios documentados"
           className="no-scrollbar enters enters-1 -mx-5 mt-5 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 xl:grid-cols-4"
         >
-          {cities.map((city) => (
+          {ranked.map((city) => (
             <li
               key={city.id}
               className="w-[calc(100vw-3.5rem)] max-w-[420px] shrink-0 snap-start sm:w-auto sm:max-w-none"
             >
-              <CityRailCard city={city} />
+              <CityRailCard city={city} featured={city.id === campaign?.city.id ? campaign.source : undefined} />
             </li>
           ))}
         </ul>
@@ -142,7 +154,8 @@ export default async function HomePage() {
             mucha gente no pasa de aquí. */}
         <p className="mt-8 text-[12px] leading-relaxed text-faint lg:col-start-2 lg:row-start-2 lg:mt-6">
           {SITE_NAME} publica los casos con el consentimiento de cada persona. Las donaciones van
-          al canal de cada municipio o de cada familia, y no pasan por este portal.
+          al canal de cada caso, o al canal general cuando no tiene uno propio, y no pasan por
+          este portal.
         </p>
       </div>
     </div>

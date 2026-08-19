@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CasePortrait } from "@/components/case/CasePortrait";
 import { CategoryChip } from "@/components/ui/Chip";
 import { card, lifts } from "@/components/ui/styles";
-import { excerpt, thumbUrl } from "@/lib/format";
+import { caseLead, thumbUrl } from "@/lib/format";
 import { savedFrame } from "@/lib/photo-frame";
 import type { CaseWithPhotos } from "@/lib/types";
 import { FramedPhoto } from "@/components/ui/Photo";
@@ -70,7 +70,14 @@ export function CaseBigCard({
   // El hogar dice quiénes son y la historia qué les está pasando: dos cosas
   // distintas, y la segunda es a lo que se viene. Va debajo del nombre, a tres
   // renglones, y el hogar queda de subtítulo.
-  const story = caseRecord.story ? excerpt(caseRecord.story, 150) : "";
+  //
+  // La frase la elige `caseLead()` y no un recorte a pelo: si el equipo escribió el
+  // resumen de esta causa, va ese. El recorte automático corta donde cae —a mitad de
+  // frase, a veces a mitad de palabra— y aquí hay ocho tarjetas seguidas cortadas
+  // igual, así que la ficha del municipio es donde más se nota. Los 150 se quedan:
+  // es el hueco de tres renglones a 13 px, y `caseLead` recorta también el resumen
+  // escrito a mano por si un día la columna se estrecha.
+  const story = caseLead(caseRecord, 150);
   const gallery = caseRecord.photos.filter((photo) => photo.id !== caseRecord.portrait_photo_id);
 
   return (
@@ -78,6 +85,7 @@ export function CaseBigCard({
       <div className="flex items-start gap-3.5">
         <CasePortrait
           name={caseRecord.display_name}
+          caseKind={caseRecord.case_kind}
           path={caseRecord.portraitPath}
           frame={caseRecord.portraitFrame}
           className="size-20 rounded-full text-[26px]"

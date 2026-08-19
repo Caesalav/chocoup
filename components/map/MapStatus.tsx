@@ -9,10 +9,13 @@ import { formatDate, plural } from "@/lib/format";
  */
 export function MapStatus({
   municipios,
+  openCases,
   openNeeds,
   updatedAt,
 }: {
   municipios: number;
+  /** Casos con algo sin cubrir. Es lo que el mapa cuenta; el color es lo otro. */
+  openCases: number;
   openNeeds: number;
   updatedAt: string | null;
 }) {
@@ -24,6 +27,8 @@ export function MapStatus({
         <span className="text-body">
           {plural(municipios, "municipio documentado", "municipios documentados")}
         </span>
+        <span aria-hidden> · </span>
+        {plural(openCases, "caso abierto", "casos abiertos")}
         <span aria-hidden> · </span>
         {plural(openNeeds, "necesidad abierta", "necesidades abiertas")}
       </p>

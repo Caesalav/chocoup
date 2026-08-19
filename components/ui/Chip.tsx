@@ -1,5 +1,6 @@
 import { CheckIcon } from "@/components/ui/icons";
-import type { NeedStatus, OfferRecordState, OfferStatus } from "@/lib/types";
+import { isCoveredNeed } from "@/lib/needs";
+import type { NeedStatus, OfferRecordState, OfferStatus, FeedbackKind } from "@/lib/types";
 import {
   needCategoryLabel,
   needStatusLabel,
@@ -56,7 +57,7 @@ const needStatusStyles: Record<NeedStatus, string> = {
 export function NeedStatusChip({ status }: { status: NeedStatus }) {
   return (
     <span className={`${base} ${needStatusStyles[status] ?? needStatusStyles.abierta}`}>
-      {status === "cubierta" && <CheckIcon className="-ml-0.5 size-3.5 stroke-[2.4]" />}
+      {isCoveredNeed({ status }) && <CheckIcon className="-ml-0.5 size-3.5 stroke-[2.4]" />}
       {needStatusLabel(status)}
     </span>
   );
@@ -67,12 +68,12 @@ export function NeedStatusChip({ status }: { status: NeedStatus }) {
  * resuelto en verde.
  *
  * Y lo que ya no está en juego se queda sin color, que es donde caen las otras
- * dos. «Rechazada» va al aire: el filete y nada dentro, porque hay un veredicto
+ * dos. «Negada» va al aire: el filete y nada dentro, porque hay un veredicto
  * escrito pero no un resultado que celebrar ni una espera que atender.
  *
  * «Retirada» es el caso raro de los cuatro y por eso no cabía en ninguno de los
  * tres estilos que ya había. En verde diría que salió bien y en cálido que sigue
- * esperando, y las dos serían mentira; con el filete de «Rechazada» se leerían
+ * esperando, y las dos serían mentira; con el filete de «Negada» se leerían
  * como la misma cosa, que es justo lo que no son —una es un no y la otra una
  * baja—. Así que se queda en la familia sin color, pero rellena en vez de al
  * aire: la pastilla se hunde al tono del papel de fondo (`canvas`, un peldaño por
@@ -147,5 +148,27 @@ export function UrgentChip() {
 export function DraftChip({ label = "Borrador" }: { label?: string }) {
   return (
     <span className={`${base} border border-dashed border-line-strong text-faint`}>{label}</span>
+  );
+}
+
+/**
+ * El buzón del equipo: un error es un aviso, una idea no lo es.
+ *
+ * El error va en el rojo de la escala —el mismo que usa el recuadro de
+ * validación—, porque es algo que hay que atender. La idea va en el verde
+ * lavado de lo constructivo. Mezclarlos en un solo estilo haría que un «el
+ * mapa no carga» y un «¿y si hubiera un filtro por barrio?» se leyeran igual
+ * de urgente, y no lo son.
+ */
+const feedbackKindStyles: Record<FeedbackKind, string> = {
+  error: "bg-need-high-soft text-need-high",
+  idea: "bg-accent-soft text-accent-strong",
+};
+
+export function FeedbackKindChip({ kind }: { kind: FeedbackKind }) {
+  return (
+    <span className={`${base} ${feedbackKindStyles[kind] ?? feedbackKindStyles.idea}`}>
+      {kind === "error" ? "Error" : "Idea"}
+    </span>
   );
 }

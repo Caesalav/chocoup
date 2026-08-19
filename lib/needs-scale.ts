@@ -4,26 +4,34 @@ import { MUNICIPALITIES } from "./choco-texture";
  * Escala de color del mapa y cruce entre municipios del DANE y ciudades
  * documentadas.
  *
- * El color sale de `openNeeds` y de nada más. Es el único número que el equipo
- * mantiene al día desde el panel, así que es el único que puede colorear un mapa
- * sin mentir: la leyenda dice "necesidades abiertas" y no "gravedad" porque eso
- * es literalmente lo que se está contando.
+ * El color sale de cuánto falta por cubrir —el inverso del avance de
+ * `cityProgress`— y de nada más. Un pueblo documentado donde ya no falta nada
+ * no es gris: el gris es «nadie ha ido». Mezclarlos diría que Quibdó, resuelto,
+ * está igual que un municipio al que el equipo no ha llegado.
+ *
+ * El avance lo calcula lib/case-progress.ts sobre el montón de necesidades del
+ * pueblo. Aquí solo se reparte ese resto en tramos, para que la leyenda, el
+ * punto de la tarjeta y la forma en el mapa digan lo mismo.
  */
 
 export type NeedsTier = "blank" | "none" | "low" | "mid" | "high";
 
 /**
- * Tramos anchos y pocos: con cuatro municipios documentados, una escala continua
- * daría cuatro tonos indistinguibles y sugeriría una precisión que no tenemos.
+ * Tramos anchos y pocos: una escala continua daría treinta rojos
+ * indistinguibles y sugeriría una precisión que el tablero no tiene.
  *
- * Sin dato no hay tono: los 26 municipios que nadie ha visitado quedan en gris,
- * que es distinto de haber ido y no encontrar nada abierto (`none`).
+ * `progress` nulo es «nadie ha documentado». Cero necesidades, o todas
+ * cubiertas, es `none`: se fue, y ahora mismo no falta nada. Esas dos cosas
+ * no pueden parecerse.
  */
-export function needsTier(openNeeds: number | undefined): NeedsTier {
-  if (openNeeds === undefined) return "blank";
-  if (openNeeds <= 0) return "none";
-  if (openNeeds <= 3) return "low";
-  if (openNeeds <= 6) return "mid";
+export function needsTier(
+  progress: { total: number; ratio: number } | undefined,
+): NeedsTier {
+  if (!progress) return "blank";
+  const remaining = progress.total === 0 ? 0 : 1 - progress.ratio;
+  if (remaining <= 0) return "none";
+  if (remaining <= 1 / 3) return "low";
+  if (remaining <= 2 / 3) return "mid";
   return "high";
 }
 
@@ -45,10 +53,10 @@ export const TIER_DOT: Record<NeedsTier, string> = {
 };
 
 export const NEEDS_LEGEND: { tier: NeedsTier; label: string }[] = [
-  { tier: "none", label: "0" },
-  { tier: "low", label: "1–3" },
-  { tier: "mid", label: "4–6" },
-  { tier: "high", label: "7 o más" },
+  { tier: "none", label: "Nada falta" },
+  { tier: "low", label: "Falta poco" },
+  { tier: "mid", label: "A medias" },
+  { tier: "high", label: "Prioritario" },
   { tier: "blank", label: "Sin documentar" },
 ];
 
@@ -95,8 +103,8 @@ const matchKey = (name: string) => {
   return ALIASES[key] ?? key;
 };
 
-/** Lo que la escala necesita de una ciudad: cómo se llama y qué tiene abierto. */
-type Documented = { name: string; openNeeds?: number };
+/** Lo que la escala necesita de una ciudad: cómo se llama y cuánto le falta. */
+type Documented = { name: string; progress?: { total: number; ratio: number } };
 
 export type PaintedMunicipality<T> = {
   id: string;
@@ -123,7 +131,7 @@ export function paintMunicipalities<T extends Documented>(cities: T[]): PaintedM
       id: shape.id,
       name: shape.name,
       d: shape.d,
-      tier: needsTier(city?.openNeeds),
+      tier: needsTier(city?.progress),
       city,
     };
   });

@@ -8,33 +8,39 @@
  * como documentación de nada. El banner del portal lo deja claro en pantalla.
  */
 import { situationPhotos, withUpdatePhotos } from "./case-photos";
+import { lastUpdateOn } from "./case-updates";
+import type { ContributionTally } from "./contributions";
 import {
   donationChannel,
   moneyDestinationsOf,
+  type DonationChannel,
   type MoneyDestination,
 } from "./donation-channel";
 import { savedFrame } from "./photo-frame";
 import { NEED_CATEGORIES } from "./constants";
+import { EMPTY_FOCUS, type CampaignFocusRow } from "./campaign";
+import { cityProgress } from "./case-progress";
+import { countCoveredNeeds, countOpenCases, countOpenNeeds, isOpenNeed } from "./needs";
 import type {
   AdminCityRow,
   AidRecord,
   Case,
   CaseCard,
+  CaseKind,
   CasePage,
   CaseSummary,
   CaseUpdate,
   CaseWithPhotos,
   CityCardData,
-  CityDonationEntry,
   CityPage,
   City,
   DonationColumns,
-  Foundation,
   Need,
   NeedCard,
   NeedCategory,
   NeedOption,
   NeedStatus,
+  NewsletterSignup,
   Offer,
   OfferRecord,
   OfferStatus,
@@ -44,6 +50,7 @@ import type {
   PortalTotals,
   TeamMemberEntry,
   TeamSession,
+  FeedbackNote,
 } from "./types";
 
 /** UUIDs con forma válida para que los enlaces del formulario funcionen igual. */
@@ -53,14 +60,26 @@ function demoId(kind: number, index: number): string {
 }
 
 const CITY = 1;
-const FOUNDATION = 2;
 const CASE = 3;
 const NEED = 4;
 const PHOTO = 5;
 const OFFER = 6;
 const UPDATE = 7;
+const FEEDBACK = 8;
+const NEWSLETTER = 9;
+
+// El 2 era de las fundaciones y se queda libre. No se reaprovecha: los
+// identificadores de muestra salen en las direcciones y en las capturas, y
+// reciclar el número haría que una captura vieja de una fundación y una nueva de
+// otra cosa señalaran a la misma fila.
 
 const day = (n: number) => `2026-08-${String(n).padStart(2, "0")}T14:30:00.000Z`;
+
+/**
+ * El mismo día sin hora, como lo guarda una columna `date`: la fecha en que se
+ * comprobó un canal, que es un día de Colombia y no un instante.
+ */
+const dayOnly = (n: number) => `2026-08-${String(n).padStart(2, "0")}`;
 
 // ---------------------------------------------------------------------------
 // Municipios
@@ -121,47 +140,9 @@ const citySeeds: CitySeed[] = [
   },
 ];
 
-/**
- * Los canales de donación de muestra, y son inventados a propósito.
- *
- * El canal de verdad de un municipio o de una familia vive en su fila y lo
- * escribe coordinación desde el panel. Copiar aquí uno real lo convertiría en dos
- * sitios, y el segundo no se cambia desde ningún panel: el día que cambiara, este
- * archivo seguiría enseñando el viejo a cualquiera que abriera el portal sin
- * claves. Un destino caducado enseñado como bueno es dinero perdido, así que los
- * de muestra se ven de lejos que lo son.
- *
- * Están repartidos para que se puedan ver los estados sin tocar nada:
- * Quibdó con llave y además fundación con enlace —las dos vías a la vez, cada una
- * rotulada con de quién es—, Istmina con enlace propio, y Bahía Solano solo con
- * el de su fundación. Nuquí y Condoto sin nada, que es como nace un municipio.
- */
-const NO_CHANNEL: DonationColumns = {
-  donation_key: "",
-  donation_url: "",
-  donation_phone: "",
-  donation_app: "",
-  donation_holder: "",
-};
-
-const keyChannel = (value: string, app: string, holder: string): DonationColumns => ({
-  ...NO_CHANNEL,
-  donation_key: value,
-  donation_app: app,
-  donation_holder: holder,
-});
-
-const linkChannel = (url: string): DonationColumns => ({ ...NO_CHANNEL, donation_url: url });
-
-const cityChannels: Record<string, DonationColumns> = {
-  quibdo: keyChannel("@quibdo-muestra", "Bre-B", "Alcaldía de Quibdó (muestra)"),
-  istmina: linkChannel("https://ejemplo.org/istmina"),
-};
-
 export const demoCities: City[] = citySeeds.map((seed, index) => ({
   id: demoId(CITY, index),
   ...seed,
-  ...(cityChannels[seed.slug] ?? NO_CHANNEL),
   created_at: day(4),
   updated_at: day(11 + index),
 }));
@@ -169,71 +150,72 @@ export const demoCities: City[] = citySeeds.map((seed, index) => ({
 const cityBySlug = (slug: string) => demoCities.find((city) => city.slug === slug)!;
 
 // ---------------------------------------------------------------------------
-// Fundaciones
+// Canales de donación de muestra
 //
-// Una por municipio como máximo, que es lo que garantiza la base de datos
-// (`foundations_one_per_city`, ver 0004). Aquí había además una segunda
-// fundación en Quibdó, «aliada», para poder ver la tarjeta secundaria: ya no
-// existe esa tarjeta ni ese estado, y dejarla habría sido enseñar en el portal de
-// muestra una forma que la base de datos rechaza.
+// Son inventados a propósito. El canal de verdad —el general y el de cada
+// familia— vive en la base de datos y lo escribe coordinación desde el panel.
+// Copiar aquí uno real lo convertiría en dos sitios, y el segundo no se cambia
+// desde ningún panel: el día que cambiara, este archivo seguiría enseñando el
+// viejo a cualquiera que abriera el portal sin claves. Un destino caducado
+// enseñado como bueno es dinero perdido, así que los de muestra se ven de lejos
+// que lo son.
 //
-// Condoto y Nuquí se quedan sin ninguna a propósito: es como nace un municipio
-// —creado antes de la visita, con la fundación por levantar— y así se puede ver
-// que la ficha se sostiene sin canal de donación.
+// Aquí había también canales de municipio. Se fueron con 0015: ya no hay canales
+// por ciudad, y `City` dejó de tener las columnas del destino.
 // ---------------------------------------------------------------------------
 
-type FoundationSeed = Omit<Foundation, "id" | "city_id" | "created_at"> & { citySlug: string };
+const NO_CHANNEL: DonationColumns = {
+  donation_key: "",
+  donation_url: "",
+  donation_phone: "",
+  donation_app: "",
+  donation_holder: "",
+  donation_verified_on: null,
+};
 
-const foundationSeeds: FoundationSeed[] = [
-  {
-    citySlug: "quibdo",
-    name: "Fundación Atrato Vive",
-    description:
-      "Llevan ocho años trabajando en los barrios de la ribera. Coordinan el albergue del coliseo y el reparto de mercados.",
-    contact_name: "Yeimy Palacios",
-    phone: "604 671 2345",
-    whatsapp: "3115557788",
-    email: "contacto@atratovive.org",
-    website: "https://atratovive.org",
-    donation_url: "https://atratovive.org/donar",
-    address: "Carrera 4 # 24-18, barrio Cesar Conto",
-  },
-  {
-    citySlug: "istmina",
-    name: "Corporación Istmina Unida",
-    description: "Junta de acción comunal ampliada. Tienen el censo de viviendas afectadas.",
-    contact_name: "Alberto Perea",
-    phone: "604 670 8811",
-    whatsapp: "3103334455",
-    email: "istminaunida@correo.com",
-    website: "",
-    donation_url: "https://vaki.co/vaki/istmina-unida",
-    address: "Calle 8 # 3-40, frente a la casa de la cultura",
-  },
-  {
-    citySlug: "bahia-solano",
-    name: "Fundación Mar y Selva",
-    description:
-      "Trabajan con las asociaciones de pescadores de El Valle y Huina. Reciben donaciones en Medellín y las embarcan en Buenaventura.",
-    contact_name: "Erika Klinger",
-    phone: "",
-    whatsapp: "3148889900",
-    email: "marysleva.choco@correo.com",
-    website: "",
-    donation_url: "https://vaki.co/vaki/mar-y-selva",
-    address: "Calle principal, al lado de la Capitanía",
-  },
-];
-
-export const demoFoundations: Foundation[] = foundationSeeds.map((seed, index) => {
-  const { citySlug, ...rest } = seed;
-  return {
-    id: demoId(FOUNDATION, index),
-    city_id: cityBySlug(citySlug).id,
-    created_at: day(6),
-    ...rest,
-  };
+const keyChannel = (
+  value: string,
+  app: string,
+  holder: string,
+  verifiedOn: string | null = null,
+): DonationColumns => ({
+  ...NO_CHANNEL,
+  donation_key: value,
+  donation_app: app,
+  donation_holder: holder,
+  donation_verified_on: verifiedOn,
 });
+
+const linkChannel = (url: string, verifiedOn: string | null = null): DonationColumns => ({
+  ...NO_CHANNEL,
+  donation_url: url,
+  donation_verified_on: verifiedOn,
+});
+
+/**
+ * El canal general de muestra.
+ *
+ * Es una llave y no un enlace porque es lo que hay en la base real, y porque la
+ * llave es el formato que más pantalla ocupa —se escribe entera, con sus dos
+ * pasos— y conviene poder verla sin claves. Lleva «(muestra)» en el titular por
+ * lo mismo que los demás: para que nadie la copie creyendo que es la buena.
+ *
+ * Comprobado el 12 de agosto, o sea dentro de los 60 días de
+ * `CHANNEL_CHECK_STALE_DAYS`: es el estado bueno de esa frase, y el que hay que
+ * poder ver en el destino que alcanza a más gente. El envejecido se ve en el canal
+ * propio de Familia Klinger, más abajo, con una fecha de mayo.
+ *
+ * Las fechas de este archivo son de agosto de 2026 y por eso la muestra envejece
+ * sola: leída dentro de un año, esta llave dirá que lleva sin comprobarse un año.
+ * Es lo correcto para lo que es —una demostración de un momento— y es justo lo que
+ * supabase/datos-de-prueba.sql no puede permitirse, porque ese se pega sobre la
+ * base de verdad meses después; ahí las dos fechas van restadas de `current_date`.
+ */
+export function demoGeneralChannel(): DonationChannel | null {
+  return donationChannel(
+    keyChannel("@soschoco-muestra", "Bre-B", "Chocó-up (muestra)", dayOnly(12)),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Casos
@@ -248,6 +230,18 @@ type CaseSeed = {
   published: boolean;
   created_at?: string;
   updated_at?: string;
+  /**
+   * Sin poner, 'persona', que es lo que pone la base de datos por omisión y lo que
+   * son casi todas. Los que sí lo dicen están para poder ver lo que el tipo cambia,
+   * que es la reserva del retrato: el colegio de Istmina va sin retrato a propósito.
+   */
+  case_kind?: CaseKind;
+  /**
+   * La frase que viaja por WhatsApp. Sin poner, la tarjeta recorta la historia con
+   * `excerpt()` como hasta ahora, y eso también hay que poder verlo: la mayoría de
+   * las fichas van a estar así una temporada.
+   */
+  summary?: string;
 };
 
 const DANIELA = "Daniela, madre soltera reconstruye sola su casa";
@@ -263,6 +257,7 @@ const caseSeeds: CaseSeed[] = [
     published: true,
     created_at: day(8),
     updated_at: day(17),
+    summary: "Perdió su casa con el temblor y reconstruye sola con sus dos hijas.",
   },
   {
     citySlug: "quibdo",
@@ -326,6 +321,31 @@ const caseSeeds: CaseSeed[] = [
       "La casa de palafito en El Valle perdió tres pilotes y el piso quedó ladeado. La lancha con la que Wilmar pescaba se partió contra el muelle.\n\nSin la lancha no hay ingreso. Piden madera para los pilotes y ayuda para reparar el motor, que se puede recuperar según el mecánico del pueblo.",
     consent_to_publish: true,
     published: true,
+    summary: "Sin la lancha no hay ingreso: piden madera para los pilotes y arreglar el motor.",
+  },
+  /**
+   * Una causa que no es una persona, y por eso está aquí.
+   *
+   * Es el caso que hace visible lo que 0016 vino a arreglar: sin retrato, la reserva
+   * de una persona son sus iniciales, y «IE» en un círculo donde tenía que haber una
+   * escuela se lee como un dato mal guardado. Va sin retrato a propósito —un colegio
+   * no tiene cara— y sin canal propio, así que además sirve para ver el renglón de
+   * procedencia del canal general en algo que no es una familia.
+   *
+   * Va al final de la lista y no en medio: los identificadores de muestra se sacan
+   * del índice de este array y salen en las direcciones y en las capturas, así que
+   * meterlo entre dos casos existentes renombraría a la mitad.
+   */
+  {
+    citySlug: "istmina",
+    display_name: "Escuela del barrio Niño Jesús",
+    household: "128 estudiantes, 6 docentes",
+    story:
+      "El techo de dos salones se vino abajo la noche del temblor y el muro del patio quedó agrietado. No hubo nadie dentro.\n\nLas clases se reparten entre la casa de la cultura y la sede alterna, en turnos de media jornada. Lo que piden es teja y madera para rearmar la cubierta antes de que vuelvan las lluvias fuertes, y pupitres: los de los dos salones quedaron debajo.",
+    consent_to_publish: true,
+    published: true,
+    case_kind: "colegio",
+    summary: "Dos salones sin techo: piden teja, madera y pupitres antes de las lluvias.",
   },
 ];
 
@@ -337,12 +357,18 @@ const caseSeeds: CaseSeed[] = [
  * de armar en la sección de fotos. Aquí no falta nada más.
  */
 const caseRows: Omit<Case, "portrait_photo_id" | keyof DonationColumns>[] = caseSeeds.map((seed, index) => {
-  const { citySlug, created_at, updated_at, ...rest } = seed;
+  const { citySlug, created_at, updated_at, case_kind, summary, ...rest } = seed;
   return {
     id: demoId(CASE, index),
     city_id: cityBySlug(citySlug).id,
     created_at: created_at ?? day(7 + (index % 5)),
     updated_at: updated_at ?? day(12 + (index % 4)),
+    // Los dos valores por omisión son los de la base de datos, escritos aquí para
+    // que los datos de muestra no puedan enseñar un estado que la tabla no permite:
+    // una causa sin clasificar es una persona, y una sin resumen tiene la cadena
+    // vacía y no un nulo.
+    case_kind: case_kind ?? "persona",
+    summary: summary ?? "",
     ...rest,
   };
 });
@@ -675,21 +701,37 @@ const portraitSeeds: Record<string, string> = {
 };
 
 /**
- * Dos familias con canal propio y cinco sin ninguno, que es la proporción real:
- * lo normal es no tener a dónde recibir todavía, y la ficha tiene que sostenerse
- * diciéndolo. Una con llave y otra con enlace, para poder ver los dos formatos.
+ * Dos familias con canal propio y seis sin ninguno, que es la proporción real:
+ * lo normal es no tener uno abierto a su nombre, y desde 0015 esas seis reciben
+ * por el canal general. Las dos proporciones importan aquí, porque son los dos
+ * estados que la ficha tiene que saber distinguir con palabras —«el canal que el
+ * equipo registró para ella» y «el canal general del portal»— y el portal de
+ * muestra es donde se comprueba que se distinguen. Una con llave y otra con
+ * enlace, para poder ver los dos formatos.
+ *
+ * Daniela se queda sin canal propio a propósito, igual que en la base real: es el
+ * caso que se abre para revisar cómo se lee el general.
  *
  * El dominio es `ejemplo.org` y no una plataforma de recaudación de verdad. Ya
  * hubo que vaciar enlaces de muestra que apuntaban a campañas vivas de terceros:
  * un enlace inventado que existe manda dinero a alguien que no lo pidió.
+ *
+ * Las dos llevan fecha de comprobación y llevan las dos que hay: una reciente y
+ * una vieja. Son los dos estados de esa frase y los dos tienen que poder verse sin
+ * claves, porque el segundo es la mitad del valor del campo —una comprobación de
+ * hace cinco meses presentada como insignia fija diría que esto está vigilado
+ * cuando lleva cinco meses sin mirarse—. La de Klinger está escrita en mayo a
+ * propósito, que son más de los 60 días de `CHANNEL_CHECK_STALE_DAYS` contados
+ * desde el agosto en el que viven estos datos.
  */
 const caseChannels: Record<string, DonationColumns> = {
   "Familia Mosquera Palacios": keyChannel(
     "@mosquera-muestra",
     "Nequi",
     "Yeimy Palacios (muestra)",
+    dayOnly(9),
   ),
-  "Familia Klinger Valencia": linkChannel("https://ejemplo.org/klinger-valle"),
+  "Familia Klinger Valencia": linkChannel("https://ejemplo.org/klinger-valle", "2026-05-14"),
 };
 
 export const demoCases: Case[] = caseRows.map((row) => ({
@@ -1067,11 +1109,28 @@ export const demoOffersWithContext: OfferWithContext[] = demoOffers.map((offer) 
 // y los casos con consentimiento. `includeDrafts` es lo que usa el panel.
 // ---------------------------------------------------------------------------
 
-const openNeedsOf = (needs: Need[]) => needs.filter((need) => need.status !== "cubierta").length;
+const categoriesOf = (needs: Need[]) => [...new Set(needs.filter(isOpenNeed).map((need) => need.category))];
 
-const categoriesOf = (needs: Need[]) => [
-  ...new Set(needs.filter((need) => need.status !== "cubierta").map((need) => need.category)),
-];
+/**
+ * Las necesidades de un municipio que el público puede ver: las de la zona más
+ * las de sus casos visibles.
+ *
+ * El filtro por caso visible es lo que en modo real hacen las RLS
+ * (`needs_public_read`, 0001), y sin él estos datos contaban de más: la tarjeta
+ * de /municipios sumaba lo que le falta a una familia cuyo caso todavía no está
+ * publicado, y la ficha de ese municipio no, porque `demoCityPage` sí filtra.
+ * Hoy no se nota —el único caso en borrador de la muestra no tiene necesidades
+ * anotadas— y por eso conviene que esté escrito: en cuanto alguien le añada una
+ * para probar el panel, los datos de muestra volverían a enseñar el descuadre
+ * que el portal ya no tiene.
+ */
+function visibleNeeds(cityId: string, includeDrafts: boolean): Need[] {
+  const visibleIds = new Set(visibleCases(cityId, includeDrafts).map((row) => row.id));
+  return demoNeeds.filter(
+    (need) =>
+      need.city_id === cityId && (need.case_id === null || visibleIds.has(need.case_id)),
+  );
+}
 
 const coverOf = (photos: Photo[]) => {
   const first = [...photos].sort((a, b) => a.sort_order - b.sort_order)[0];
@@ -1095,21 +1154,35 @@ export function demoCityCards(): CityCardData[] {
   return demoCities
     .filter((city) => city.published)
     .map((city) => {
-      const needs = demoNeeds.filter((need) => need.city_id === city.id);
+      const needs = visibleNeeds(city.id, false);
       const covers = demoPhotos.filter((photo) => photo.city_id === city.id && photo.case_id === null);
+      const progress = cityProgress(needs);
       return {
         ...city,
         coverPath: coverOf(covers),
         coverFrame: savedFrame(
           [...covers].sort((a, b) => a.sort_order - b.sort_order)[0] ?? null,
         ),
-        openNeeds: openNeedsOf(needs),
+        openNeeds: countOpenNeeds(needs),
+        openCases: countOpenCases(needs),
         caseCount: visibleCases(city.id, false).length,
         needs: needs.map((need) => ({
           category: need.category,
           status: need.status,
           case_id: need.case_id,
         })),
+        progress: {
+          total: progress.total,
+          covered: progress.covered,
+          partial: progress.partial,
+          ratio: progress.ratio,
+        },
+        standingOffers: demoOffers.filter(
+          (offer) =>
+            offer.city_id === city.id &&
+            (offer.status === "pendiente" || offer.status === "aceptada") &&
+            offer.delivered_on === null,
+        ).length,
       };
     });
 }
@@ -1119,16 +1192,17 @@ export function demoCityPage(slug: string, includeDrafts: boolean): CityPage | n
   if (!city || (!city.published && !includeDrafts)) return null;
 
   const visible = visibleCases(city.id, includeDrafts);
-  const visibleIds = new Set(visible.map((row) => row.id));
+  // El mismo conjunto que cuenta la tarjeta de /municipios, partido en dos por
+  // el ámbito: la ficha las enseña separadas —el panel edita las de la zona en
+  // su propio formulario— y su cabecera vuelve a sumarlas. Partiendo de aquí no
+  // hay forma de que una de las dos pantallas vea una necesidad que la otra no.
+  const needs = visibleNeeds(city.id, includeDrafts);
 
   return {
     city,
-    foundation: demoFoundations.find((row) => row.city_id === city.id) ?? null,
     photos: demoPhotos.filter((row) => row.city_id === city.id && row.case_id === null),
-    zoneNeeds: demoNeeds.filter((row) => row.city_id === city.id && row.case_id === null),
-    caseNeeds: demoNeeds.filter(
-      (row) => row.case_id !== null && visibleIds.has(row.case_id),
-    ),
+    zoneNeeds: needs.filter((row) => row.case_id === null),
+    caseNeeds: needs.filter((row) => row.case_id !== null),
     cases: visible.map((row) => detailCase(row)),
   };
 }
@@ -1155,7 +1229,7 @@ function summarizeCase(row: Case): CaseSummary {
     // puntero descolocado puede acabar enseñando la cara de otra familia.
     portraitPath: portrait ? portrait.thumb_path || portrait.storage_path : null,
     portraitFrame: savedFrame(portrait ?? null),
-    openNeeds: openNeedsOf(needs),
+    openNeeds: countOpenNeeds(needs),
     categories: categoriesOf(needs),
   };
 }
@@ -1183,18 +1257,23 @@ export function demoCasePage(
   const caseRecord = visibleCases(city.id, includeDrafts).find((row) => row.id === caseId);
   if (!caseRecord) return null;
 
+  const updates = demoCaseUpdates
+    .filter((row) => row.case_id === caseRecord.id)
+    .sort(
+      (a, b) =>
+        a.happened_on.localeCompare(b.happened_on) || a.created_at.localeCompare(b.created_at),
+    );
+
   return {
     city,
     caseRecord,
     photos: demoPhotos.filter((row) => row.case_id === caseRecord.id),
     needs: demoNeeds.filter((row) => row.case_id === caseRecord.id),
-    updates: demoCaseUpdates
-      .filter((row) => row.case_id === caseRecord.id)
-      .sort(
-        (a, b) =>
-          a.happened_on.localeCompare(b.happened_on) || a.created_at.localeCompare(b.created_at),
-      ),
-    foundation: demoFoundations.find((row) => row.city_id === city.id) ?? null,
+    updates,
+    generalChannel: demoGeneralChannel(),
+    // La misma función que la capa de datos de verdad, y por eso se importa en vez
+    // de repetir el `at(-1)`: la fecha del rótulo la decide un solo sitio.
+    lastUpdateOn: lastUpdateOn(updates),
   };
 }
 
@@ -1251,16 +1330,18 @@ const publishedCities = () => demoCities.filter((city) => city.published);
 
 export function demoPortalTotals(): PortalTotals {
   const cities = publishedCities();
-  const ids = new Set(cities.map((city) => city.id));
-  const needs = demoNeeds.filter((need) => ids.has(need.city_id));
-  const covered = needs.filter((need) => need.status === "cubierta").length;
+  // Municipio a municipio y con el filtro del público, que es como se arma la
+  // suma en modo real (`getPortalTotals` suma lo que sirve `getCityCards`): si
+  // aquí se cogieran todas las necesidades de la ciudad, el inicio contaría lo
+  // de un caso que no sale en ninguna pantalla.
+  const needs = cities.flatMap((city) => visibleNeeds(city.id, false));
 
   return {
     cities: cities.length,
     cases: cities.reduce((sum, city) => sum + visibleCases(city.id, false).length, 0),
     needs: needs.length,
-    coveredNeeds: covered,
-    openNeeds: needs.length - covered,
+    coveredNeeds: countCoveredNeeds(needs),
+    openNeeds: countOpenNeeds(needs),
     updatedAt:
       cities.map((city) => city.updated_at).sort((a, b) => b.localeCompare(a))[0] ?? null,
   };
@@ -1291,40 +1372,73 @@ export function demoNeedCards(): NeedCard[] {
   );
 }
 
-/** Los municipios publicados, con foto, canal y fundación. Igual que en
- *  producción: salen todos, tengan o no canal. */
-export function demoCityDonationEntries(): CityDonationEntry[] {
-  return publishedCities().map((city) => {
-    const covers = demoPhotos.filter((photo) => photo.city_id === city.id && photo.case_id === null);
-    const first = [...covers].sort((a, b) => a.sort_order - b.sort_order)[0];
-    return {
-      city,
-      channel: donationChannel(city),
-      foundation: demoFoundations.find((row) => row.city_id === city.id) ?? null,
-      coverPath: first?.storage_path ?? null,
-      coverFrame: savedFrame(first ?? null),
-    };
-  });
-}
-
 /** El repaso de dinero del panel, con la misma regla que en producción: se
  *  arman con `moneyDestinationsOf`, así que la lista de muestra no puede contar
  *  una cosa distinta de la de verdad. */
 export function demoMoneyDestinations(): MoneyDestination[] {
-  return demoCities.flatMap((city) =>
-    moneyDestinationsOf(
-      city,
-      demoFoundations.find((row) => row.city_id === city.id) ?? null,
-      demoCases.filter((row) => row.city_id === city.id),
-    ),
+  return moneyDestinationsOf(
+    demoGeneralChannel(),
+    demoCases.map((row) => {
+      const city = demoCities.find((entry) => entry.id === row.city_id)!;
+      return {
+        ...row,
+        cityName: city.name,
+        citySlug: city.slug,
+        cityPublished: city.published,
+      };
+    }),
   );
+}
+
+/**
+ * El contador de aportes con datos de muestra.
+ *
+ * Se cuenta sobre `demoOffers` y con el mismo criterio que la vista
+ * `public.offer_tally` (0015): lo que sigue en pie —pendiente o aceptada— y, de
+ * eso, lo entregado. Contarlo aquí de otra manera sería el fallo de lib/needs.ts
+ * otra vez, esta vez entre el portal de muestra y el de verdad, que es donde peor
+ * se ve: nadie compara las dos a la vez.
+ *
+ * Lo que no se reproduce es la cascada de publicación, porque `demoOffers` solo
+ * apunta a municipios publicados y añadirla aquí sería escribir una condición que
+ * ningún dato ejercita.
+ */
+/** En muestra no hay foco editorial: el aviso cae en el pueblo más atrasado. */
+export function demoCampaignFocus(): CampaignFocusRow {
+  return EMPTY_FOCUS;
+}
+
+export function demoContributionTally(): ContributionTally {
+  const standing = demoOffers.filter(
+    (offer) => offer.status === "pendiente" || offer.status === "aceptada",
+  );
+  return {
+    ofrecidos: standing.length,
+    entregados: standing.filter((offer) => offer.delivered_on !== null).length,
+  };
+}
+
+/**
+ * Dos correos de muestra para que la pantalla del panel no se vea vacía.
+ *
+ * Son inventados y llevan el dominio `ejemplo.org` por lo mismo que los canales:
+ * escribirle a una dirección de muestra que existiera sería escribirle a alguien
+ * que no lo pidió.
+ */
+export function demoNewsletterSignups(): NewsletterSignup[] {
+  return [
+    { id: demoId(NEWSLETTER, 0), email: "vecina@ejemplo.org", created_at: day(16) },
+    { id: demoId(NEWSLETTER, 1), email: "colegio.san.agustin@ejemplo.org", created_at: day(13) },
+  ];
 }
 
 export function demoAdminCities(): AdminCityRow[] {
   return demoCities.map((city) => ({
     ...city,
     caseCount: demoCases.filter((row) => row.city_id === city.id).length,
-    openNeeds: openNeedsOf(demoNeeds.filter((row) => row.city_id === city.id)),
+    // El panel ve también lo de los casos en borrador, igual que el equipo en
+    // modo real: `includeDrafts` en vez del filtro del público.
+    openNeeds: countOpenNeeds(visibleNeeds(city.id, true)),
     photoCount: demoPhotos.filter((row) => row.city_id === city.id).length,
     pendingOffers: demoOffers.filter(
       (row) => row.city_id === city.id && row.status === "pendiente",
@@ -1339,9 +1453,35 @@ export function demoOffersFor(status?: OfferStatus): OfferWithContext[] {
   return [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
+/**
+ * Dos notas de muestra para que el buzón del panel no se vea vacío. Son
+ * inventadas, como el resto: un error y una idea, una con contacto y otra sin
+ * él, que es lo que hay que poder distinguir de un vistazo.
+ */
+export function demoFeedback(): FeedbackNote[] {
+  return [
+    {
+      id: demoId(FEEDBACK, 0),
+      kind: "error",
+      body: "En el mapa, al tocar Bahía Solano en el móvil, a veces no abre la ficha y se queda el zoom a medias.",
+      contact: "3001112233",
+      page_path: "/mapa",
+      created_at: day(16),
+    },
+    {
+      id: demoId(FEEDBACK, 1),
+      kind: "idea",
+      body: "¿Se podría filtrar las necesidades por barrio y no solo por municipio? En Quibdó hay varios y cuesta encontrar los de La Yesquita.",
+      contact: "",
+      page_path: "/necesidades",
+      created_at: day(14),
+    },
+  ];
+}
+
 export function demoNeedOptions(): NeedOption[] {
   return demoNeeds
-    .filter((need) => need.status !== "cubierta")
+    .filter(isOpenNeed)
     .map((need) => ({
       id: need.id,
       title: need.title,

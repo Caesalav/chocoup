@@ -10,33 +10,15 @@ export function personInitials(name: string): string {
 }
 
 /*
- * Aquí había un `PersonPortrait` que dibujaba las iniciales de una familia y que
- * ya no llamaba nadie. Lo que hace ese trabajo es `CasePortrait`, que además sabe
- * pintar el retrato cuando lo hay; dos versiones del mismo hueco eran dos sitios
- * donde arreglar la próxima vez y solo uno en pantalla.
- */
-
-/**
- * Quién hay detrás de un caso, donde la referencia pone al dueño y al anfitrión
- * del alojamiento.
+ * Del archivo se han ido dos componentes y queda la función.
  *
- * En lugar de la foto de perfil van las iniciales: no tenemos retratos del
- * equipo ni de la gente de las fundaciones, y una silueta genérica repetida dos
- * veces dice menos que dos letras.
+ * Primero un `PersonPortrait` que dibujaba las iniciales de una familia y que ya
+ * no llamaba nadie: eso lo hace `CasePortrait`, que además sabe pintar el retrato
+ * cuando lo hay. Y ahora el `PersonBadge` que le daba nombre, que enseñaba a la
+ * fundación del municipio y a su persona de contacto al pie de la ficha de un
+ * caso; las fundaciones se fueron con 0015 y ese bloque con ellas.
+ *
+ * El nombre del archivo se queda. `personInitials` la llama `CasePortrait` y
+ * renombrarlo movería un import por un archivo que no cambia de oficio: sigue
+ * siendo de dónde salen las dos letras cuando no hay cara que enseñar.
  */
-export function PersonBadge({ name, role }: { name: string; role: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      <span
-        aria-hidden
-        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-canvas text-[13px] font-medium text-muted"
-      >
-        {personInitials(name)}
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-[14px] leading-tight text-ink">{name}</span>
-        <span className="mt-0.5 block truncate text-[12px] text-faint">{role}</span>
-      </span>
-    </div>
-  );
-}

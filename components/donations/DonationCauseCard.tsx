@@ -1,39 +1,54 @@
 import Link from "next/link";
 import { DonateButton, DonateOverlay } from "@/components/donations/DonateOverlay";
+import { GeneralChannelNote } from "@/components/donations/GeneralChannelNote";
 import { Photo } from "@/components/ui/Photo";
 import { button } from "@/components/ui/styles";
-import { donationChannel, type DonationChannel } from "@/lib/donation-channel";
-import { excerpt } from "@/lib/format";
+import { caseDonation, type DonationChannel } from "@/lib/donation-channel";
+import { caseLead } from "@/lib/format";
 import type { CaseCard } from "@/lib/types";
 
 type Props = {
   caseCard: CaseCard;
-  /** El canal del municipio, por si esta causa todavía no tiene el suyo. */
-  cityChannel: DonationChannel | null;
+  /** El canal general del portal, que es lo que recibe si la causa no tiene el suyo. */
+  generalChannel: DonationChannel | null;
 };
 
 /**
  * Una causa en la rejilla de donar: la primera foto, un recorte de su historia
- * y los dos botones. El dinero de «Donar» va al canal de esa familia si lo
- * tiene; si no, al de su municipio, y el pop-up lo dice.
+ * y los dos botones.
+ *
+ * Una causa es una persona, un colegio, un animal o una fundación. La palabra
+ * importa aquí más que en ninguna otra pantalla: esta rejilla tenía antes tres
+ * pestañas —municipios, fundaciones y causas— y donar a un municipio no
+ * significaba nada, porque un municipio no recibe nada.
+ *
+ * El pop-up dice de quién es el canal antes de enseñarlo, y lo dice con la misma
+ * frase que la ficha (`GeneralChannelNote`). Esa repetición es deliberada: el
+ * gesto de donar desde aquí es más rápido que desde la ficha —dos toques y la
+ * llave delante— y es justo donde más falta hace saber a dónde va.
  */
-export function DonationCauseCard({ caseCard, cityChannel }: Props) {
-  const own = donationChannel(caseCard);
-  const channel = own ?? cityChannel;
+export function DonationCauseCard({ caseCard, generalChannel }: Props) {
+  const donation = caseDonation(caseCard, generalChannel);
   const href = `/ciudades/${caseCard.citySlug}/casos/${caseCard.id}`;
-  const story = caseCard.story ? excerpt(caseCard.story, 140) : "";
+  // El resumen escrito a mano si lo hay, y si no el recorte de la historia. Aquí
+  // esa frase es lo único que hay para decidir a cuál de las causas de la rejilla
+  // pulsar, y un corte a mitad de palabra es lo que la deja sin decir nada. Ver
+  // `caseLead()` en lib/format.ts.
+  const story = caseLead(caseCard, 140);
   const onPhoto = Boolean(caseCard.coverPath);
 
   return (
     <DonateOverlay
-      title={own ? `Donar a ${caseCard.display_name}` : `Donar a ${caseCard.cityName}`}
-      channel={channel}
+      title={
+        donation.source === "propio"
+          ? `Donar a ${caseCard.display_name}`
+          : `Donar por ${caseCard.display_name}`
+      }
+      channel={donation.channel}
       note={
-        own
-          ? undefined
-          : cityChannel
-            ? `Esta causa todavía no tiene canal propio. El dinero iría al municipio de ${caseCard.cityName}.`
-            : undefined
+        donation.source === "general" ? (
+          <GeneralChannelNote caseName={caseCard.display_name} />
+        ) : undefined
       }
     >
       <article className="flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-panel-high shadow-card">
@@ -63,6 +78,19 @@ export function DonationCauseCard({ caseCard, cityChannel }: Props) {
         {story && (
           <p className="px-4 pt-4 text-[14px] leading-relaxed text-body">{story}</p>
         )}
+
+        {/* El rótulo va en la tarjeta y no solo dentro del pop-up: quien recorre
+            la rejilla decide a cuál pulsar mirando esto, y «tiene canal propio» o
+            «recibe por el general» cambia lo que está eligiendo. Dentro se repite
+            entero, porque leer una etiqueta de tres palabras no es haberlo
+            entendido. */}
+        <p className="px-4 pt-3 text-[12px] leading-relaxed text-faint">
+          {donation.source === "propio"
+            ? "Canal propio"
+            : donation.source === "general"
+              ? "Recibe por el canal general del portal"
+              : "Todavía sin canal"}
+        </p>
 
         <div className="mt-auto flex gap-2 p-3.5">
           <Link href={href} className={`${button.secondary} min-w-0 flex-1`}>

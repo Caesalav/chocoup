@@ -75,9 +75,9 @@ export type MapPin = {
   slug: string;
   lat: number;
   lng: number;
-  /** Necesidades abiertas: de aquí sale el color de su municipio. Sin el dato,
-   *  la forma se pinta como no documentada, que es lo que de verdad sabemos. */
-  openNeeds?: number;
+  /** Avance del pueblo: de aquí sale el color. Sin el dato, la forma se pinta
+   *  como no documentada, que es lo que de verdad sabemos. */
+  progress?: { total: number; ratio: number };
 };
 
 export type PlacedPin = MapPin & {
