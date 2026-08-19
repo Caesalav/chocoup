@@ -1,37 +1,43 @@
 import Link from "next/link";
-import { card } from "@/components/ui/styles";
+import { card, moneyTrack } from "@/components/ui/styles";
 import { plural, relativeDays } from "@/lib/format";
+import { shortCOP } from "@/lib/money-progress";
 import type { PortalTotals } from "@/lib/types";
 
 /**
- * Donde la referencia tiene la tarjeta de puntos, aquí va el estado real del
- * registro: qué parte de las causas del Chocó ya está cubierta del todo.
+ * El estado del registro, en una cifra: qué parte del problema ya tiene dinero.
  *
- * El tono es lo que decide esta pieza. La referencia celebra —"¡ya casi!", un
- * descuento, una llama—, y esto documenta un terremoto: un porcentaje, una
- * barra y ni un adjetivo. La barra crece con lo solucionado, no con lo que
- * falta, porque lo que falta es la lista entera y no un logro a medias.
+ * La referencia celebra; esto documenta un terremoto: un porcentaje, una barra
+ * y ni un adjetivo. La barra crece con lo donado sobre la meta de todas las
+ * causas, que es el denominador del portal entero. No cuenta causas cerradas:
+ * una causa con la mitad del dinero no está «medio solucionada» como fila, y
+ * sí mueve el problema.
  *
- * Los números salen de la misma consulta (getPortalTotals) para que no puedan
+ * Los números salen de la misma consulta (`getPortalTotals`) para que no puedan
  * contradecirse en la misma pantalla.
  */
 export function ProgressCard({ totals }: { totals: PortalTotals }) {
-  const percent =
-    totals.cases > 0 ? Math.round((totals.solvedCases / totals.cases) * 100) : 0;
+  const { goal, donated } = totals.budget;
+  const hasGoal = goal > 0;
+  const percent = hasGoal ? Math.min(100, Math.round((donated / goal) * 100)) : 0;
 
   return (
     <div className={`${card} p-4`}>
       <div className="flex items-start justify-between gap-4">
         <p className="font-display text-[26px] leading-none tabular-nums text-ink">
-          {percent}
-          <span className="text-faint"> %</span>{" "}
-          <span className="font-sans text-[15px] font-normal text-muted">
-            causas solucionadas
-          </span>
+          {hasGoal ? (
+            <>
+              {percent}
+              <span className="text-faint"> %</span>{" "}
+              <span className="font-sans text-[15px] font-normal text-muted">resuelto</span>
+            </>
+          ) : (
+            <span className="font-sans text-[15px] font-normal text-muted">Sin meta aún</span>
+          )}
         </p>
 
         <Link
-          href="/casos"
+          href="/donaciones"
           className="shrink-0 rounded-full border border-line-strong px-4 py-2 text-[13px] font-medium text-body transition-[border-color,color,scale] duration-150 hover:border-ink/40 hover:text-ink active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Ver
@@ -39,19 +45,27 @@ export function ProgressCard({ totals }: { totals: PortalTotals }) {
       </div>
 
       {/* El canal va en `canvas`, una superficie por debajo del papel: sobre una
-          tarjeta blanca es el único hueco que se ve sin dibujarle un borde. */}
+          tarjeta blanca es el único hueco que se ve sin dibujarle un borde. Lo
+          donado es lima, el mismo tramo que en las pistas de cada causa. */}
       <div
         role="img"
-        aria-label={`${percent} por ciento de las causas del Chocó solucionadas`}
-        className="mt-4 h-2 overflow-hidden rounded-full bg-canvas"
+        aria-label={
+          hasGoal
+            ? `${percent} por ciento del problema resuelto`
+            : "Todavía no hay una meta en dinero"
+        }
+        className={`mt-4 h-2 overflow-hidden rounded-full ${moneyTrack.rest}`}
       >
-        <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
+        <div
+          className={`h-full rounded-full ${moneyTrack.donated}`}
+          style={{ width: `${percent}%` }}
+        />
       </div>
 
       <p className="mt-2.5 text-[12px] text-faint">
-        {totals.cases === 0
-          ? "Todavía no hay causas publicadas"
-          : `${plural(totals.solvedCases, "causa", "causas")} de ${totals.cases} · ${plural(totals.cities, "municipio", "municipios")}`}
+        {!hasGoal
+          ? "Todavía no hay una meta en dinero"
+          : `${shortCOP(donated)} donados de ${shortCOP(goal)} · ${plural(totals.cities, "municipio", "municipios")}`}
       </p>
 
       {/* Cuándo se tocó esto por última vez. En el móvil va arriba del inicio,

@@ -4,6 +4,7 @@ import { CampaignCard } from "@/components/home/CampaignCard";
 import { CampaignStrip } from "@/components/home/CampaignStrip";
 import { ChocoMap } from "@/components/map/ChocoMap";
 import { ColombiaLocator } from "@/components/map/ColombiaLocator";
+import { LiveBadge } from "@/components/map/LiveBadge";
 import { MapIntro } from "@/components/map/MapIntro";
 import { MapStatus } from "@/components/map/MapStatus";
 import { MapViewTabs, parseMapView } from "@/components/map/MapViewTabs";
@@ -127,6 +128,7 @@ export default async function MapPage({ searchParams }: Props) {
             <MapIntro />
           </>
         )}
+        <LiveBadge />
       </div>
 
       <div className="enters enters-2 shrink-0 border-t border-line pt-2.5 lg:col-start-1 lg:row-start-3 lg:mt-4">

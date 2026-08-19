@@ -430,16 +430,6 @@ body {
   letter-spacing: -0.04em;
 }
 
-/* La marca: el letrero CHOCÓ UP. Extra negra, versales, tracking cerrado.
-   Es la misma Outfit del cuerpo, empujada al peso del original: una serif
-   aparte era otra voz, y este letrero pide la geométrica. */
-.font-brand {
-  font-family: var(--font-sans);
-  font-weight: 800;
-  letter-spacing: -0.05em;
-  text-transform: uppercase;
-}
-
 /* La voz del panel del equipo: la misma familia en versalitas, más aire. Es lo
    que queda de la etapa anterior, y se queda a propósito —el panel es una
    herramienta y no el portal—. En las pantallas públicas no se usa: allí todo
@@ -982,12 +972,51 @@ body {
   animation: intro-handoff 2.1s cubic-bezier(0.6, 0, 0.2, 1) both;
 }
 
+/* El LED de «Live»: el punto respira y un aro se va. No es el `.pulse-ring` de
+   la acción principal, que late tres veces y se queda; éste no se acaba, porque
+   lo que dice es que el mapa sigue en el presente. */
+.live-led {
+  animation: live-core 1.8s ease-in-out infinite;
+}
+.live-led::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  animation: live-ring 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes live-core {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes live-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(2.15);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .enters,
   .draws-check,
   .pulse-ring::after,
   .map-fill,
-  .map-chosen-pulse {
+  .map-chosen-pulse,
+  .live-led,
+  .live-led::after {
     animation: none;
   }
   .draws-check {
