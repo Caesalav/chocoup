@@ -34,7 +34,10 @@ const ACTIONS = TABS.filter((tab) => tab.href !== "/");
 const item =
   "flex min-h-10 items-center rounded-full px-3.5 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const idle = "text-body hover:bg-line hover:text-ink";
-const open = "bg-ink font-medium text-paper";
+/* La sección abierta es una pastilla de `selva` con tinta `luz`, 12,77:1. Era de
+   tinta neutra: el mismo negro que el texto, que marcaba bien pero no decía de
+   quién es esta web. */
+const open = "bg-selva font-medium text-luz";
 
 export function SiteHeader({ className = "" }: { className?: string }) {
   const pathname = usePathname();
@@ -84,11 +87,16 @@ export function SiteHeader({ className = "" }: { className?: string }) {
         <nav aria-label="Acciones" className="ml-auto hidden lg:block">
           <ul className="flex items-center gap-1">
             {links(ACTIONS)}
+            {/* Donar es la acción de la cabecera y va en `brote`, el bloque vivo
+                de la referencia, con tinta `selva` a 9,52:1 y filete del mismo
+                verde: la frontera de brote contra el papel es de 1,30:1 y sin el
+                filete no se vería dónde empieza el botón. Es lo que lo separa de
+                la pastilla de la sección abierta, que es `selva` maciza. */}
             <li>
               <Link
                 href={DONATE.href}
                 aria-current={onDonate ? "page" : undefined}
-                className={`${item} bg-accent font-medium text-paper hover:bg-accent-strong hover:text-paper`}
+                className={`${item} border border-selva bg-brote font-medium text-selva hover:bg-liana hover:text-selva`}
               >
                 {DONATE.label}
               </Link>
@@ -96,13 +104,9 @@ export function SiteHeader({ className = "" }: { className?: string }) {
           </ul>
         </nav>
 
-        {/* Menú sin JavaScript para cuando la cabecera es lo único que hay: el
-            panel del equipo la monta a cualquier ancho, y ahí sí puede quedarse
-            estrecha. En el portal público no llega a verse nunca —por debajo de
-            `lg` manda la barra inferior— pero el panel es una web y no una app.
-
-            El desplegable va opaco y por encima de todo: cae sobre la tabla del
-            panel y no puede leerse a través. */}
+        {/* Menú sin JavaScript para cuando la cabecera es lo único que hay, en
+            pantallas estrechas. En el portal público no llega a verse —por debajo
+            de `lg` manda la barra inferior— y el panel hace lo mismo. */}
         <details className="group relative ml-auto lg:hidden">
           <summary
             className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-line-strong bg-panel-high [&::-webkit-details-marker]:hidden"

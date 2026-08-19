@@ -80,10 +80,10 @@ export default async function HomePage() {
           todas se convierte en lo contrario: esconder con un gesto lo que ya
           cabía a la vista.
 
-          El tablero va encima: el recado y el mapa. Las tarjetas son el
-          detalle de los pueblos que el mapa ya pintó. */}
+          El recado va encima: a dónde mirar ahora. El mapa entero está en su
+          propia pantalla. Las tarjetas son el detalle de los pueblos. */}
       <div className="enters enters-1 mt-5">
-        <HomeBoard cities={ranked} campaign={campaign} />
+        <HomeBoard campaign={campaign} />
       </div>
 
       {ranked.length > 0 && (

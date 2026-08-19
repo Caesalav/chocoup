@@ -69,8 +69,8 @@ export const NEED_STATUSES = [
  * No es un descuido a medio arreglar: el valor es el que hay escrito en las filas
  * de la base y en `offers_status_valid` (0012), y cambiarlo sería una migración
  * de datos para renombrar una palabra que nadie lee. La etiqueta sí se lee, y
- * tenía que cambiar: la sección se llama «Verificación, aceptación o negación de
- * los recursos ofrecidos» y sus botones y pestañas dicen «Negar» y «Negadas», así
+ * tenía que cambiar: la sección se llama «Verificación de recursos» y sus botones
+ * y pestañas dicen «Negar» y «Negadas», así
  * que una pastilla que decía «Rechazada» ponía dos palabras para la misma cosa en
  * la misma pantalla. Quien las lee no puede saber que son la misma, y con mala
  * señal y prisa eso es un titubeo delante de una decisión sobre una donación.

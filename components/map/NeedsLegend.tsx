@@ -5,9 +5,8 @@ import { NEEDS_LEGEND, TIER_DOT } from "@/lib/needs-scale";
  *
  * Dice "cuánto falta" y no "gravedad" a propósito: el color es el resto de
  * cubrir las necesidades de ese pueblo. Un municipio en gris no está bien,
- * está sin visitar, y por eso su tramo va escrito con palabras. Uno
- * documentado donde ya no falta nada tiene otro tono: se fue, y ahora mismo
- * no hace falta nada.
+ * está sin visitar. Uno documentado sin casos abiertos va en verde: se fue,
+ * y ahora mismo no hay nada que reportar.
  */
 export function NeedsLegend() {
   return (

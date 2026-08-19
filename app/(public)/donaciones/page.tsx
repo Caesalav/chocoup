@@ -5,7 +5,7 @@ import { DonationChannelCard } from "@/components/donations/DonationChannelCard"
 import { GeneralChannelNote } from "@/components/donations/GeneralChannelNote";
 import { ScreenHeader } from "@/components/nav/ScreenHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { card, cardGrid, screenTitle, shell } from "@/components/ui/styles";
+import { blockInvite, card, cardGrid, screenTitle, shell } from "@/components/ui/styles";
 import { caseDonation } from "@/lib/donation-channel";
 import { plural } from "@/lib/format";
 import { getCaseCards, getGeneralChannel } from "@/lib/data";
@@ -49,7 +49,11 @@ export default async function DonationsPage() {
           backLabel="Volver al inicio"
         />
 
-        <div className={`${card} enters enters-1 mt-5 max-w-[68ch] p-4`}>
+        {/* Lavanda, la misma receta que /ofrecer y /sugerencias, porque es el
+            mismo acto: las tres pantallas piden algo a quien llega. Lo que no
+            sube de voz son las tarjetas de causa, que llevan la cara y el
+            nombre de alguien. */}
+        <div className={`${blockInvite} enters enters-1 mt-5 max-w-[68ch] p-5 sm:p-6`}>
           <p className="text-[14px] leading-relaxed text-body">
             Nada de lo que dones pasa por este portal. Cada causa enseña a dónde va lo que le
             mandes: unas tienen un canal abierto a su nombre y otras reciben por el canal general,
@@ -58,7 +62,9 @@ export default async function DonationsPage() {
           <p className="mt-3 text-[13px] leading-relaxed text-muted">
             De lo que sí pasa por el portal —los recursos que la gente ofrece— hay constancia
             pública en el{" "}
-            <Link href="/ayudas" className="text-accent hover:underline">
+            {/* `accent-strong` y no `accent`: sobre lavanda el acento normal se
+                queda en 4,33:1, que no llega a AA. Lo mide scripts/contraste.mjs. */}
+            <Link href="/ayudas" className="text-accent-strong underline">
               registro de ayudas
             </Link>
             : de qué tipo era cada ayuda, en qué mes llegó y a qué municipio.

@@ -5,7 +5,7 @@ import { OFFER_TO_A_CASE_HEADLINE } from "@/components/cards/OfferRow";
 import { ContributionCounter } from "@/components/offers/ContributionCounter";
 import { UpdatesSignup } from "@/components/offers/UpdatesSignup";
 import { CategoryChip } from "@/components/ui/Chip";
-import { card } from "@/components/ui/styles";
+import { blockInvite, card } from "@/components/ui/styles";
 import { getContributionTally, getOfferTarget } from "@/lib/data";
 import { formatDay } from "@/lib/format";
 
@@ -66,21 +66,33 @@ export default async function OfferPage({ searchParams }: Props) {
   // inferior, y una pestaña no vuelve a ningún sitio.
   return (
     <div className="mx-auto max-w-2xl px-5 pb-8 pt-6 sm:px-8 lg:pb-20 lg:pt-14">
-      <p className="text-[13px] text-faint">Ofrecer un recurso</p>
-      <h1 className="mt-1.5 font-display text-[28px] leading-tight text-ink lg:text-[38px]">
-        {target?.completes
-          ? "Puedo completar esto"
-          : target?.needTitle
-            ? "Puedo aportar esto"
-            : target?.caseName
-              ? `Puedo ayudar a ${target.caseName}`
-              : "Quiero ayudar"}
-      </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-muted">
-        {target?.completes
-          ? "Son tres preguntas cortas. No publicamos el contacto de quien ofreció aquello, ni vamos a publicar el tuyo, así que las dos ofertas se juntan por aquí: el equipo recibe la tuya al lado de la suya y las cruza."
-          : "Son tres preguntas cortas y no hace falta crear una cuenta. Sirve igual si no eres tú quien dona, sino alguien que conoces."}
-      </p>
+      {/* La entradilla va sobre `lavanda`, que es la superficie de lo que pide
+          algo a quien mira. Es el papel que el tono frío juega en el sistema:
+          no es verde ni es cálido, así que una tarjeta de lavanda no se confunde
+          con una acción de marca ni con un estado de necesidad, y esta pantalla
+          es justo eso —una pregunta, no un dato—.
+
+          La tinta se queda en `ink` y `body` (11,67:1 y 8,39:1). Sobre lavanda la
+          rampa se agota antes que sobre papel: `faint` cae a 3,51:1 y hasta
+          `accent` se queda en 4,33:1, así que el rótulo de arriba sube a `body` y
+          cualquier enlace de dentro iría en `accent-strong`, 6,29:1. */}
+      <div className={`${blockInvite} p-5 sm:p-6 lg:p-8`}>
+        <p className="text-[13px] text-body">Ofrecer un recurso</p>
+        <h1 className="mt-1.5 font-display text-[28px] leading-tight text-ink lg:text-[38px]">
+          {target?.completes
+            ? "Puedo completar esto"
+            : target?.needTitle
+              ? "Puedo aportar esto"
+              : target?.caseName
+                ? `Puedo ayudar a ${target.caseName}`
+                : "Quiero ayudar"}
+        </h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-body">
+          {target?.completes
+            ? "Son tres preguntas cortas. No publicamos el contacto de quien ofreció aquello, ni vamos a publicar el tuyo, así que las dos ofertas se juntan por aquí: el equipo recibe la tuya al lado de la suya y las cruza."
+            : "Son tres preguntas cortas y no hace falta crear una cuenta. Sirve igual si no eres tú quien dona, sino alguien que conoces."}
+        </p>
+      </div>
 
       {/* El contador va antes del formulario y no al final: contesta lo que se
           piensa al llegar —si esto lo usa alguien— y esa duda se tiene antes de

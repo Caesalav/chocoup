@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { CASE_KINDS, PHOTO_BUCKET, TEAM_ROLES } from "@/lib/constants";
+import { CASE_KINDS, NEED_CATEGORIES, PHOTO_BUCKET, TEAM_ROLES } from "@/lib/constants";
 import { externalUrl, normalizePhone } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/env";
@@ -530,21 +530,31 @@ function caseSummary(formData: FormData): string {
   return value;
 }
 
-export async function createCase(formData: FormData) {
+/**
+ * Abre la causa y devuelve quién es, sin saltar de página.
+ *
+ * El formulario de «Nuevo caso» sube las fotos en el navegador justo después,
+ * y para eso necesita el identificador. Sin JavaScript el envío sigue yendo
+ * por `createCase`, que redirige a la ficha como siempre.
+ */
+export async function createCaseRecord(formData: FormData): Promise<{
+  id: string;
+  slug: string;
+  cityId: string;
+}> {
   const cityId = optionalId(formData, "city_id");
-  const slug = text(formData, "city_slug");
   if (!cityId) throw new Error("Falta el municipio.");
 
   const { supabase } = await requireCity(cityId);
 
+  const { data: city } = await supabase.from("cities").select("slug").eq("id", cityId).maybeSingle();
+  const slug = (city as { slug: string } | null)?.slug ?? text(formData, "city_slug");
+  if (!slug) throw new Error("No se encontró ese municipio.");
+
   // Sin canal de donación, y no es un olvido: un caso nace sin él y lo pone
   // coordinación después, desde la ficha. Mandarlo aquí lo rechazaría el
   // disparador `guard_donation_channel` para quien documenta, que es quien crea
-  // casi todos los casos. Con la fecha de comprobación pasa lo mismo desde 0016,
-  // y por el mismo motivo: es parte del canal.
-  //
-  // El tipo y el resumen SÍ van aquí: los escribe quien documenta, como el resto
-  // de la ficha. El resumen se puede dejar vacío y es como nacen casi todos.
+  // casi todos los casos.
   const { data, error } = await supabase
     .from("cases")
     .insert({
@@ -561,7 +571,12 @@ export async function createCase(formData: FormData) {
 
   if (error || !data) fail("No se pudo crear el caso", error);
 
-  redirect(`/admin/ciudades/${slug}/casos/${data.id}`);
+  return { id: data.id, slug, cityId };
+}
+
+export async function createCase(formData: FormData) {
+  const created = await createCaseRecord(formData);
+  redirect(`/admin/ciudades/${created.slug}/casos/${created.id}`);
 }
 
 export async function updateCase(formData: FormData) {
@@ -922,7 +937,11 @@ async function setOfferStatus(
 
   if (row.status === status) return;
 
-  const { error } = await supabase.from("offers").update({ status }).eq("id", id);
+  const patch: { status: OfferStatus; on_wall?: boolean } = { status };
+  if (status === "retirada" || status === "rechazada") patch.on_wall = false;
+  if (status === "pendiente" || status === "aceptada") patch.on_wall = true;
+
+  const { error } = await supabase.from("offers").update(patch).eq("id", id);
   if (error) fail("No se pudo cambiar el estado de la oferta", error);
 }
 
@@ -1000,6 +1019,97 @@ export async function withdrawOffer(formData: FormData) {
     "retirada",
     "Esa ayuda ya está registrada como entregada, así que no está en el muro: está en el registro de ayudas. Si de verdad quieres retirarla, quita antes la fecha de entrega.",
   );
+}
+
+/**
+ * Enciende o apaga el muro sin cambiar la verificación.
+ *
+ * Aceptar o negar es un juicio. Esto es otra cosa: una oferta ya aceptada puede
+ * no publicarse todavía, y una pendiente puede quitarse del muro sin negarla.
+ * El estado se queda; solo cambia `on_wall`.
+ */
+export async function setOfferOnWall(formData: FormData) {
+  const id = optionalId(formData, "id");
+  if (!id) throw new Error("Falta la oferta.");
+
+  const { supabase } = await requireRowCity("offers", id);
+  const row = await offerRow(supabase, id);
+  const onWall = bool(formData, "on_wall");
+
+  if (row.status === "rechazada" || row.status === "retirada") {
+    throw new Error(
+      onWall
+        ? "Vuelve a pendiente primero: lo negado o retirado no sale en el muro."
+        : "Esa oferta ya está fuera del muro.",
+    );
+  }
+
+  const { error } = await supabase.from("offers").update({ on_wall: onWall }).eq("id", id);
+  if (error) fail("No se pudo cambiar el muro", error);
+}
+
+/**
+ * Registrar un recurso desde el equipo, no desde /ofrecer.
+ *
+ * Nace pendiente. Si ya se habló con quien ofrece, se marca aceptada en el
+ * mismo envío. El muro es una casilla aparte.
+ */
+export async function createOffer(formData: FormData) {
+  const cityId = optionalId(formData, "city_id");
+  const { supabase } = await requireCity(cityId);
+
+  const name = text(formData, "offerer_name");
+  const contact = text(formData, "offerer_contact");
+  const resource = text(formData, "resource");
+  const message = text(formData, "message");
+  const category = text(formData, "category") || "otro";
+
+  if (name.length < 2) throw new Error("Escribe el nombre de quien ofrece.");
+  if (contact.length < 5) throw new Error("Hace falta un teléfono, WhatsApp o correo.");
+  if (resource.length < 2) throw new Error("Describe el recurso.");
+  if (!NEED_CATEGORIES.some((option) => option.value === category)) {
+    throw new Error("Ese tipo de recurso no existe.");
+  }
+
+  const caseId = optionalId(formData, "case_id");
+  if (caseId) {
+    if (!cityId) throw new Error("Para vincular a un caso, elige antes el municipio.");
+    await caseInCity(caseId, cityId);
+  }
+
+  const onWall = bool(formData, "on_wall");
+  const accepted = bool(formData, "accepted");
+
+  const { data, error } = await supabase
+    .from("offers")
+    .insert({
+      city_id: cityId,
+      case_id: caseId,
+      offerer_name: name,
+      offerer_contact: contact,
+      resource,
+      category,
+      message,
+      publish_name: bool(formData, "publish_name"),
+      status: "pendiente",
+      team_notes: "",
+      delivered_on: null,
+      on_wall: true,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) fail("No se pudo guardar el recurso", error);
+
+  const patch: { status?: OfferStatus; on_wall?: boolean } = {};
+  if (accepted) patch.status = "aceptada";
+  if (!onWall) patch.on_wall = false;
+  if (Object.keys(patch).length > 0) {
+    const { error: updateError } = await supabase.from("offers").update(patch).eq("id", data.id);
+    if (updateError) fail("El recurso se creó, pero no se pudo aplicar el muro o la aceptación", updateError);
+  }
+
+  redirect("/admin/recursos");
 }
 
 /**

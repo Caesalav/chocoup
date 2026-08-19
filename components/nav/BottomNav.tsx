@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Dock, DockAction, DockIcon } from "@/components/nav/Dock";
 import { activeHref, DONATE, TABS } from "@/components/nav/destinations";
 
 /**
- * Barra inferior fija.
+ * Barra inferior fija del portal.
  *
  * Es cliente por `usePathname`, pero Next la pinta también en el servidor: el
  * HTML ya llega con la pestaña correcta marcada y con los enlaces puestos, así
@@ -37,42 +37,16 @@ export function BottomNav() {
   const branch = onDonate ? null : (activeHref(pathname, TABS) ?? "/");
 
   return (
-    <nav
-      aria-label="Secciones del portal"
-      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden"
-    >
-      <ul className="flex items-center gap-0.5 rounded-full bg-ink/95 p-1.5 shadow-float backdrop-blur">
-        {TABS.map(({ href, label, Icon }) => {
-          const active = href === branch;
-
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                aria-current={active ? "page" : undefined}
-                aria-label={label}
-                className={`flex h-12 w-11 items-center justify-center rounded-full transition-[background-color,color] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper ${
-                  active
-                    ? "bg-paper text-ink"
-                    : "text-paper/65 hover:bg-paper/10 hover:text-paper"
-                }`}
-              >
-                <Icon className="size-[22px] shrink-0" />
-              </Link>
-            </li>
-          );
-        })}
-        <li>
-          <Link
-            href={DONATE.href}
-            aria-current={onDonate ? "page" : undefined}
-            className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-accent px-3.5 text-paper transition-colors hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper"
-          >
-            <DONATE.Icon className="size-[20px] shrink-0" />
-            <span className="text-[13px] font-medium">{DONATE.label}</span>
-          </Link>
-        </li>
-      </ul>
-    </nav>
+    <Dock label="Secciones del portal">
+      {TABS.map(({ href, label, Icon }) => {
+        const active = href === branch;
+        return (
+          <DockIcon key={href} href={href} label={label} active={active}>
+            <Icon className="size-[22px] shrink-0" />
+          </DockIcon>
+        );
+      })}
+      <DockAction href={DONATE.href} label={DONATE.label} active={onDonate} Icon={DONATE.Icon} />
+    </Dock>
   );
 }

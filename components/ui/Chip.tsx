@@ -38,15 +38,31 @@ export function CategoryChip({ category }: { category: string }) {
  * Ahora cada una está en el tramo de la escala que le corresponde, que es el
  * mismo con el que se pinta su municipio en el mapa:
  *
- *   Urgente   need-high macizo   papel sobre rojo        6,3:1
- *   Abierta   need-mid  lavado   rust sobre naranja      5,9:1 (5,5:1 sobre papel)
- *   Parcial   need-mid  al aire  lo mismo, a medio hacer: el filete y no el relleno
- *   Cubierta  accent    lavado   verde sobre verde       6,7:1
+ *   Urgente   need-high macizo   papel sobre rojo        8,53:1
+ *   Abierta   need-mid  lavado   rust sobre naranja      6,07:1
+ *   Parcial   need-mid  al aire  lo mismo, a medio hacer: el filete, no el relleno
+ *   Cubierta  accent    lavado   verde sobre verde       7,10:1
  *
- * El verde y el naranja lavados quedan a la misma luminancia (1,04:1 entre
- * ellos), así que a un ojo que no separe rojo de verde no le bastaría el tono.
- * Por eso «Cubierta» lleva además el visto: la única de las cuatro con dibujo,
- * y la diferencia sobrevive en escala de grises.
+ * EL REPARTO NO CAMBIA AL CAMBIAR LA IDENTIDAD, y hay que decirlo porque la
+ * tentación es la contraria: con tres verdes de marca en la paleta nueva en vez
+ * de uno, pintar los estados «a juego» es más fácil que antes y rompe lo mismo.
+ * Lo que sí se rederivó son los VALORES de la escala cálida: seguían siendo los
+ * de una identidad anterior de papel y ámbar y se leían como de otro sistema. La
+ * familia sigue siendo cálida y aparte del verde, pero ahora sale de la misma
+ * ley que el resto de la paleta —ver las fichas `--color-need-*`—.
+ *
+ * El salto de urgencia, que es lo que no puede perderse, subió al rederivarla:
+ * «Urgente» contra «Abierta» está en 6,85:1 en color y 3,64:1 en deuteranopía,
+ * donde antes daba 4,71:1 y 2,69:1.
+ *
+ * El verde y el naranja lavados quedan a la misma luminancia a propósito
+ * —1,01:1 entre ellos en color, 1,01:1 en gris y 1,17:1 en deuteranopía—, así que
+ * a un ojo que no separe rojo de verde el tono no le dice nada. Por eso
+ * «Cubierta» lleva además el visto: la única de las cuatro con dibujo, y la
+ * diferencia sobrevive a los tres filtros.
+ *
+ * Los números los saca `node scripts/contraste.mjs --estados` leyendo la paleta,
+ * y la lámina renderizada con los filtros está en capturas-verificacion/marca/.
  */
 const needStatusStyles: Record<NeedStatus, string> = {
   abierta: "bg-need-mid-soft text-need-mid-strong",
@@ -81,7 +97,7 @@ export function NeedStatusChip({ status }: { status: NeedStatus }) {
  * ha pasado a la oferta. Macizo contra filete se distingue de reojo y sin
  * depender del tono, así que aguanta en escala de grises igual que el visto de
  * «Cubierta» ahí arriba. El texto sube a `muted` porque `faint` sobre `canvas` se
- * queda en 4,5:1 raspando; así son 6,4:1.
+ * queda en 4,57:1 raspando; así son 6,42:1.
  *
  * No lleva dibujo propio —una cruz, una raya— porque el único hueco para
  * distinguirla estaba en el relleno: el filete discontinuo ya es de `DraftChip`

@@ -5,9 +5,10 @@ import { MUNICIPALITIES } from "./choco-texture";
  * documentadas.
  *
  * El color sale de cuánto falta por cubrir —el inverso del avance de
- * `cityProgress`— y de nada más. Un pueblo documentado donde ya no falta nada
+ * `cityProgress`— y de nada más. Un pueblo documentado sin casos abiertos
  * no es gris: el gris es «nadie ha ido». Mezclarlos diría que Quibdó, resuelto,
- * está igual que un municipio al que el equipo no ha llegado.
+ * está igual que un municipio al que el equipo no ha llegado. El resuelto va
+ * en verde: está bien.
  *
  * El avance lo calcula lib/case-progress.ts sobre el montón de necesidades del
  * pueblo. Aquí solo se reparte ese resto en tramos, para que la leyenda, el
@@ -21,8 +22,8 @@ export type NeedsTier = "blank" | "none" | "low" | "mid" | "high";
  * indistinguibles y sugeriría una precisión que el tablero no tiene.
  *
  * `progress` nulo es «nadie ha documentado». Cero necesidades, o todas
- * cubiertas, es `none`: se fue, y ahora mismo no falta nada. Esas dos cosas
- * no pueden parecerse.
+ * cubiertas, es `none`: se fue, y ahora mismo no hay casos que reportar.
+ * Esas dos cosas no pueden parecerse.
  */
 export function needsTier(
   progress: { total: number; ratio: number } | undefined,
@@ -43,6 +44,16 @@ export const TIER_FILL: Record<NeedsTier, string> = {
   high: "fill-need-high",
 };
 
+/** El mismo tono en el trazo: cada pueblo sella sus juntas del color propio,
+ *  para que entre dos formas no asome el papel. */
+export const TIER_STROKE: Record<NeedsTier, string> = {
+  blank: "stroke-need-blank",
+  none: "stroke-need-none",
+  low: "stroke-need-low",
+  mid: "stroke-need-mid",
+  high: "stroke-need-high",
+};
+
 /** El mismo tono como punto, para la leyenda y las tarjetas del listado. */
 export const TIER_DOT: Record<NeedsTier, string> = {
   blank: "bg-need-blank",
@@ -53,7 +64,7 @@ export const TIER_DOT: Record<NeedsTier, string> = {
 };
 
 export const NEEDS_LEGEND: { tier: NeedsTier; label: string }[] = [
-  { tier: "none", label: "Nada falta" },
+  { tier: "none", label: "Sin casos reportados" },
   { tier: "low", label: "Falta poco" },
   { tier: "mid", label: "A medias" },
   { tier: "high", label: "Prioritario" },

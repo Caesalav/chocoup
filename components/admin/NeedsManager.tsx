@@ -17,11 +17,16 @@ export function NeedsManager({
 }) {
   return (
     <div>
-      <form action={createNeed} className="rounded-xl border border-line bg-panel p-4">
+      <form action={createNeed} className="rounded-xl border border-line bg-panel p-5 sm:p-6">
         <input type="hidden" name="city_id" value={cityId} />
         {caseId && <input type="hidden" name="case_id" value={caseId} />}
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <h3 className="font-display text-[18px] leading-tight text-ink">Añadir una necesidad</h3>
+        <p className="mt-1 text-[13px] leading-relaxed text-muted">
+          Título corto, etiqueta y, si se sabe, cuánto hace falta.
+        </p>
+
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <label className="block sm:col-span-2">
             <span className={field.label}>Qué falta</span>
             <input
@@ -33,7 +38,7 @@ export function NeedsManager({
           </label>
 
           <label className="block">
-            <span className={field.label}>Categoría</span>
+            <span className={field.label}>Etiqueta</span>
             <select name="category" className={field.select} defaultValue="otro">
               {NEED_CATEGORIES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -41,6 +46,7 @@ export function NeedsManager({
                 </option>
               ))}
             </select>
+            <span className={field.hint}>La misma que ve quien ofrece y quien lee el muro.</span>
           </label>
 
           <label className="block">

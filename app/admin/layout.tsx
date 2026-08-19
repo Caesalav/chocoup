@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { AdminBottomNav } from "./AdminBottomNav";
 import { AdminNav } from "./AdminNav";
 import { SiteHeader } from "@/components/SiteHeader";
 import { getFeedback, getOffers } from "@/lib/admin-data";
@@ -25,17 +26,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     const team = demoTeamSession();
     return (
       <>
-        {/* La misma cabecera del portal, que aquí se monta a cualquier ancho: el
-            panel es una web y no una app, y no tiene barra inferior de la que
-            tirar. Debajo va la del equipo, con lo que solo existe aquí. */}
-        <SiteHeader />
+        {/* La misma navegación del portal: cabecera en escritorio, barra abajo
+            en el móvil. Debajo de la cabecera, en pantallas grandes, van las
+            tres secciones del equipo. */}
+        <SiteHeader className="hidden lg:block" />
         <AdminNav
           email={team.email}
           role={team.role}
           pendingOffers={pendingOffers.length}
           feedbackCount={inbox.length}
         />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pb-[var(--nav-h)] lg:pb-0">{children}</main>
+        <AdminBottomNav pendingOffers={pendingOffers.length} />
       </>
     );
   }
@@ -66,7 +68,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   // Los dos contadores que la barra lleva desde siempre, colgados de donde vive
-  // ahora cada cosa: las ofertas sin revisar en «Recursos ofrecidos» y el buzón en
+  // ahora cada cosa: las ofertas sin revisar en Verificación y el buzón en
   // «Sugerencias». Se cuentan aquí, en el layout, porque la barra se pinta en todas
   // las pantallas del panel y si cada una los pidiera por su cuenta habría un
   // número distinto según por dónde se entrara.
@@ -82,14 +84,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader className="hidden lg:block" />
       <AdminNav
         email={email}
         role={team.role}
         pendingOffers={count ?? 0}
         feedbackCount={inbox ?? 0}
       />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 pb-[var(--nav-h)] lg:pb-0">{children}</main>
+      <AdminBottomNav pendingOffers={count ?? 0} />
     </>
   );
 }

@@ -553,54 +553,86 @@ la altura del hueco**: cada línea de texto encima o debajo del mapa se la quita
 
 ## Sistema visual
 
-Papel claro y cartográfico: fondo hueso cálido, tarjetas casi blancas de borde finísimo y
-tinta casi negra. Se documenta a pleno sol del mediodía y con el teléfono en la mano, así que
-la legibilidad manda sobre el carácter. Los tokens están en `app/globals.css`.
+**La identidad completa está en [`MARCA.md`](MARCA.md):** la paleta con sus valores y el papel
+de cada color, los dos registros y cuándo se usa cada uno, la escala de estados y por qué es
+otra familia, tipografía, radios y formas, los contrastes medidos y las reglas que impiden
+repetir los fallos que ya estuvieron publicados. Lo de aquí abajo es el resumen para orientarse.
 
-| Papel | Token | Valor |
+Campo casi blanco con bloques macizos de color encima, esquinas generosas y ni un degradado.
+Se documenta a pleno sol del mediodía y con el teléfono en la mano, así que la legibilidad
+manda sobre el carácter. Las fichas están en `app/globals.css` y las recetas en
+`components/ui/styles.ts`.
+
+| Papel | Ficha | Valor |
 | --- | --- | --- |
-| Fondo de página | `paper` | `#F6F3EE` |
-| Tierra del mapa | `canvas` / `land` | `#EFECE5` / `#E7E2D9` |
-| Tarjetas | `panel` / `panel-high` | `#FDFBF7` / `#FFFFFF` |
-| Titulares y texto | `ink` / `body` / `muted` | `#191411` / `#3A332D` / `#5C534B` |
-| Acento de marca | `accent` | `#1B7A4C` — selva de la bandera del Chocó |
+| Fondo de página | `paper` | `#F4F7F2` |
+| Tierra del mapa | `canvas` / `land` | `#EAEEE6` / `#DFE5DA` |
+| Tarjetas | `panel` / `panel-high` | `#FAFCF8` / `#FFFFFF` |
+| Titulares y texto | `ink` / `body` / `muted` | `#0E1A15` / `#27352F` / `#475851` |
+| Bloque oscuro, y el botón principal | `selva` | `#0F352D` — tinta clara encima, 12,77:1 |
+| Superficie viva, nunca texto | `brote` | `#A5ED69` — sobre blanco es 1,41:1 |
+| Solo formas orgánicas: las cintas | `liana` | `#1AB169` |
+| El contrapeso frío: lo que pide algo | `lavanda` | `#DCC8FE` |
+| Enlaces y aros de foco | `accent` | `#126A44` — 6,13:1 sobre papel |
 
 Ninguna ficha de color puede llamarse como una utilidad de Tailwind. El papel se llamó `base`
 un tiempo, y con ese nombre `text-base` dejaba de ser un tamaño de letra para ser un color:
 los cuatro sitios que lo escribían pidiendo 16 px se quedaron sin tamaño, y cualquiera que lo
-escribiera esperando tamaño se llevaba letra color papel sobre papel.
+escribiera esperando tamaño se llevaba letra color papel sobre papel. Por eso los colores
+nuevos van en castellano: `lime` es una familia de Tailwind y `selva` no puede serlo nunca.
 
-### Dos familias, y no se mezclan
+### Dos registros, y los decide la pantalla
 
-**Verde (`accent`) es la marca y por tanto lo que se hace:** botones, enlaces, la
-navegación, y la pastilla de una necesidad ya cubierta, que es la única forma de "hecho"
-que existe aquí.
+La paleta se muestreó de una lámina alegre, y aquí hay fichas de personas cuya casa se cayó.
+**Registro abierto** —portada, navegación, mapa, listados, páginas de invitación— con `brote`,
+bloques de `selva`, cintas y `lavanda`. **Registro sobrio** —la ficha de una persona y las
+tarjetas que llevan su cara— con papel, tinta, `accent` y la escala de necesidad, y nada más:
+ahí la foto y el nombre son lo único que puede levantar la voz. No es criterio de quien
+maquete, lo comprueba el `lint`.
 
-**La escala cálida (`need-blank` … `need-high`, de `#E8E4DD` a `#A92A1A`) es cuánto
-falta.** Pinta los municipios del mapa y, con los mismos tonos, las pastillas de estado de
-una necesidad: el chip «Urgente» de Quibdó y la forma de Quibdó en el mapa dicen lo mismo
-con el mismo color.
+### Dos familias de color, y no se mezclan
+
+**El verde de marca es lo que se hace:** botones, enlaces, la navegación, y la pastilla de una
+necesidad ya cubierta, que es la única forma de "hecho" que existe aquí.
+
+**La escala cálida (`need-blank` … `need-high`, de `#E4E9E0` a `#920A1B`) es cuánto falta.**
+Pinta los municipios del mapa y, con los mismos tonos, las pastillas de estado de una
+necesidad: el chip «Urgente» de Quibdó y la forma de Quibdó en el mapa dicen lo mismo con el
+mismo color.
 
 | Estado | Relleno | Tinta | Contraste |
 | --- | --- | --- | --- |
-| Urgente | `need-high` macizo | `paper` | 6,3:1 |
-| Abierta | `need-mid-soft` | `need-mid-strong` | 5,9:1 |
-| Parcial | filete, sin relleno | `need-mid-strong` | 7,4:1 |
-| Cubierta | `accent-soft` + visto | `accent-strong` | 6,7:1 |
+| Urgente | `need-high` macizo | `paper` | 8,53:1 |
+| Abierta | `need-mid-soft` | `need-mid-strong` | 6,07:1 |
+| Parcial | filete, sin relleno | `need-mid-strong` | 7,91:1 |
+| Cubierta | `accent-soft` + visto | `accent-strong` | 7,10:1 |
 
 La regla existe porque se rompió: con la urgencia pintada de verde de marca, «Abierta»,
 «Urgente» y «Cubierta» eran tres verdes medios seguidos y la urgencia dejaba de leerse.
 Y en el otro sentido, más verde nunca puede significar más necesidad: se leería como
 "mejor" y aquí significa lo contrario.
 
-Los dos lavados —el naranja de «Abierta» y el verde de «Cubierta»— quedan a la misma
-luminancia (1,04:1 entre ellos), así que el tono no basta para quien no separa rojo de
-verde. Por eso «Cubierta» lleva el visto: es la única pastilla con dibujo y la diferencia
-sobrevive en escala de grises.
+**Aparte del verde, pero no de otra paleta.** Los cálidos venían de la identidad anterior de
+papel y ámbar y se conservaron intactos al cambiar de marca: cumplían la regla y aun así se
+leían como invitados al lado de `brote` y `lavanda`. Están rederivados en OKLCH a la misma
+saturación relativa que el núcleo de la marca —95 % del techo del sRGB, igual que `lavanda`,
+`liana` y `accent`—, y por eso las fichas se escriben en `oklch()`: en hexadecimal la ley no se
+ve, y eso es lo que dejó sobrevivir los valores muertos. El salto de urgencia **subió** al
+hacerlo (6,85:1 contra 4,71:1), y los cinco peores pares del mapa mejoran en los tres filtros.
+El detalle está en [MARCA.md](MARCA.md).
+
+Los dos lavados —el naranja de «Abierta» y el verde de «Cubierta»— quedan **a propósito** a la
+misma luminancia: 1,01:1 entre ellos en color, 1,01:1 en gris y 1,17:1 en deuteranopía. El tono
+no los separa, y no se pretende que lo haga. Por eso «Cubierta» lleva el visto: es la única
+pastilla con dibujo, y una forma sobrevive a los tres filtros. La lámina que lo demuestra está
+en `capturas-verificacion/marca/`.
 
 Sufijos: `-soft` es el relleno pálido de una pastilla y `-strong` la versión de más peso,
 que sobre papel quiere decir **más oscura** —el hover no puede ir hacia la luz cuando el
 fondo ya es lo más claro que hay—.
+
+Los números se regeneran con `node scripts/contraste.mjs`, que los calcula leyendo
+`app/globals.css` para que no puedan quedarse desfasados.
 
 ### Superficies y estados
 

@@ -10,15 +10,15 @@ import {
   type MapPin,
 } from "@/lib/choco-map";
 import { plural } from "@/lib/format";
-import { paintMunicipalities, TIER_FILL } from "@/lib/needs-scale";
-import { PaletteFillDefs } from "@/components/ui/PaletteFillDefs";
+import { paintMunicipalities, TIER_FILL, TIER_STROKE } from "@/lib/needs-scale";
 
 type Props = {
   pins: MapPin[];
   /** Construye el enlace de cada municipio documentado. Sin esto el mapa es un
    *  dibujo: se usa así en la ficha, donde no hay a dónde ir. */
   hrefFor?: (pin: MapPin) => string;
-  /** Municipio elegido: se le marca el contorno y el resto se apaga un punto. */
+  /** Municipio elegido: se le marca el punto, no un filete. Un contorno de tinta
+   *  sobre el mosaico abre un hueco de papel entre vecinos. */
   activeSlug?: string;
   /** Solo la silueta y el punto, para usos diminutos donde el mosaico se
    *  convertiría en papilla: a 96 px de ancho, la separación entre municipios
@@ -29,10 +29,6 @@ type Props = {
   className: string;
 };
 
-/** Separación entre municipios: es el papel del fondo asomando entre las formas,
- *  no una línea de color, así que el mosaico funciona sobre cualquier fondo. */
-const GAP = 3;
-
 /**
  * El Chocó como mosaico de sus 30 municipios, coloreados por cuánto falta
  * por cubrir.
@@ -41,11 +37,20 @@ const GAP = 3;
  * los enlaces son <a>, así que /mapa funciona con la señal del Chocó y
  * compartido por WhatsApp. Las formas son del DANE (lib/choco-texture) y no se
  * mueven nunca: no hay cámara, ni zoom, ni máscara, ni detalle de calles.
- * Elegir un municipio cambia colores y contornos, jamás el encuadre.
+ *
+ * Cada forma se pinta de un tono plano. El trazo es del mismo color, fino, y
+ * va debajo del relleno: cubre las rendijas del DANE sin dibujar un filete.
+ * Un contorno negro o uno de papel entre pueblos es exactamente el hueco que
+ * se veía alrededor de Quibdó.
  */
 export function ChocoMap({ pins, hrefFor, activeSlug, bare = false, className }: Props) {
   const painted = paintMunicipalities(pins);
-  const active = activeSlug ? painted.find((shape) => shape.city?.slug === activeSlug) : undefined;
+  // Los sin documentar van debajo: así el trazo de un pueblo en color sella
+  // la junta y no deja asomar el papel entre dos formas que no coinciden al
+  // píxel —el DANE simplificado deja rendijas de menos de una unidad.
+  const layered = [...painted].sort(
+    (a, b) => Number(a.tier !== "blank") - Number(b.tier !== "blank"),
+  );
   const placed = placePins(pins);
   const ocean = bare ? null : placeOceanLabel(placed);
 
@@ -66,7 +71,6 @@ export function ChocoMap({ pins, hrefFor, activeSlug, bare = false, className }:
           : `Mapa del Chocó con ${plural(pins.length, "municipio documentado", "municipios documentados")}`
       }
     >
-      <PaletteFillDefs />
       {bare ? (
         <path
           d={CHOCO_PATH}
@@ -75,49 +79,39 @@ export function ChocoMap({ pins, hrefFor, activeSlug, bare = false, className }:
           strokeLinejoin="round"
         />
       ) : (
-        painted.map((shape) => {
-          const href = shape.city && hrefFor ? hrefFor(shape.city) : null;
-          // Con un municipio elegido los demás bajan un punto. No desaparecen:
-          // la silueta del departamento la forman los 30, no los documentados.
-          const dimmed = Boolean(active) && shape.id !== active?.id;
+        <>
+          {/* Base del departamento: si dos polígonos del DANE no se tocan al
+              píxel, lo que asoma es el gris de «sin documentar», no el papel. */}
+          <path d={CHOCO_PATH} className="fill-need-blank" />
+          {layered.map((shape) => {
+            const href = shape.city && hrefFor ? hrefFor(shape.city) : null;
 
-          const region = (
-            <path
-              d={shape.d}
-              className={`${TIER_FILL[shape.tier]} stroke-paper`}
-              strokeWidth={GAP}
-              strokeLinejoin="round"
-              opacity={dimmed ? 0.7 : undefined}
-            />
-          );
+            const region = (
+              <path
+                d={shape.d}
+                className={`${TIER_FILL[shape.tier]} ${TIER_STROKE[shape.tier]}`}
+                strokeWidth={1.2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                style={{ paintOrder: "stroke fill" }}
+              />
+            );
 
-          return href && shape.city ? (
-            <Link
-              key={shape.id}
-              href={href}
-              scroll={false}
-              aria-label={shape.city.name}
-              className="map-region"
-            >
-              {region}
-            </Link>
-          ) : (
-            <g key={shape.id}>{region}</g>
-          );
-        })
-      )}
-
-      {/* El contorno del elegido va en su propia pasada, encima del mosaico
-          entero: dentro del grupo lo taparía la separación de sus vecinos, que
-          se dibujan después. */}
-      {active && !bare && (
-        <path
-          d={active.d}
-          className="fill-none stroke-ink"
-          strokeWidth={4}
-          strokeLinejoin="round"
-          pointerEvents="none"
-        />
+            return href && shape.city ? (
+              <Link
+                key={shape.id}
+                href={href}
+                scroll={false}
+                aria-label={shape.city.name}
+                className="map-region"
+              >
+                {region}
+              </Link>
+            ) : (
+              <g key={shape.id}>{region}</g>
+            );
+          })}
+        </>
       )}
 
       {/* El rótulo del mar va donde queda sitio: la altura y la separación de la

@@ -900,6 +900,7 @@ type OfferSeed = {
   /** Autorización expresa para aparecer con nombre. Sin ella, la entrega se
    *  publica igual pero sin decir de quién viene. */
   publishName?: boolean;
+  on_wall?: boolean;
 };
 
 const offerSeeds: OfferSeed[] = [
@@ -1084,6 +1085,7 @@ export const demoOffers: Offer[] = offerSeeds.map((seed, index) => {
     publish_name: seed.publishName ?? false,
     team_notes: seed.team_notes ?? "",
     created_at: day(10 + (index % 5)),
+    on_wall: seed.on_wall ?? true,
   };
 });
 
@@ -1181,6 +1183,7 @@ export function demoCityCards(): CityCardData[] {
           (offer) =>
             offer.city_id === city.id &&
             (offer.status === "pendiente" || offer.status === "aceptada") &&
+            offer.on_wall &&
             offer.delivered_on === null,
         ).length,
       };
@@ -1410,7 +1413,8 @@ export function demoCampaignFocus(): CampaignFocusRow {
 
 export function demoContributionTally(): ContributionTally {
   const standing = demoOffers.filter(
-    (offer) => offer.status === "pendiente" || offer.status === "aceptada",
+    (offer) =>
+      (offer.status === "pendiente" || offer.status === "aceptada") && offer.on_wall,
   );
   return {
     ofrecidos: standing.length,
@@ -1626,6 +1630,7 @@ export function demoOfferRecords(): OfferRecord[] {
     .filter(
       (offer) =>
         (offer.status === "pendiente" || offer.status === "aceptada") &&
+        offer.on_wall &&
         // Lo que llegó sale de aquí y aparece en `demoAidRecords`. Las dos listas
         // se reparten las ofertas por esta misma línea y no se solapan nunca.
         offer.delivered_on === null &&

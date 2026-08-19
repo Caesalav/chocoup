@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { eyebrow, panel } from "@/components/ui/styles";
+import { AdminHeader } from "@/components/admin/AdminHeader";
+import { PledgeIcon } from "@/components/ui/icons";
+import { panel } from "@/components/ui/styles";
 import { getNewsletterSignups } from "@/lib/admin-data";
 import { formatDate, plural } from "@/lib/format";
 import { currentTeam } from "@/lib/team";
@@ -32,19 +34,21 @@ export default async function SignupsPage() {
   if (session?.role !== "coordinacion") {
     return (
       <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
-        <Link href="/admin/recursos" className="text-sm text-muted hover:text-ink hover:underline">
-          ← Recursos ofrecidos
-        </Link>
-        <h1 className="mt-6 font-display text-3xl text-ink">Esta lista es de coordinación</h1>
-        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
+        <AdminHeader
+          backHref="/admin/recursos"
+          backLabel="Verificación"
+          title="Esta lista es de coordinación"
+          Icon={PledgeIcon}
+        />
+        <p className="mt-8 max-w-prose text-[14px] leading-relaxed text-muted">
           Son correos de personas que pidieron novedades del portal, y no pertenecen a ningún
           municipio: no hay asignación que los haga de nadie. La base de datos no le concede la
           lectura a ninguna cuenta fuera de coordinación, ni para contarlos.
         </p>
-        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
+        <p className="mt-3 max-w-prose text-[14px] leading-relaxed text-muted">
           Las ofertas de tus municipios sí las ves, en{" "}
           <Link href="/admin/recursos" className="text-accent hover:underline">
-            recursos ofrecidos
+            verificación de recursos
           </Link>
           .
         </p>
@@ -56,21 +60,13 @@ export default async function SignupsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-      <Link href="/admin/recursos" className="text-sm text-muted hover:text-ink hover:underline">
-        ← Recursos ofrecidos
-      </Link>
-
-      <p className={`${eyebrow} mt-4`}>Recursos ofrecidos</p>
-      <h1 className="mt-1 font-display text-3xl text-ink">Correos para los avisos</h1>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Quien deja su correo en «Quiero ayudar» pide que le contemos cómo avanza la plataforma, y
-        nada más. No es el contacto de una oferta: usarlo para responder por algo que alguien
-        ofreció sería escribirle por una vía que no autorizó.
-      </p>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Esta lista no la ve nadie más. Ni documentación, ni el público, ni contada: la base de
-        datos no le concede la lectura a nadie fuera de coordinación.
-      </p>
+      <AdminHeader
+        backHref="/admin/recursos"
+        backLabel="Verificación"
+        title="Correos para los avisos"
+        Icon={PledgeIcon}
+        description="Quien deja su correo en «Quiero ayudar» pide que le contemos cómo avanza la plataforma, y nada más. No es el contacto de una oferta."
+      />
 
       {signups.length === 0 ? (
         <p className={`${panel} mt-6 p-4 text-sm leading-relaxed text-muted`}>

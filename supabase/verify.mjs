@@ -211,6 +211,7 @@ const MIGRATIONS = [
   "migrations/0016_ficha_de_causa.sql",
   "migrations/0017_donaciones_preparadas.sql",
   "migrations/0018_tablero.sql",
+  "migrations/0019_muro_de_ofertas.sql",
 ];
 const migration = (file) => readFileSync(join(HERE, file), "utf8");
 

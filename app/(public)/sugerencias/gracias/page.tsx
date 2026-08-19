@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 export default function FeedbackThanksPage() {
   return (
     <div className="mx-auto max-w-2xl px-5 pb-8 pt-10 sm:px-8 lg:pb-24 lg:pt-16">
-      <span className="flex size-14 items-center justify-center rounded-full bg-accent-soft text-accent-strong">
+      {/* El mismo sello de brote que /ofrecer/gracias: ver la nota de allí sobre
+          por qué no lleva el lavado verde de la pastilla «Cubierta». */}
+      <span className="flex size-14 items-center justify-center rounded-full bg-brote text-selva">
         <CheckIcon className="draws-check size-7 stroke-[2.5]" />
       </span>
 

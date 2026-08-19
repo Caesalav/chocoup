@@ -4,6 +4,7 @@ import {
   markOfferDelivered,
   rejectOffer,
   reopenOffer,
+  setOfferOnWall,
   updateOffer,
   withdrawOffer,
 } from "@/app/admin/actions";
@@ -66,6 +67,7 @@ export function OfferCard({
   const isPending = offer.status === "pendiente";
   const isDelivered = offer.delivered_on !== null;
   const isClosed = offer.status === "rechazada" || offer.status === "retirada";
+  const onWall = offer.on_wall !== false && !isClosed && !isDelivered;
 
   return (
     <li
@@ -87,6 +89,15 @@ export function OfferCard({
       <div className="flex flex-wrap items-center gap-2">
         <OfferStatusChip status={offer.status} />
         <CategoryChip category={offer.category} />
+        {!isClosed && !isDelivered && (
+          <span
+            className={`rounded-full px-3 py-1 text-[12px] ${
+              onWall ? "bg-accent-soft text-accent-strong" : "bg-line text-muted"
+            }`}
+          >
+            {onWall ? "En el muro" : "Fuera del muro"}
+          </span>
+        )}
         {offer.delivered_on && (
           <span className="text-xs text-accent-strong">
             Llegó el {formatDay(offer.delivered_on)}
@@ -145,11 +156,12 @@ export function OfferCard({
           </form>
         )}
 
-        {isPending && (
-          <form action={withdrawOffer}>
+        {!isClosed && !isDelivered && (
+          <form action={setOfferOnWall}>
             <input type="hidden" name="id" value={offer.id} />
-            <SubmitButton variant="ghost" pendingLabel="Quitando…">
-              Quitar del muro
+            <input type="hidden" name="on_wall" value={onWall ? "" : "on"} />
+            <SubmitButton variant="ghost" pendingLabel="Guardando…">
+              {onWall ? "Quitar del muro" : "Poner en el muro"}
             </SubmitButton>
           </form>
         )}
@@ -178,8 +190,8 @@ export function OfferCard({
         <p className="mt-2 max-w-prose text-xs leading-relaxed text-faint">
           Aceptar dice que hablaste con esa persona y que cuentas con lo que ofrece
           {offer.publish_name ? ", y publica su nombre en el muro, que lo autorizó" : ""}. Negar es
-          un no del equipo y queda escrito. Quitar del muro no juzga nada: lo saca de «Lo que se ha
-          ofrecido» y se puede reponer de un toque.
+          un no del equipo y queda escrito. Quitar del muro lo esconde de «Lo que se ha ofrecido»
+          sin cambiar la verificación: sigue aquí, pendiente.
         </p>
       )}
 
@@ -341,16 +353,34 @@ export function OfferCard({
               </form>
               <form action={withdrawOffer}>
                 <input type="hidden" name="id" value={offer.id} />
-                <SubmitButton variant="ghost" pendingLabel="Quitando…">
-                  Quitar del muro
+                <SubmitButton variant="ghost" pendingLabel="Retirando…">
+                  Retirar del todo
                 </SubmitButton>
               </form>
             </div>
             <p className="mt-2 max-w-prose text-xs leading-relaxed text-muted">
               Volver a pendiente deshace el «sí» y, si esa persona autorizó su nombre, lo quita
               otra vez del muro: en «Lo que se ha ofrecido» el nombre sale solo con las dos cosas
-              juntas. Quitar del muro la saca del todo y la deja como retirada. Ninguna de las dos
-              borra nada: la oferta sigue aquí, con su contacto y sus notas.
+              juntas. Retirar del todo la deja como retirada, fuera de esta bandeja. Ninguna de las
+              dos borra nada: la oferta sigue aquí, con su contacto y sus notas.
+            </p>
+          </div>
+        )}
+
+        {isPending && (
+          <div className="mt-4 border-t border-line pt-4">
+            <p className="text-sm text-body">Si no es una oferta de verdad</p>
+            <div className="mt-2">
+              <form action={withdrawOffer}>
+                <input type="hidden" name="id" value={offer.id} />
+                <SubmitButton variant="ghost" pendingLabel="Retirando…">
+                  Retirar del todo
+                </SubmitButton>
+              </form>
+            </div>
+            <p className="mt-2 max-w-prose text-xs leading-relaxed text-muted">
+              La saca de pendientes y del muro. Para solo esconderla de «Lo que se ha ofrecido»
+              mientras la revisas, usa el botón de arriba.
             </p>
           </div>
         )}

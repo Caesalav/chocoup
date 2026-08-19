@@ -23,9 +23,10 @@ export const metadata: Metadata = {
 /**
  * El mapa a pantalla: Colombia, la leyenda al pie y las tarjetas al lado.
  *
- * El inicio ya enseña el tablero a media altura. Esta vista es la que se
- * comparte cuando alguien pregunta dónde queda esto, o quiere el departamento
- * entero. Por eso la apertura Colombia → Chocó vive aquí y no en el inicio.
+ * El mosaico del Chocó vive solo aquí. En el inicio queda el recado del
+ * momento y un enlace a esta vista; un segundo dibujo a media altura
+ * repetía el oficio y marcaba un pueblo con un filete que no le
+ * correspondía.
  *
  * Y por eso mismo hay dos vistas y no una. Quien pregunta «dónde queda» necesita
  * el país entero; quien ya lo sabe quiere el departamento y sus colores, y hasta
@@ -100,7 +101,7 @@ export default async function MapPage({ searchParams }: Props) {
         ) : campaign ? (
           <CampaignStrip
             campaign={campaign}
-            className="mt-1 text-[12px] leading-snug text-muted lg:mt-2 lg:text-[14px]"
+            className="mt-1 text-[12px] leading-snug lg:mt-2 lg:text-[14px]"
           />
         ) : (
           <p className="mt-1 text-[12px] leading-snug text-muted lg:mt-2 lg:text-[14px]">
@@ -120,7 +121,6 @@ export default async function MapPage({ searchParams }: Props) {
             <ChocoMap
               pins={pins}
               hrefFor={(pin) => `/ciudades/${pin.slug}`}
-              activeSlug={campaign?.city.slug}
               className="size-full"
             />
             <MapIntro />
@@ -163,8 +163,7 @@ export default async function MapPage({ searchParams }: Props) {
         <h2 className={screenTitle}>Municipios documentados</h2>
         <p className="mt-2 text-[14px] leading-relaxed text-muted">
           Los documentados salen en color, del más atrasado al más cubierto. Gris es que
-          nadie ha llegado todavía; un pueblo visitado donde ya no falta nada tiene otro
-          tono, no el gris.
+          nadie ha llegado todavía; un pueblo visitado sin casos abiertos va en verde.
         </p>
         <ul className="mt-5 grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 overflow-y-auto">
           {ranked.map((city) => (

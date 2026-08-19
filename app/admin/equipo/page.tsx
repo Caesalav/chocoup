@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { removeTeamMember, saveTeamMember } from "@/app/admin/actions";
+import { AdminHeader } from "@/components/admin/AdminHeader";
+import { FormSection } from "@/components/admin/FormSection";
 import { DangerSubmitButton, SubmitButton } from "@/components/admin/SubmitButton";
-import { eyebrow, field, panel } from "@/components/ui/styles";
+import { field, panel } from "@/components/ui/styles";
 import { getAdminCities, getTeamDirectory } from "@/lib/admin-data";
 import { TEAM_ROLES, teamRoleLabel } from "@/lib/constants";
 import { currentTeam } from "@/lib/team";
@@ -33,10 +34,11 @@ export default async function TeamPage() {
   if (session?.role !== "coordinacion") {
     return (
       <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
-        <Link href="/admin" className="text-sm text-muted hover:text-ink hover:underline">
-          ← Panel del equipo
-        </Link>
-        <h1 className="mt-6 font-display text-3xl text-ink">Esta pantalla es de coordinación</h1>
+        <AdminHeader
+          backHref="/admin"
+          backLabel="Panel del equipo"
+          title="Esta pantalla es de coordinación"
+        />
         <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
           Tu cuenta documenta municipios. Los permisos del equipo los reparte quien coordina; si
           necesitas un municipio más, pídelo por ahí.
@@ -49,32 +51,18 @@ export default async function TeamPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-      <Link href="/admin" className="text-sm text-muted hover:text-ink hover:underline">
-        ← Panel del equipo
-      </Link>
+      <AdminHeader
+        backHref="/admin"
+        backLabel="Panel del equipo"
+        title="Quién documenta qué"
+        description="Quien coordina puede con todo el portal. Quien documenta escribe solo en los municipios que le asignes, y no publica municipios ni toca los canales de donación."
+      />
 
-      <p className={`${eyebrow} mt-4`}>Panel del equipo</p>
-      <h1 className="mt-1 font-display text-3xl text-ink">Quién documenta qué</h1>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Quien coordina puede con todo el portal. Quien documenta sube fotos, escribe casos y
-        registra necesidades <span className="text-ink">solo en los municipios que le asignes</span>
-        , y no publica municipios ni toca los canales de donación —ni el destino ni la fecha en que
-        se comprobó—.
-      </p>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Hay dos listas que tampoco ve: los correos apuntados a los avisos, que no pertenecen a
-        ningún municipio, y el repaso de todos los destinos de dinero. Las dos son de coordinación
-        en la base de datos, no solo en la pantalla.
-      </p>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Puedes invitar a alguien antes de que entre por primera vez: basta su correo, y la primera
-        vez que entre ya encontrará sus municipios esperando. Esto reparte permisos, no crea la
-        cuenta: la contraseña se le da de alta en Supabase.
-      </p>
-
-      <section className="mt-8">
-        <h2 className="font-display text-2xl text-ink">Invitar a alguien</h2>
-        <form action={saveTeamMember} className={`${panel} mt-4 space-y-4 p-5`}>
+      <form action={saveTeamMember} className="mt-8">
+        <FormSection
+          title="Invitar a alguien"
+          hint="Basta el correo. La primera vez que entre ya encontrará sus municipios. Esto reparte permisos, no crea la cuenta: la contraseña se da de alta en Supabase."
+        >
           <label className="block">
             <span className={field.label}>Correo</span>
             <input
@@ -94,12 +82,12 @@ export default async function TeamPage() {
           <CityField cities={cities} />
 
           <SubmitButton pendingLabel="Invitando…">Invitar</SubmitButton>
-        </form>
-      </section>
+        </FormSection>
+      </form>
 
       <section className="mt-10">
-        <h2 className="font-display text-2xl text-ink">El equipo</h2>
-        <p className="mt-1 text-sm text-muted">
+        <h2 className="font-display text-[20px] leading-tight text-ink">El equipo</h2>
+        <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
           {members.length === 0
             ? "Todavía no hay nadie en la lista."
             : `${members.length} personas con acceso.`}

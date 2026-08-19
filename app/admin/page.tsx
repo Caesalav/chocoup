@@ -31,10 +31,8 @@ export const dynamic = "force-dynamic";
  * publicar. Un menú obligaría a entrar en las tres para averiguarlo, con la señal
  * del Chocó y una recarga por sección.
  *
- * El recordatorio del orden de trabajo —abre el municipio, escribe qué pasó, sube
- * fotos, publica— se fue a /admin/ciudades. Aquí describía el trabajo de una de
- * las tres secciones como si fuera el del panel entero, y donde hace falta es
- * delante de la lista de municipios, que es el primer paso que enumera.
+ * El recordatorio de cómo documentar un pueblo ya no vive aquí: Ciudades es
+ * crear y situar, y los casos se abren en su sección.
  */
 export default async function AdminHomePage() {
   const [team, cities, cases, pendingOffers, inbox, focus] = await Promise.all([
@@ -79,6 +77,7 @@ export default async function AdminHomePage() {
    * a `ADMIN_SECTIONS` no obligue a acordarse de esta lista: sin su entrada, la
    * tarjeta sale sin números en vez de salir descolocada.
    */
+  const unreadOnWall = pendingOffers.filter((offer) => offer.on_wall !== false).length;
   const waiting: Record<
     string,
     { count: number; one: string; many: string; calm: string; note: string | null }
@@ -119,12 +118,14 @@ export default async function AdminHomePage() {
       one: "oferta sin revisar",
       many: "ofertas sin revisar",
       calm: "Nada esperando respuesta",
-      // Lo que se publicó sin que nadie lo leyera: es lo primero que hay que saber
-      // de esta bandeja y no se puede deducir del número de arriba.
       note:
-        pendingOffers.length > 0
-          ? "Ya están publicadas en el muro sin que nadie las haya leído"
-          : null,
+        unreadOnWall > 0
+          ? unreadOnWall === pendingOffers.length
+            ? "Ya están en el muro sin que nadie las haya leído"
+            : "Algunas ya están en el muro sin que nadie las haya leído"
+          : pendingOffers.length > 0
+            ? "Fuera del muro, pendientes de revisar"
+            : null,
     },
   };
 
@@ -156,7 +157,10 @@ export default async function AdminHomePage() {
               href={section.href}
               className={`${cardLink} flex h-full flex-col p-5`}
             >
-              <h2 className="font-display text-xl leading-tight text-ink">{section.title}</h2>
+              <h2 className="flex items-center gap-2 font-display text-xl leading-tight text-ink">
+                <section.Icon className="size-5 shrink-0 text-accent" />
+                {section.title}
+              </h2>
               <p className="mt-2 text-[13px] leading-relaxed text-muted">{section.blurb}</p>
 
               {/* Los números al final de la tarjeta y anclados abajo con `mt-auto`:

@@ -2,14 +2,27 @@
 
 /* Sistema claro sobre papel.
  *
- * Paleta muestreada de la referencia: fondo de papel cálido, tarjetas casi
- * blancas con el borde finísimo, tinta casi negra.
+ * La paleta sale de muestrear los píxeles de una lámina de referencia, no de
+ * estimarla a ojo: cinco colores que se llevan casi todo el área —blanco
+ * 44,96 %, brote 6,84 %, selva 6,65 %, lavanda 5,46 %, liana 1,81 %— y un
+ * campo de blanco enorme entre bloques grandes de esquina redondeada.
+ *
+ * Lo que se abstrae es el SISTEMA, no la marca de la que se muestreó: un campo
+ * casi blanco, bloques macizos de color con tinta oscurísima encima, un verde
+ * medio reservado a formas orgánicas, y un tono frío que hace de contrapeso.
+ * Todo plano. No hay un solo degradado en esta hoja, y eso es una decisión:
+ * la referencia no tiene ninguno y en una pantalla que se abre con mala señal
+ * un plano es lo único que se ve igual en cualquier aparato.
+ *
+ * Los números medidos de todo esto están en MARCA.md, y los calcula
+ * `node scripts/contraste.mjs` leyendo este archivo. Si cambias un valor de
+ * aquí, esa tabla se queda mentirosa hasta que la vuelvas a generar.
  *
  * ---------------------------------------------------------------------------
  * Dos familias de color, y no se mezclan
  *
- * VERDE (`accent`) es la marca —selva de la bandera del Chocó— y por tanto todo
- * lo que se hace: botones, enlaces, la barra de navegación, y la pastilla de una
+ * VERDE DE MARCA (`selva`, `brote`, `liana`, `accent`) es lo que se hace:
+ * botones, enlaces, navegación, superficies de invitación, y la pastilla de una
  * necesidad ya cubierta, que es la única forma de "hecho" que existe aquí.
  *
  * ESCALA CÁLIDA (`need-*`) es el calor del dato: cuánto falta. Pinta los
@@ -23,12 +36,48 @@
  * cosmético. Y en el otro sentido, más verde nunca puede significar más
  * necesidad: se leería como “mejor” y aquí significa lo contrario.
  *
+ * Cambiar de identidad no relaja esto: al contrario, con tres verdes de marca
+ * en vez de uno la tentación de pintar un estado de verde es mayor. Los cuatro
+ * estados siguen siendo tres cálidos y un verde, y lo que sostiene la
+ * diferencia cuando el color no llega es el visto de «Cubierta».
+ *
+ * Pero «familia aparte» no es «otro idioma visual», y esa distinción costó una
+ * vuelta entera. Al cambiar la identidad se conservaron los cuatro cálidos con
+ * los valores exactos que tenían, que venían de una paleta de papel y ámbar:
+ * cumplían la regla de no ser verdes y aun así se leían como invitados de otro
+ * sistema al lado de `brote` y `lavanda`. Estar en otro tono no exime de estar
+ * en el mismo registro. La escala de ahora está derivada en OKLCH a la misma
+ * saturación relativa que el núcleo de la marca; la ley entera está escrita
+ * junto a las fichas `--color-need-*`.
+ *
+ * ---------------------------------------------------------------------------
+ * Dos registros, y los decide la pantalla
+ *
+ * La referencia es alegre porque vende plantas de interior. Aquí hay fichas de
+ * mujeres cuya casa se cayó, y la misma paleta tiene que sostener las dos cosas.
+ *
+ * REGISTRO ABIERTO —portada, navegación, mapa, listados, páginas de invitación
+ * (`/ofrecer`, `/sugerencias`, las de gracias)—: `brote` a plena potencia como
+ * superficie, bloques de `selva`, cintas de `liana`, `lavanda` en lo que pide
+ * algo. Es una web que invita a entrar.
+ *
+ * REGISTRO SOBRIO —la ficha de una persona y las tarjetas que llevan su cara y
+ * su nombre—: papel, tinta, `accent` como línea y como texto, y la escala de
+ * necesidad para el estado. Sin cintas, sin campos grandes de `brote`, sin
+ * `lavanda`. Ahí la foto y el nombre son lo único que puede levantar la voz;
+ * una cinta ondulada detrás del retrato de alguien que perdió la casa dice algo
+ * que el proyecto no quiere decir.
+ *
+ * No se deja al gusto de quien maquete: la regla de ESLint del final de
+ * eslint.config.mjs prohíbe las clases del registro abierto en los archivos del
+ * sobrio, y falla el `lint` si alguien las escribe.
+ *
  * ---------------------------------------------------------------------------
  * Superficies: la escala crece hacia abajo, y el estado no vive en el relleno
  *
  * Este diseño es todo tarjetas, y una tarjeta tiene que poder decir que está
  * bajo el dedo, elegida o pulsada. Por arriba no queda sitio: papel, panel y
- * panel alto se llevan nueve y dos niveles de 255, y el techo es el blanco. Un
+ * panel alto se llevan ocho y tres niveles de 255, y el techo es el blanco. Un
  * cambio de relleno entre esos tres es literalmente invisible —así lo intentaba
  * la portada anterior con el filete, y no se veía.
  *
@@ -59,70 +108,209 @@
      también lo que heredaban. Y al revés era peor: quien escribiera `text-base`
      esperando tamaño se llevaba letra color papel sobre papel. No rompía por un
      detalle del orden de la hoja —`.text-ink` sale 56 líneas después de
-     `.text-base` y ganaba por eso, no por especificidad—. Ningún nombre de esta
-     paleta debe coincidir con una utilidad de Tailwind. */
-  --color-paper: #f6f3ee;
-  --color-canvas: #efece5;
-  --color-land: #e7e2d9;
-  --color-contour: #b9b1a4;
+     `.text-base` y ganaba por eso, no por especificidad—.
 
-  /* Escala por necesidades abiertas: el único color del mapa. Los cinco valores
-     tienen que ordenarse de un vistazo y sin leer la leyenda, así que el gris de
-     "sin documentar" es el más claro de todos —se hunde en el papel— y el rojo
-     es el único tono que sobrevive a mirar el mapa de reojo. */
-  --color-need-blank: #e8e4dd;
-  --color-need-none: #d3ccc0;
-  --color-need-low: #f3b591;
-  --color-need-mid: #e2743f;
-  --color-need-high: #a92a1a;
+     NINGÚN nombre de esta paleta puede coincidir con una utilidad de Tailwind, y
+     por eso los cuatro colores nuevos van en castellano: `selva`, `brote`,
+     `liana`, `lavanda`. Los nombres ingleses que pedía el oído —`forest`,
+     `lime`, `vine`, `lavender`— tienen dos problemas. `lime` es una familia de
+     color de Tailwind, así que `--color-lime` conviviría con `bg-lime-500` y
+     nadie sabría de dónde sale cuál. Y en castellano el choque es imposible por
+     construcción, que es la única garantía que no depende de acordarse. */
+  --color-paper: #f4f7f2;
+  --color-canvas: #eaeee6;
+  --color-land: #dfe5da;
+  --color-contour: #93a198;
+
+  /* Escala por necesidades abiertas: el único color del mapa, en planos. Los
+     cinco valores tienen que ordenarse de un vistazo y sin leer la leyenda: el
+     gris de "sin documentar" se hunde en el papel; el verde de "sin casos
+     reportados" dice que está bien; el rojo es el único tono que sobrevive a
+     mirar el mapa de reojo.
+
+     ESTÁ ESCRITA EN OKLCH Y NO EN HEXADECIMAL, y eso no es coquetería: es la
+     única forma de que se vea la ley de la que sale. Los cuatro valores tienen
+     la misma estructura —L que baja, H que gira hacia el rojo, C al 95 % de lo
+     que el sRGB permite— y en hexadecimal eso es invisible. La etapa anterior
+     de esta escala eran cuatro hexadecimales heredados de una identidad de
+     papel y ámbar, y sobrevivieron a un cambio de marca entero precisamente
+     porque nadie podía leer de dónde venían.
+
+     LA LEY, y hay que respetarla si se toca algo:
+
+     1. SATURACIÓN AL 95 % DEL TECHO DEL sRGB. Es la media medida del núcleo
+        cromático de la marca —lavanda 97,3 %, liana 95,9 %, accent 92,3 %— y es
+        lo que hace que esta familia se lea del mismo sistema que aquélla. Ojo:
+        lo que se iguala es la saturación RELATIVA, no el croma. En croma
+        absoluto la lavanda (0,077) parece cuatro veces más apagada que este rojo
+        (0,164), y en realidad las dos están pegadas al borde del sRGB: el
+        espacio de color es mucho más estrecho en el lila claro que en el rojo
+        oscuro. Igualar el croma a pelo entre tonos distintos es el error que
+        deja una familia "de otro idioma" al lado de la otra.
+
+     2. EL EJE CÁLIDO SE QUEDA. H va de 152 (verde) a 74, 46 y 24: oro, naranja,
+        rojo. Los tres cálidos no pueden volverse verdes —más verde no puede
+        significar más necesidad, se leería como "mejor"— y el giro hacia el rojo
+        es lo que hace que la urgencia se lea como urgencia y no como un tramo
+        más de una rampa.
+
+     3. LA LUMINOSIDAD LA MANDA EL MAPA, no la estética. Los cinco valores pintan
+        municipios como áreas pequeñas, sin etiqueta al lado, y el mapa no los
+        ordena: cualquier municipio puede tocar a cualquier otro. Los diez pares
+        están medidos en color, en gris y en deuteranopía por
+        `node scripts/contraste.mjs`, y los cinco peores de esta escala son
+        mejores que los cinco de la que había. El verde se queda en L 0,620 a
+        propósito: esquiva los dos peldaños del verde de marca (liana 0,671,
+        accent 0,465) para que no sean fichas duplicadas.
+
+     `need-blank` es el único que NO está en OKLCH, y también a propósito: no es
+     un tramo de la escala sino el gris del papel, pertenece a la familia neutra
+     de arriba y se retiñe con ella. Lo que lo saca de la escala no es su
+     luminosidad —está en el mismo sitio que siempre— sino su croma: 0,013 contra
+     el 0,15 de los otros cuatro. Es el único de los cinco sin color, y eso es lo
+     que se lee como ausencia de dato.
+
+     El verde no es el de marca. `--color-accent` es el verde de lo que se hace;
+     `need-none` es más claro para que un municipio resuelto se lea como "todo
+     bien" y no como un botón gigante. */
+  --color-need-blank: #e4e9e0;
+  --color-need-none: oklch(0.62 0.156 152);
+  --color-need-low: oklch(0.74 0.15 74);
+  --color-need-mid: oklch(0.58 0.157 46);
+  --color-need-high: oklch(0.42 0.164 24);
 
   /* Los dos pesos que la escala necesita cuando deja de pintar formas y pasa a
-     escribir palabras. `need-mid` a pelo sobre papel se queda en 2,8:1, así que
+     escribir palabras. `need-mid` a pelo sobre papel se queda en 4,2:1, así que
      una pastilla «Abierta» lleva el tono en el relleno y una versión bajada del
-     mismo naranja —mismo tono OKLCH, 44°— en la tinta: 5,9:1 sobre su relleno.
-     `need-high` sí aguanta como texto (6,3:1) y por eso no necesita pareja. */
-  --color-need-mid-soft: oklch(0.68 0.15 45 / 22%);
-  --color-need-mid-strong: #94380a;
-  --color-need-high-soft: oklch(0.49 0.17 31 / 14%);
+     mismo naranja en la tinta: 6,1:1 sobre su relleno. `need-high` sí aguanta
+     como texto (8,5:1 sobre papel) y por eso no necesita pareja.
 
-  --color-panel: #fdfbf7;
+     `need-mid-strong` es el mismo naranja de `need-mid` —H 46, saturación al
+     95 %— bajado a L 0,440. Se deriva y no se elige: es "el mismo tono con más
+     peso", que en un sistema claro quiere decir más oscuro.
+
+     Los alfas se escriben con los mismos números que la ficha de la que salen,
+     de modo que el parentesco se vea en el archivo y el lavado sea medible sin
+     adivinar de qué color partía.
+
+     El 20 % de `need-mid-soft` no es libre: es el alfa que deja este lavado a la
+     misma luminancia que `accent-soft` (1,01:1 entre los dos). Que sean
+     indistinguibles por tono es el motivo por el que «Cubierta» lleva un visto;
+     ver la nota de `--color-accent-soft`. */
+  --color-need-mid-soft: oklch(0.58 0.157 46 / 20%);
+  --color-need-mid-strong: oklch(0.44 0.12 46);
+  --color-need-high-soft: oklch(0.42 0.164 24 / 12%);
+
+  --color-panel: #fafcf8;
   --color-panel-high: #ffffff;
 
-  --color-ink: #191411;
-  --color-body: #3a332d;
-  --color-muted: #5c534b;
-  --color-faint: #736a62;
+  /* Tinta con el matiz de la selva dentro. Un negro neutro sobre un papel que
+     tira a verde se lee como una mancha de otra imagen; con el mismo matiz que
+     el papel y que el verde, la página parece de una pieza.
+
+     Los cuatro pesos están medidos contra el papel nuevo y ninguno baja del que
+     tenía en la etapa anterior: ink 16,51:1 (igual), body 11,87:1 (era 11,22),
+     muted 6,98:1 (era 6,79) y faint 4,97:1 (era 4,78). `faint` es el que iba
+     raspando AA y es el que más sube. */
+  --color-ink: #0e1a15;
+  --color-body: #27352f;
+  --color-muted: #475851;
+  --color-faint: #5f6e67;
+
+  /* La tinta clara, para lo que se escribe encima de un bloque de `selva`. Es el
+     blanco teñido de brote de la referencia y no el blanco puro: 12,77:1 sobre
+     selva, y el matiz evita que un bloque verde muy oscuro con letras neutras
+     parezca un recorte pegado. Se llama `luz` porque es lo que hace. */
+  --color-luz: #f0fee5;
 
   /* Negro con alfa: sobre papel una línea blanca no existe. */
   --color-line: oklch(0 0 0 / 10%);
   --color-line-strong: oklch(0 0 0 / 20%);
 
-  /* Selva chocoana: el verde de la mitad de la bandera. Es el único verde del
-     portal. Antes eran dos —`amber`, que no era ámbar, y `teal`, a dieciséis
-     grados de tono de distancia— y a la vista eran el mismo color con dos
-     nombres, así que nadie podía saber cuál tocaba.
+  /* ---------------------------------------------------------------------------
+     Los tres verdes de la referencia, con el papel que juega cada uno.
 
-     `-strong` es la versión de más peso, y en claro eso quiere decir más
-     oscura: el hover no puede ir hacia la luz cuando el fondo ya es lo más
-     claro de la página. `-soft` es el relleno de una pastilla.
+     SELVA es el bloque oscuro y la autoridad: 12,40:1 contra el papel, así que
+     un bloque de selva se recorta solo y no necesita filete. Es el relleno del
+     botón principal —con `luz` encima, 12,77:1— y el único de los tres que
+     sirve en los dos registros.
 
-     El plano sigue aquí porque el texto, el filete y `::selection` no pueden
-     ser un degradado. El volumen de un relleno —botón, pastilla, barra, mapa—
-     lo pintan `--fill-*` más abajo: el tope es un verde vivo y el pie el bosque,
-     la misma familia, sin un segundo nombre. */
-  --color-accent: #1b7a4c;
-  --color-accent-strong: #145c39;
-  --color-accent-soft: oklch(0.55 0.13 155 / 14%);
+     BROTE es superficie y nunca texto. Sobre blanco se queda en 1,41:1: escrito
+     con él, un rótulo no existe. Con tinta oscura encima es de lo más legible
+     que hay en la paleta (selva sobre brote, 9,52:1). Y como superficie tiene
+     una consecuencia que hay que respetar: su frontera contra el papel es de
+     1,30:1, muy por debajo del 3:1 que pide WCAG 1.4.11 para el contorno de un
+     control, así que en cuanto un bloque de brote se pueda pulsar lleva filete
+     de selva. Como fondo de una sección, que no es un control, no lo necesita.
 
-  /* Sombras cálidas, no negras. Sobre un papel con este amarillo, una sombra
-     neutra se lee como suciedad gris; con el tono del papel dentro parece luz.
-     Son cuatro y se usan enteras, sin mezclar: reposo, levantada al pasar por
-     encima, hundida al pulsar, y flotante para lo que va anclado a la pantalla
-     —la barra inferior y la de acciones— que no descansa sobre nada. */
-  --shadow-card: 0 1px 2px oklch(0.3 0.03 55 / 5%), 0 2px 6px -2px oklch(0.3 0.03 55 / 7%);
-  --shadow-lift: 0 3px 6px oklch(0.3 0.03 55 / 8%), 0 14px 28px -8px oklch(0.3 0.03 55 / 26%);
-  --shadow-press: 0 1px 1px oklch(0.3 0.03 55 / 12%);
-  --shadow-float: 0 4px 10px oklch(0.3 0.03 55 / 10%), 0 16px 36px -10px oklch(0.3 0.03 55 / 28%);
+     LIANA es solo forma orgánica: las cintas onduladas, y nada más. 2,58:1
+     contra el papel y 2,79:1 contra el blanco, o sea que no es texto ni es
+     frontera. Es el color de las cintas de `.cintas`, y ahí va al 35 % por un
+     motivo medido, no estético: al 100 % la tinta clara que cruzara una cinta se
+     quedaría en 2,66:1, y al 35 % en 7,16:1. Es el mismo tipo de garantía que
+     los velos de las fotos —el peor caso primero—.
+
+     ACCENT es el verde que sí aguanta como palabra: 6,13:1 sobre papel, contra
+     los 4,82:1 del verde de la etapa anterior. Sale de la rampa entre selva y
+     liana, al 42 %, que es el punto donde deja de ser un tono decorativo y pasa
+     a poder ser un enlace. Contra `body` da 1,94:1, suficiente para que un
+     enlace se vea que lo es sin subrayarlo.
+
+     `-strong` es la versión de más peso, y en claro eso quiere decir más oscura:
+     el hover no puede ir hacia la luz cuando el fondo ya es lo más claro de la
+     página. `-soft` es el relleno de una pastilla. */
+  --color-selva: #0f352d;
+  --color-brote: #a5ed69;
+  --color-liana: #1ab169;
+  --color-accent: #126a44;
+  --color-accent-strong: #0d4f34;
+
+  /* El 18 % está elegido para que este lavado y `need-mid-soft` queden a la
+     MISMA luminancia: 1,01:1 entre ellos en color, 1,01:1 en gris y 1,17:1 en
+     deuteranopía. Es a propósito y no un descuido. Significa que el tono no
+     separa la pastilla «Cubierta» de la pastilla «Abierta», y por tanto que la
+     diferencia tiene que estar en otra parte: el visto de «Cubierta», que es la
+     única de las cuatro con dibujo. Si alguien sube o baja este alfa para que
+     "se distingan mejor", lo que consigue es que se distingan para quien ya las
+     distinguía y sigan sin distinguirse para quien no. La lámina de
+     capturas-verificacion/marca/ es la prueba renderizada con filtros. */
+  --color-accent-soft: rgb(18 106 68 / 18%);
+
+  /* El contrapeso frío. En la referencia es la tarjeta que invita a hacer algo
+     —"planta hierbas en tu casa"— y aquí hace exactamente ese papel: la
+     superficie de las pantallas que piden algo a quien mira (`/ofrecer`,
+     `/sugerencias`, las de gracias). Sirve porque no es verde ni es cálido, así
+     que no le roba significado a ninguna de las dos familias: una tarjeta de
+     lavanda no puede confundirse con una acción de marca ni con un estado de
+     necesidad. Es superficie, como `brote`: 1,41:1 contra el papel, y con tinta
+     `ink` encima 11,67:1. Registro abierto solamente. */
+  --color-lavanda: #dcc8fe;
+
+  /* Sombras con el matiz del papel dentro, no negras. Sobre un papel que tira a
+     verde una sombra neutra se lee como suciedad gris; con el mismo tono dentro
+     parece luz. Son cuatro y se usan enteras, sin mezclar: reposo, levantada al
+     pasar por encima, hundida al pulsar, y flotante para lo que va anclado a la
+     pantalla —la barra inferior y la de acciones— que no descansa sobre nada. */
+  --shadow-card: 0 1px 2px oklch(0.28 0.03 160 / 5%), 0 2px 6px -2px oklch(0.28 0.03 160 / 7%);
+  --shadow-lift: 0 3px 6px oklch(0.28 0.03 160 / 8%), 0 14px 28px -8px oklch(0.28 0.03 160 / 26%);
+  --shadow-press: 0 1px 1px oklch(0.28 0.03 160 / 12%);
+  --shadow-float: 0 4px 10px oklch(0.28 0.03 160 / 10%), 0 16px 36px -10px oklch(0.28 0.03 160 / 28%);
+
+  /* Radios. La referencia redondea de más: sus tarjetas llevan 23-24 px medidos
+     en cajas de 415x222 y 220x223, o sea entre el 10 % y el 11 % del lado corto,
+     y el icono es un cuadrado de esquina casi tan blanda como una pastilla.
+     Reproducirlo pieza a pieza sería repintar cada `rounded-*` del portal, así
+     que se sube la escala entera un peldaño desde aquí: es un sitio, se lee de
+     un vistazo y alcanza también a las pantallas que nadie ha vuelto a tocar.
+     `rounded-full` no entra —una pastilla es una pastilla— y `xs` tampoco, que
+     es el radio de un filete y no de una caja. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.375rem;
+  --radius-3xl: 1.75rem;
+  --radius-4xl: 2.25rem;
 
   --font-display: var(--font-display), "Bricolage Grotesque", system-ui, sans-serif;
   --font-sans: var(--font-sans), "Outfit", system-ui, sans-serif;
@@ -146,149 +334,46 @@
      destinos se muda a una cabecera. Nunca están las dos: la barra desaparece a
      partir de `lg` y la cabecera no existe por debajo. */
   --head-h: 72px;
-
-  /* Volumen de los rellenos. La luz viene de arriba a la izquierda. El tope es
-     un verde vivo —más croma, más hoja— y el pie es el bosque de siempre: sin
-     ese salto el degradado no se leía. La letra de los botones cae a mitad de
-     pastilla, donde ya manda `--color-accent` (4,8:1 con papel); el vivo es el
-     brillo del borde de arriba, no el fondo del texto.
-
-     La escala cálida abre igual: el mapa no lleva letra encima, y «Urgente»
-     arranca en un rojo vivo; la letra de la pastilla cae sobre `--color-need-high`. */
-  --accent-lit: #2bbd68;
-  --accent-deep: #0c4530;
-  --accent-press: #083324;
-  --need-low-lit: #ffc090;
-  --need-low-deep: #d47838;
-  --need-mid-lit: #ff8a45;
-  --need-mid-deep: #a84818;
-  --need-high-lit: #e24a32;
-  --need-high-deep: #6e140c;
-  --need-blank-lit: #f3efe8;
-  --need-blank-deep: #d4cdc2;
-  --need-none-lit: #e4dcd0;
-  --need-none-deep: #b8afa1;
-
-  --fill-accent: linear-gradient(
-    145deg,
-    var(--accent-lit) 0%,
-    var(--color-accent) 46%,
-    var(--accent-deep) 100%
-  );
-  --fill-accent-strong: linear-gradient(
-    145deg,
-    #1a9b54 0%,
-    var(--accent-deep) 48%,
-    var(--accent-press) 100%
-  );
-  --fill-accent-soft: linear-gradient(
-    145deg,
-    oklch(0.72 0.18 148 / 32%) 0%,
-    oklch(0.52 0.12 158 / 10%) 100%
-  );
-  --fill-need-low: linear-gradient(
-    145deg,
-    var(--need-low-lit) 0%,
-    var(--color-need-low) 46%,
-    var(--need-low-deep) 100%
-  );
-  --fill-need-mid: linear-gradient(
-    145deg,
-    var(--need-mid-lit) 0%,
-    var(--color-need-mid) 46%,
-    var(--need-mid-deep) 100%
-  );
-  --fill-need-high: linear-gradient(
-    145deg,
-    var(--need-high-lit) 0%,
-    var(--color-need-high) 46%,
-    var(--need-high-deep) 100%
-  );
-  --fill-need-mid-soft: linear-gradient(
-    145deg,
-    oklch(0.78 0.16 48 / 42%) 0%,
-    oklch(0.62 0.14 38 / 14%) 100%
-  );
-  --fill-need-high-soft: linear-gradient(
-    145deg,
-    oklch(0.62 0.19 32 / 32%) 0%,
-    oklch(0.42 0.16 28 / 10%) 100%
-  );
-  --fill-need-blank: linear-gradient(
-    145deg,
-    var(--need-blank-lit) 0%,
-    var(--need-blank-deep) 100%
-  );
-  --fill-need-none: linear-gradient(
-    145deg,
-    var(--need-none-lit) 0%,
-    var(--need-none-deep) 100%
-  );
 }
 
-@layer utilities {
-  .bg-accent {
-    background-color: var(--color-accent);
-    background-image: var(--fill-accent);
-  }
-  .bg-accent-strong,
-  .hover\:bg-accent-strong:hover {
-    background-color: var(--color-accent-strong);
-    background-image: var(--fill-accent-strong);
-  }
-  .bg-accent-soft {
-    background-color: var(--color-accent-soft);
-    background-image: var(--fill-accent-soft);
-  }
-  .bg-need-low {
-    background-color: var(--color-need-low);
-    background-image: var(--fill-need-low);
-  }
-  .bg-need-mid {
-    background-color: var(--color-need-mid);
-    background-image: var(--fill-need-mid);
-  }
-  .bg-need-high {
-    background-color: var(--color-need-high);
-    background-image: var(--fill-need-high);
-  }
-  .bg-need-mid-soft {
-    background-color: var(--color-need-mid-soft);
-    background-image: var(--fill-need-mid-soft);
-  }
-  .bg-need-high-soft,
-  .hover\:bg-need-high-soft:hover {
-    background-color: var(--color-need-high-soft);
-    background-image: var(--fill-need-high-soft);
-  }
-  .bg-need-blank {
-    background-color: var(--color-need-blank);
-    background-image: var(--fill-need-blank);
-  }
-  .bg-need-none {
-    background-color: var(--color-need-none);
-    background-image: var(--fill-need-none);
-  }
-
-  .fill-accent {
-    fill: url(#fill-accent);
-  }
-  .fill-need-blank {
-    fill: url(#fill-need-blank);
-  }
-  .fill-need-none {
-    fill: url(#fill-need-none);
-  }
-  .fill-need-low {
-    fill: url(#fill-need-low);
-  }
-  .fill-need-mid {
-    fill: url(#fill-need-mid);
-  }
-  .fill-need-high {
-    fill: url(#fill-need-high);
-  }
+/* ---------------------------------------------------------------------------
+ * Cintas: la forma orgánica del sistema
+ *
+ * En la referencia son bandas anchas que serpentean por detrás del contenido de
+ * un bloque, y son lo que evita que un rectángulo de color macizo parezca un
+ * cuadro de PowerPoint. Aquí van igual, con dos condiciones que no son de gusto.
+ *
+ * UNA: `liana` al 35 %, y no al 100 %. Es el techo calculado para que el texto
+ * pueda cruzar una cinta sin perder legibilidad: la tinta `luz` sobre una cinta
+ * maciza se quedaría en 2,66:1, y al 35 % está en 7,16:1. Así la cinta puede
+ * pasar por donde quiera y no hay que acordarse de esquivarla con el texto, que
+ * es una regla que nadie cumple. Es el mismo criterio de los velos de las fotos:
+ * primero el peor caso, y luego la decoración.
+ *
+ * DOS: es del REGISTRO ABIERTO. No aparece en la ficha de una persona ni en las
+ * tarjetas que llevan su cara. Lo comprueba el `lint`.
+ *
+ * Va como imagen de fondo con un SVG incrustado —no como pseudoelemento ni como
+ * <svg> en el marcado— porque tiene que funcionar sin JavaScript, no añadir un
+ * nodo que un lector de pantalla tenga que ignorar, y poder ir en un elemento
+ * que ya tenga contenido dentro.
+ *
+ * Y son CUATRO bandas repartidas por todo el alto, que es lo que costó una
+ * captura: con dos, el `cover` de una caja muy ancha y baja —el bloque de la
+ * portada mide 1330x80— recorta una franja horizontal del centro de la
+ * composición, y el centro era justamente el hueco entre las dos bandas. Salía
+ * un bloque verde liso con un arañazo en una esquina. Con cuatro, y con la
+ * ondulación solapando en vertical, cualquier recorte cae encima de alguna: la
+ * clase tiene que servir igual en esa franja y en el panel alto y estrecho de la
+ * landing, que es el otro extremo (640x950).
+ * ------------------------------------------------------------------------- */
+.cintas {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 260'%3E%3Cg fill='none' stroke='%231ab169' stroke-opacity='.35' stroke-width='38' stroke-linecap='round'%3E%3Cpath d='M-60 28 C 66 -20 156 66 256 26 S 400 -22 540 22'/%3E%3Cpath d='M-60 96 C 72 52 150 140 262 98 S 404 46 540 92'/%3E%3Cpath d='M-60 166 C 66 122 158 210 256 168 S 398 116 540 162'/%3E%3Cpath d='M-60 236 C 74 192 148 280 268 238 S 410 186 540 232'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
 }
+
 .has-strip {
   --strip-h: 76px;
 }
@@ -348,7 +433,7 @@ body {
    escribir. Va como imagen de fondo y no como pseudoelemento porque un <select>
    no admite ::after. */
 .select-chevron {
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.2 1.6 6 6.4l4.8-4.8' fill='none' stroke='%235c534b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.2 1.6 6 6.4l4.8-4.8' fill='none' stroke='%23475851' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.9rem center;
   background-size: 0.7rem;
@@ -576,6 +661,7 @@ body {
    y el trazo de separación de los siguientes taparía el del que está debajo. */
 .map-region {
   cursor: pointer;
+  outline: none;
 }
 .map-region path {
   transition: filter 0.18s ease;

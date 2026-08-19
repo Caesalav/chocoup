@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "./supabase/server";
 import { isDemoMode } from "./supabase/env";
+import { caseProgress, type CaseProgress } from "./case-progress";
 import {
   demoAdminCities,
   demoCaseUpdates,
@@ -11,11 +12,13 @@ import {
   demoNeeds,
   demoNewsletterSignups,
   demoOffersFor,
+  demoPhotos,
   demoTeamDirectory,
 } from "./demo-data";
 import { getGeneralChannel } from "./data";
 import { donationChannel, moneyDestinationsOf, type MoneyDestination } from "./donation-channel";
-import { countOpenNeeds, OPEN_STATUSES } from "./needs";
+import { countOpenNeeds, isOpenNeed, OPEN_STATUSES } from "./needs";
+import { savedFrame, type PhotoFrame } from "./photo-frame";
 import type {
   AdminCityRow,
   Case,
@@ -23,10 +26,13 @@ import type {
   City,
   FeedbackNote,
   Need,
+  NeedCategory,
   NeedOption,
+  NeedStatus,
   NewsletterSignup,
   OfferStatus,
   OfferWithContext,
+  Photo,
   TeamMemberEntry,
 } from "./types";
 
@@ -74,6 +80,22 @@ export async function getAdminCities(): Promise<AdminCityRow[]> {
 }
 
 /**
+ * Un recurso que todavía falta en una causa, para enseñarlo en la lista.
+ *
+ * Es el presupuesto de esta pantalla: no hay recaudo en pesos que se pueda
+ * leer —la pasarela no está, y un cero fingido diría que nadie ha ayudado—
+ * así que el plan son estas líneas (tejas, mercados, tanques) y lo recopilado
+ * es cuántas ya están cubiertas. Ver `caseProgress`.
+ */
+export type AdminCaseResource = {
+  title: string;
+  quantity: string;
+  category: NeedCategory;
+  status: NeedStatus;
+  urgent: boolean;
+};
+
+/**
  * Una causa en la lista de /admin/casos, reducida a lo que hace falta para
  * elegirla de un vistazo.
  *
@@ -82,12 +104,12 @@ export async function getAdminCities(): Promise<AdminCityRow[]> {
  * porque nació antes de que hubiera un archivo de consultas del panel.
  *
  * Lo que lleva y lo que no está decidido por una sola pregunta: ¿esto ayuda a
- * saber en qué causa hay que entrar? El municipio y el tipo la identifican; sin
- * publicar y sin consentimiento dicen qué le falta para salir; el canal dice si
- * el dinero es suyo o del general; las necesidades abiertas dicen cuánto le
- * queda; y el último avance es el dato por el que existe esta pantalla —quien
- * vuelve el jueves a escribir un avance busca la que lleva más tiempo sin
- * ninguno—.
+ * saber en qué causa hay que entrar? El municipio y el tipo la identifican; el
+ * retrato la reconoce; sin publicar y sin consentimiento dicen qué le falta
+ * para salir; el avance dice cuánto del plan está cubierto; los recursos
+ * abiertos dicen qué falta todavía, con nombre y cantidad; y el último avance
+ * es el dato por el que existe esta pantalla —quien vuelve el jueves a
+ * escribir busca la que lleva más tiempo sin ninguno—.
  *
  * No lleva el destino del dinero escrito ni su fecha de comprobación. Eso se
  * repasa entero en `MONEY_REVIEW_PATH`, que es de coordinación, y esta lista la
@@ -98,6 +120,9 @@ export type AdminCaseRow = {
   id: string;
   displayName: string;
   kind: CaseKind;
+  household: string;
+  summary: string;
+  createdAt: string;
   cityId: string;
   cityName: string;
   citySlug: string;
@@ -107,6 +132,12 @@ export type AdminCaseRow = {
   /** Con canal propio, o recibiendo por el general. Ver `caseDonation()`. */
   ownChannel: boolean;
   openNeeds: number;
+  /** Cuánto del plan de recursos está cubierto. Sin necesidades, total 0. */
+  progress: CaseProgress;
+  /** Lo que todavía falta, urgentes primero. Lo cubierto no se lista aquí. */
+  resources: AdminCaseResource[];
+  portraitPath: string | null;
+  portraitFrame: PhotoFrame | null;
   /**
    * El día del último avance del diario, o nulo si todavía no hay ninguno.
    *
@@ -140,61 +171,38 @@ export type AdminCaseRow = {
  * ser la del último avance que quien mira puede leer.
  */
 export async function getAdminCases(): Promise<AdminCaseRow[]> {
-  /**
-   * Por municipio y dentro de él por nombre, que es como se busca: quien abre esto
-   * viene con un nombre en la cabeza y el pueblo es lo que reduce la lista a un
-   * puñado. No por fecha del último avance, aunque sea el dato más interesante de
-   * cada fila: una lista que se reordena sola cada vez que alguien escribe algo es
-   * una lista donde no se vuelve a encontrar lo que estaba a media pantalla.
-   *
-   * Se ordena aquí y no en la consulta porque el criterio de fuera es el nombre del
-   * municipio, que llega embebido: `order` no alcanza las columnas de una tabla
-   * anidada, así que ordenarlo en Postgres pediría una vista o un segundo viaje. Con
-   * `localeCompare` en español, además, la eñe y las tildes caen donde las espera
-   * quien lee.
-   */
-  const byCityThenName = (a: AdminCaseRow, b: AdminCaseRow) =>
-    a.cityName.localeCompare(b.cityName, "es") || a.displayName.localeCompare(b.displayName, "es");
-
   if (isDemoMode()) {
-    return demoCases
-      .map((row) => {
-        const city = demoCities.find((entry) => entry.id === row.city_id)!;
-        return {
-          id: row.id,
-          displayName: row.display_name,
-          kind: row.case_kind,
-          cityId: city.id,
-          cityName: city.name,
-          citySlug: city.slug,
-          cityPublished: city.published,
-          published: row.published,
-          consent: row.consent_to_publish,
-          ownChannel: donationChannel(row) !== null,
-          openNeeds: countOpenNeeds(demoNeeds.filter((need) => need.case_id === row.id)),
-          lastUpdateOn: lastHappenedOn(
-            demoCaseUpdates.filter((update) => update.case_id === row.id),
-          ),
-        };
-      })
-      .sort(byCityThenName);
+    return demoCases.map((row) => {
+      const city = demoCities.find((entry) => entry.id === row.city_id)!;
+      return toAdminCase(
+        row,
+        city,
+        demoNeeds.filter((need) => need.case_id === row.id),
+        demoCaseUpdates.filter((update) => update.case_id === row.id),
+        demoPhotos.filter((photo) => photo.case_id === row.id),
+      );
+    });
   }
 
   const supabase = await createSupabaseServerClient();
 
-  // Las necesidades y los avances viajan dentro de la misma consulta y no en dos
-  // vueltas más: son dos números por fila, y pedirlos por separado en una lista
-  // de cuarenta causas es cómo esta pantalla dejaría de abrirse con la señal del
-  // Chocó. De los avances se pide solo el día, que es lo único que se cuenta.
+  // Retrato, recursos y avances van en la misma consulta: son lo que la tarjeta
+  // enseña, y pedirlos por separado en una lista de cuarenta causas es cómo
+  // esta pantalla dejaría de abrirse con la señal del Chocó. De los avances se
+  // pide solo el día. De las fotos, lo que hace falta para el retrato —la
+  // grande no cabe aquí—.
   const { data } = await supabase
     .from("cases")
-    .select("*, cities(name, slug, published), needs(id, status), case_updates(happened_on)")
-    .order("display_name");
+    .select(
+      "*, cities(name, slug, published), needs(id, status, title, quantity, category, urgent), case_updates(happened_on), photos!photos_case_id_fkey(id, storage_path, thumb_path, focus_x, focus_y, zoom)",
+    )
+    .order("created_at", { ascending: false });
 
   type Row = Case & {
     cities: Pick<City, "name" | "slug" | "published"> | null;
-    needs: Pick<Need, "id" | "status">[];
+    needs: Pick<Need, "id" | "status" | "title" | "quantity" | "category" | "urgent">[];
     case_updates: { happened_on: string }[];
+    photos: Pick<Photo, "id" | "storage_path" | "thumb_path" | "focus_x" | "focus_y" | "zoom">[];
   };
 
   return ((data ?? []) as Row[])
@@ -203,21 +211,53 @@ export async function getAdminCases(): Promise<AdminCaseRow[]> {
     // entonces la fila no se puede situar en ninguna parte. Se cae de la lista en
     // vez de inventarle un «Sin municipio» que no llevaría a ningún sitio.
     .filter((row) => row.cities)
-    .map((row) => ({
-      id: row.id,
-      displayName: row.display_name,
-      kind: row.case_kind,
-      cityId: row.city_id,
-      cityName: row.cities!.name,
-      citySlug: row.cities!.slug,
-      cityPublished: row.cities!.published,
-      published: row.published,
-      consent: row.consent_to_publish,
-      ownChannel: donationChannel(row) !== null,
-      openNeeds: countOpenNeeds(row.needs),
-      lastUpdateOn: lastHappenedOn(row.case_updates),
-    }))
-    .sort(byCityThenName);
+    .map((row) => toAdminCase(row, row.cities!, row.needs, row.case_updates, row.photos ?? []));
+}
+
+type NeedSlice = Pick<Need, "id" | "status" | "title" | "quantity" | "category" | "urgent">;
+type PhotoSlice = Pick<Photo, "id" | "storage_path" | "thumb_path" | "focus_x" | "focus_y" | "zoom">;
+
+function toAdminCase(
+  row: Case,
+  city: Pick<City, "name" | "slug" | "published">,
+  needs: NeedSlice[],
+  updates: { happened_on: string }[],
+  photos: PhotoSlice[],
+): AdminCaseRow {
+  const portrait = row.portrait_photo_id
+    ? photos.find((photo) => photo.id === row.portrait_photo_id)
+    : undefined;
+
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    kind: row.case_kind,
+    household: row.household,
+    summary: row.summary,
+    createdAt: row.created_at,
+    cityId: row.city_id,
+    cityName: city.name,
+    citySlug: city.slug,
+    cityPublished: city.published,
+    published: row.published,
+    consent: row.consent_to_publish,
+    ownChannel: donationChannel(row) !== null,
+    openNeeds: countOpenNeeds(needs),
+    progress: caseProgress(needs),
+    resources: needs
+      .filter(isOpenNeed)
+      .sort((a, b) => Number(b.urgent) - Number(a.urgent))
+      .map((need) => ({
+        title: need.title,
+        quantity: need.quantity,
+        category: need.category,
+        status: need.status,
+        urgent: need.urgent,
+      })),
+    portraitPath: portrait ? portrait.thumb_path || portrait.storage_path : null,
+    portraitFrame: portrait ? savedFrame(portrait) : null,
+    lastUpdateOn: lastHappenedOn(updates),
+  };
 }
 
 /** El día del avance más reciente, o nulo si esa causa no tiene ninguno. */

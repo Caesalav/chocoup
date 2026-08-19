@@ -21,7 +21,7 @@ export default async function CitiesPage() {
       <div className={`${shell} pt-4 lg:pt-10`}>
         <ScreenHeader
           title="Municipios"
-          subtitle="Donde el equipo ha estado. En el mapa, gris es sin visitar; otro tono, ya no falta nada."
+          subtitle="Donde el equipo ha estado. En el mapa, gris es sin visitar; verde es sin casos reportados."
           backHref="/"
           backLabel="Volver al inicio"
           count={cities.length}

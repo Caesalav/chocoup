@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { saveGeneralDonationChannel } from "@/app/admin/actions";
+import { AdminHeader } from "@/components/admin/AdminHeader";
 import { ChannelCheck } from "@/components/admin/ChannelCheck";
 import { DonationChannelForm } from "@/components/admin/DonationChannelForm";
-import { eyebrow, panel } from "@/components/ui/styles";
+import { FormSection } from "@/components/admin/FormSection";
+import { CasesIcon } from "@/components/ui/icons";
+import { panel } from "@/components/ui/styles";
 import { getMoneyDestinations } from "@/lib/admin-data";
 import { getGeneralChannel } from "@/lib/data";
 import { CHANNEL_CHECK_STALE_DAYS } from "@/lib/donation-channel";
@@ -50,14 +53,13 @@ export default async function MoneyPage() {
   if (session?.role !== "coordinacion") {
     return (
       <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
-        <Link href="/admin/casos" className="text-sm text-muted hover:text-ink hover:underline">
-          ← Casos
-        </Link>
-        <h1 className="mt-6 font-display text-3xl text-ink">Esta pantalla es de coordinación</h1>
-        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
-          A dónde va el dinero de cada causa y el canal general del portal los registra quien
-          coordina. Tu cuenta documenta municipios: puedes escribir todo lo demás de sus fichas.
-        </p>
+        <AdminHeader
+          backHref="/admin/casos"
+          backLabel="Casos"
+          title="Esta pantalla es de coordinación"
+          Icon={CasesIcon}
+          description="A dónde va el dinero de cada causa y el canal general del portal los registra quien coordina."
+        />
       </div>
     );
   }
@@ -96,27 +98,25 @@ export default async function MoneyPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-      <Link href="/admin/casos" className="text-sm text-muted hover:text-ink hover:underline">
-        ← Casos
-      </Link>
-
-      <p className={`${eyebrow} mt-4`}>Casos</p>
-      <h1 className="mt-1 font-display text-3xl text-ink">A dónde va el dinero</h1>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Todos los destinos que el portal publica hoy, juntos. El de una causa se edita en su
-        ficha, y el enlace de cada fila lleva allí.
-      </p>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Una causa sin canal propio <span className="text-ink">recibe por el general</span>, y su
-        ficha lo dice con esas palabras: no la presenta como si el canal fuera suyo.{" "}
-        {generalRow?.usedBy
-          ? `Ahora mismo ${
-              generalRow.usedBy === 1
-                ? "hay una causa publicada que recibe"
-                : `hay ${generalRow.usedBy} causas publicadas que reciben`
-            } así.`
-          : "Ahora mismo no hay ninguna causa publicada recibiendo por él."}
-      </p>
+      <AdminHeader
+        backHref="/admin/casos"
+        backLabel="Casos"
+        title="A dónde va el dinero"
+        Icon={CasesIcon}
+        description={
+          <>
+            Todos los destinos que el portal publica hoy. El de una causa se edita en su ficha. Una
+            causa sin canal propio <span className="text-ink">recibe por el general</span>
+            {generalRow?.usedBy
+              ? `, y ahora mismo ${
+                  generalRow.usedBy === 1
+                    ? "hay una causa publicada que recibe"
+                    : `hay ${generalRow.usedBy} causas publicadas que reciben`
+                } así.`
+              : ", y ahora mismo no hay ninguna causa publicada recibiendo por él."}
+          </>
+        }
+      />
 
       {/* El aviso va arriba y antes del formulario, porque es lo que se viene a
           hacer: quien abre esto sin un motivo concreto lo abre para repasar, y sin
@@ -141,25 +141,23 @@ export default async function MoneyPage() {
         </p>
       )}
 
-      <section className="mt-8">
-        <h2 className="font-display text-2xl text-ink">El canal general</h2>
-        <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted">
-          Es el destino con más alcance del portal: cambiarlo cambia a dónde va el dinero de
-          todas las causas sin canal propio a la vez. Se edita aquí porque no es de nadie en
-          particular y no tiene ficha donde vivir.
-        </p>
-        <div className="mt-4">
+      <div className="mt-8">
+        <FormSection
+          framed={false}
+          title="El canal general"
+          hint="Es el destino con más alcance del portal: cambiarlo cambia a dónde va el dinero de todas las causas sin canal propio a la vez."
+        >
           <DonationChannelForm
             action={saveGeneralDonationChannel}
             row={generalRaw}
             owner="el portal"
             emptyWarning="Con los tres campos de destino vacíos, ninguna causa sin canal propio tiene a dónde recibir, y sus fichas lo dicen con esas palabras."
           />
-        </div>
-      </section>
+        </FormSection>
+      </div>
 
       <section className="mt-10">
-        <h2 className="font-display text-2xl text-ink">Se ven en el portal</h2>
+        <h2 className="font-display text-[20px] leading-tight text-ink">Se ven en el portal</h2>
         {live.length === 0 ? (
           <p className={`${panel} mt-4 p-4 text-sm leading-relaxed text-muted`}>
             Ningún destino publicado. Nadie que abra el portal encuentra a dónde enviar dinero.
@@ -178,8 +176,8 @@ export default async function MoneyPage() {
           antes de que salga, no después. */}
       {draft.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-display text-2xl text-ink">Escritos, pero todavía sin salir</h2>
-          <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted">
+          <h2 className="font-display text-[20px] leading-tight text-ink">Escritos, pero todavía sin salir</h2>
+          <p className="mt-1.5 max-w-prose text-[13px] leading-relaxed text-muted">
             Están guardados y no los ve nadie: su municipio está sin publicar, o la causa sigue en
             borrador o sin consentimiento. Se revisan ahora, que es cuando todavía no hay dinero
             de por medio.
@@ -193,7 +191,7 @@ export default async function MoneyPage() {
       )}
 
       <section className="mt-10 border-t border-line pt-6">
-        <h2 className="font-display text-2xl text-ink">Quién puede cambiarlos</h2>
+        <h2 className="font-display text-[20px] leading-tight text-ink">Quién puede cambiarlos</h2>
         <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
           Solo coordinación, y está comprobado en tres capas que no dependen entre sí: la ficha
           no ofrece el campo, la Server Action lo rechaza, y la base de datos para el cambio

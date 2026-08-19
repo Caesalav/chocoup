@@ -11,9 +11,17 @@ export default function ThanksPage() {
   return (
     <div className="mx-auto max-w-2xl px-5 pb-8 pt-10 sm:px-8 lg:pb-24 lg:pt-16">
       {/* El visto se dibuja al entrar: confirma el envío sin necesidad de leer.
-          Es el mismo glifo que lleva la pastilla «Cubierta», solo que a tamaño
-          de sello y con el trazo animado. */}
-      <span className="flex size-14 items-center justify-center rounded-full bg-accent-soft text-accent-strong">
+          Es el mismo glifo que lleva la pastilla «Cubierta», a tamaño de sello y
+          con el trazo animado.
+
+          El sello va en `brote` y la pastilla en el lavado verde, aunque el glifo
+          sea el mismo, y la diferencia es a propósito: una pastilla «Cubierta»
+          aparece dentro de una lista de necesidades, entre otras tres pastillas
+          con las que se compara, y ahí el lavado es lo que la deja en su sitio.
+          Esto es la única cosa que hay en la pantalla y confirma algo que acaba
+          de pasar, así que puede ser lo más vivo de la paleta. `selva` sobre
+          `brote` da 9,52:1. */}
+      <span className="flex size-14 items-center justify-center rounded-full bg-brote text-selva">
         <CheckIcon className="draws-check size-7 stroke-[2.5]" />
       </span>
 

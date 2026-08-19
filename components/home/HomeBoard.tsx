@@ -1,70 +1,53 @@
 import Link from "next/link";
 import { CampaignStrip } from "@/components/home/CampaignStrip";
-import { ChocoMap } from "@/components/map/ChocoMap";
-import { NeedsLegend } from "@/components/map/NeedsLegend";
-import { card } from "@/components/ui/styles";
+import { blockDark } from "@/components/ui/styles";
 import type { ResolvedCampaign } from "@/lib/campaign";
-import type { CityCardData } from "@/lib/types";
 
 /**
- * El tablero en la portada: el recado y el mapa, juntos.
+ * El recado de la portada, sin el mapa.
  *
- * /mapa sigue siendo la vista a pantalla, con Colombia, la leyenda al pie y
- * las tarjetas al lado. Aquí el oficio es otro: abrir el portal y ver de un
- * vistazo dónde falta, como se abre el juego y se ve la galaxia. El mapa no
- * ocupa la pantalla entera —se comería municipios, casos y el estado del
- * registro— pero sí es lo primero que se mira después de la marca.
+ * El mosaico del Chocó vive solo en /mapa: ahí cabe entero, con Colombia, la
+ * leyenda y las tarjetas al lado. En el inicio un segundo dibujo repetía el
+ * mismo oficio a media altura y además marcaba un pueblo —Quibdó— con un filete
+ * que no le correspondía. Aquí queda el foco del momento, y el enlace a verlo
+ * en su sitio.
+ *
+ * Es el bloque oscuro con cintas, y es el ÚNICO de la portada: es la pieza de más
+ * peso del sistema y dos de ellas en la misma pantalla dejan a las dos sin ser la
+ * principal. Va aquí y no en la tarjeta de estado porque lo que esta pieza dice
+ * —a dónde mirar ahora— es lo primero que hay que leer al abrir el portal.
+ *
+ * El registro es el abierto: la portada es lo que se comparte por WhatsApp y
+ * tiene que invitar a entrar. La ficha de una persona, dos pantallas más
+ * adentro, no lleva nada de esto.
  */
-export function HomeBoard({
-  cities,
-  campaign,
-}: {
-  cities: CityCardData[];
-  campaign: ResolvedCampaign | null;
-}) {
-  const pins = cities.map((city) => ({
-    id: city.id,
-    name: city.name,
-    slug: city.slug,
-    lat: city.lat,
-    lng: city.lng,
-    progress: city.progress,
-  }));
-
+export function HomeBoard({ campaign }: { campaign: ResolvedCampaign | null }) {
   return (
-    <section className={`${card} p-4 sm:p-5`} aria-label="Tablero del Chocó">
+    <section className={`${blockDark} p-5 sm:p-6`} aria-label="El Chocó ahora">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <h2 className="font-display text-[18px] leading-none text-ink">El Chocó ahora</h2>
+          <h2 className="font-display text-[20px] leading-none text-luz sm:text-[22px]">
+            El Chocó ahora
+          </h2>
           {campaign ? (
-            <div className="mt-2">
-              <CampaignStrip campaign={campaign} />
+            <div className="mt-2.5">
+              <CampaignStrip campaign={campaign} tone="oscuro" />
             </div>
           ) : (
-            <p className="mt-2 text-[13px] text-muted">
-              Los pueblos en color son los documentados. Gris es que todavía nadie ha llegado.
+            <p className="mt-2.5 text-[13px] text-luz/85">
+              Los pueblos documentados y lo que falta se ven en el mapa.
             </p>
           )}
         </div>
+        {/* La pastilla clara sobre el bloque oscuro: es la misma señal que usa la
+            barra inferior para la pestaña abierta, y aquí es el único elemento
+            pulsable del bloque, así que puede permitirse ser lo más claro. */}
         <Link
           href="/mapa"
-          className="shrink-0 text-[13px] text-accent-strong hover:text-accent"
+          className="shrink-0 rounded-full bg-luz px-4 py-2 text-[13px] font-medium text-selva transition-[background-color,scale] duration-150 hover:bg-brote active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-luz"
         >
-          Ver el mapa entero
+          Ver el mapa
         </Link>
-      </div>
-
-      <div className="relative mt-4 h-[min(52svh,32rem)] min-h-[16rem]">
-        <ChocoMap
-          pins={pins}
-          hrefFor={(pin) => `/ciudades/${pin.slug}`}
-          activeSlug={campaign?.city.slug}
-          className="size-full"
-        />
-      </div>
-
-      <div className="mt-3">
-        <NeedsLegend />
       </div>
     </section>
   );

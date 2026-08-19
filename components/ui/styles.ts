@@ -38,14 +38,42 @@ const moves = "transition-[translate,scale,background-color,border-color,color] 
  */
 const pressable = `${moves} active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 disabled:active:scale-100`;
 
+/**
+ * El botón principal es un bloque macizo de `selva` con tinta `luz`, y no el
+ * verde medio con letra blanca de la etapa anterior.
+ *
+ * Son tres cosas a la vez, y por eso gana:
+ *
+ *   - Contraste. La tinta encima da 12,77:1, contra los 5,3:1 de antes. Y la
+ *     frontera del botón contra el papel es de 12,40:1, así que el botón se
+ *     recorta solo y no necesita filete —lo que pide WCAG 1.4.11 y lo que ya no
+ *     cumpliría un botón de `brote`, en 1,30:1—.
+ *   - Registro. Es el único de los tres verdes de marca que sirve igual en la
+ *     portada y en la ficha de una persona. `brote` a plena potencia en un botón
+ *     está bien en `/ofrecer` y está mal debajo del retrato de alguien que perdió
+ *     la casa; con `selva` no hay que decidir dos veces.
+ *   - Plano. No hay degradado. La referencia no tiene ninguno, y en una pantalla
+ *     que se abre con mala señal un plano es lo único que se ve igual en
+ *     cualquier aparato.
+ *
+ * El hover va a `accent-strong`, que es más oscuro todavía: en un sistema claro
+ * el peso se gana bajando, no subiendo, porque hacia la luz está el papel.
+ */
 export const button = {
-  primary: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-medium text-paper hover:bg-accent-strong ${pressable}`,
+  primary: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-selva px-6 py-3 text-sm font-medium text-luz hover:bg-accent-strong ${pressable}`,
   secondary: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-line-strong bg-panel-high px-6 py-3 text-sm font-medium text-body hover:border-ink/40 hover:text-ink ${pressable}`,
   ghost: `inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-muted hover:bg-line hover:text-ink ${pressable}`,
+  /* La acción de invitar, para las pantallas del registro abierto: el bloque de
+     `brote` de la referencia, con tinta `selva` encima a 9,52:1. Lleva filete de
+     `selva` porque su frontera contra el papel es de 1,30:1 y un control tiene
+     que verse dónde empieza; sin el filete es una mancha de color sin borde.
+     No se usa en la ficha de una persona —lo comprueba el `lint`—. */
+  invite: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-selva bg-brote px-6 py-3 text-sm font-medium text-selva hover:bg-liana ${pressable}`,
   /* Borrar va en el rojo de la escala y no en el verde de marca: el verde es el
      color de lo que se hace a favor, y un «Borrar este municipio» pintado igual
      que «Donar dinero» es exactamente la confusión que no se puede permitir en
-     el panel. `need-high` sobre panel alto da 6,9:1, y 5,5:1 sobre su lavado. */
+     el panel. Y menos ahora, que el botón de marca es un bloque macizo y llama
+     más. `need-high` sobre panel alto da 9,22:1, y 7,12:1 sobre su lavado. */
   danger: `inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-transparent px-4 py-2 text-sm font-medium text-need-high hover:border-need-high hover:bg-need-high-soft ${pressable}`,
 };
 
@@ -85,7 +113,8 @@ export const field = {
  * Iba en la familia verde, que es la de la marca y la del «hecho»: una oferta
  * que no se envió y un envío correcto salían del mismo color. Va en el rojo
  * profundo de la escala, que aquí no cuenta necesidades sino que avisa —es el
- * mismo tono, y no hay dos rojos—. `need-high` sobre su lavado da 5,5:1.
+ * mismo tono, y no hay dos rojos—. `need-high` sobre su lavado da 7,12:1 sobre
+ * panel y 6,81:1 sobre papel.
  */
 export const alertBox = "rounded-lg bg-need-high-soft px-3.5 py-2.5 text-sm text-need-high";
 
@@ -95,6 +124,69 @@ export const alertBox = "rounded-lg bg-need-high-soft px-3.5 py-2.5 text-sm text
 
 /** Tarjeta sobria: la que usa el panel del equipo y los formularios. */
 export const panel = "rounded-xl border border-line bg-panel";
+
+// ---------------------------------------------------------------------------
+// Los dos registros
+//
+// La referencia de la que sale esta paleta es alegre porque vende plantas de
+// interior. Este portal publica fichas de personas identificables cuya casa se
+// cayó, y la misma paleta tiene que sostener las dos cosas sin partirse en dos
+// marcas. La respuesta no es tener menos color: es que el color fuerte tenga un
+// sitio donde le corresponde estar y un sitio donde no.
+//
+// REGISTRO ABIERTO: portada, navegación, mapa, listados y las pantallas que
+// piden algo (`/ofrecer`, `/sugerencias`, las de gracias). Bloques macizos,
+// cintas, `brote` y `lavanda`. Es la voz que invita a entrar.
+//
+// REGISTRO SOBRIO: la ficha de una persona y las tarjetas que llevan su cara y
+// su nombre. Papel, tinta, `accent` como línea y como texto, y la escala de
+// necesidad para el estado. Ahí la foto y el nombre son lo único que puede
+// levantar la voz.
+//
+// Lo que sigue son las superficies del registro abierto. No hay una lista
+// equivalente para el sobrio porque el sobrio no añade nada: es `card`, `panel`
+// y la tipografía de siempre. Un registro se define por lo que se quita.
+//
+// Y no es una recomendación: la regla del final de eslint.config.mjs prohíbe
+// estas clases en los archivos del registro sobrio y falla el `lint`.
+// ---------------------------------------------------------------------------
+
+/**
+ * El bloque oscuro de la referencia: `selva` con las cintas por detrás y tinta
+ * clara encima. Es la pieza de más peso del sistema y por eso hay como mucho una
+ * por pantalla —dos bloques de selva compitiendo en la misma vista y ninguno es
+ * el principal—.
+ *
+ * Las cintas pueden pasar por debajo del texto sin cuidarlo: van al 35 % de
+ * `liana` justamente para eso, y la tinta `luz` cruzándolas se queda en 7,16:1.
+ * Ver la nota de `.cintas` en app/globals.css.
+ */
+export const blockDark = "rounded-3xl bg-selva cintas text-luz";
+
+/**
+ * El bloque vivo: `brote` a plena potencia con tinta `selva`, 9,52:1. Es la
+ * superficie más alegre que tiene el sistema y la que hay que pensar dos veces
+ * antes de poner: funciona en una portada y en una página de invitación, y no
+ * funciona detrás de la cara de nadie.
+ *
+ * Sin filete porque es una superficie y no un control. En cuanto se pueda pulsar
+ * necesita el filete de `selva` —su frontera contra el papel es de 1,30:1—, y
+ * para eso está `button.invite`.
+ */
+export const blockLive = "rounded-3xl bg-brote cintas text-selva";
+
+/**
+ * La superficie de invitación: `lavanda`, el contrapeso frío.
+ *
+ * Sirve porque no es verde ni es cálido, así que no le quita significado a
+ * ninguna de las dos familias: una tarjeta de lavanda no se confunde con una
+ * acción de marca ni con un estado de necesidad. Es donde va lo que le pide algo
+ * a quien mira —«¿puedes cubrir una parte?», «cuéntanos qué falla»—.
+ *
+ * Sin cintas: la lavanda ya es el gesto, y las cintas encima la convierten en
+ * una tercera cosa que no hace falta.
+ */
+export const blockInvite = "rounded-3xl bg-lavanda text-ink";
 
 /**
  * La tarjeta grande de este diseño: radio generoso, blanco puro y sombra de
@@ -140,8 +232,11 @@ export const cardLink = `${card} block ${lifts} hover:-translate-y-1 hover:borde
  * Mando circular sobre una imagen: volver, compartir, avanzar. La pastilla
  * oscura no es decoración, es lo que garantiza el contraste del icono cuando la
  * foto de debajo sale quemada; el desenfoque solo evita que se vea el corte.
- * Al 55 % de tinta el icono aguanta 4:1 contra un blanco puro él solo, y con el
- * velo de arriba debajo se va a 10:1.
+ *
+ * Al 55 % de tinta, contra el peor caso —una foto quemada a blanco puro— el
+ * icono aguanta 3,68:1 él solo, por encima del 3:1 que pide WCAG 1.4.11 para un
+ * objeto gráfico; y con el velo de arriba debajo se va a 8,11:1. Los dos números
+ * son de la paleta nueva y se pueden volver a sacar con scripts/contraste.mjs.
  */
 export const iconOnPhoto =
   `inline-flex size-11 items-center justify-center rounded-full bg-ink/55 text-paper backdrop-blur-sm ${moves} hover:bg-ink/70 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper`;
@@ -153,10 +248,10 @@ export const iconOnPaper =
 /**
  * Etiqueta suelta sobre una foto, como el rótulo de la referencia.
  *
- * En la referencia es una pastilla clara translúcida, y así se queda mientras la
- * foto sea oscura. Aquí va oscura: sobre un cielo quemado la clara desaparece.
- * Cuenta además con el velo de arriba debajo —sola llega a 3:1 y con él a 8:1—,
- * así que no se usa sobre una imagen sin velar.
+ * En una lámina de marca esto sería una pastilla clara translúcida, y funciona
+ * mientras la foto sea oscura. Aquí va oscura: sobre un cielo del Chocó quemado
+ * la clara desaparece. Cuenta además con el velo de arriba debajo —sola llega a
+ * 3,15:1 y con él a 7,41:1—, así que no se usa sobre una imagen sin velar.
  */
 export const pillOnPhoto =
   "inline-flex items-center gap-1.5 rounded-full bg-ink/50 px-3.5 py-1.5 text-[12px] font-medium text-paper backdrop-blur-sm";

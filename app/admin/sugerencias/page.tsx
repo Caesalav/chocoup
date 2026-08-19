@@ -1,7 +1,8 @@
 import { deleteFeedback } from "@/app/admin/actions";
+import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DangerSubmitButton } from "@/components/admin/SubmitButton";
 import { FeedbackKindChip } from "@/components/ui/Chip";
-import { eyebrow, panel } from "@/components/ui/styles";
+import { panel } from "@/components/ui/styles";
 import { getFeedback } from "@/lib/admin-data";
 import { contactHref, formatDateTime } from "@/lib/format";
 import { currentTeam } from "@/lib/team";
@@ -14,14 +15,14 @@ export default async function FeedbackInboxPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-      <p className={eyebrow}>Buzón del portal</p>
-      <h1 className="mt-1 font-display text-3xl text-ink">Sugerencias y errores</h1>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-        Lo que la gente escribe sobre el portal: un fallo o una función que echan de menos. No se
-        publica. El contacto es opcional y solo lo ve el equipo.
-      </p>
+      <AdminHeader
+        backHref="/admin"
+        backLabel="Panel del equipo"
+        title="Sugerencias y errores"
+        description="Lo que la gente escribe sobre el portal: un fallo o una función que echan de menos. No se publica. El contacto es opcional y solo lo ve el equipo."
+      />
       {!canDelete && (
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
+        <p className="mt-4 max-w-prose text-[13px] leading-relaxed text-muted">
           Puedes leer las notas. Borrarlas lo hace coordinación, cuando ya no hacen falta.
         </p>
       )}

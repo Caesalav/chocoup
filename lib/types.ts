@@ -249,6 +249,12 @@ export type Offer = {
   publish_name: boolean;
   team_notes: string;
   created_at: string;
+  /**
+   * Si sale en /ofrecido. Independiente de si está pendiente o aceptada: se
+   * puede haber hablado con quien ofrece y aun así no publicarlo, o quitar del
+   * muro un pendiente sin negarlo.
+   */
+  on_wall: boolean;
 };
 
 /**
