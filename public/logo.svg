@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 72" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 72" fill="none">
   <!-- El logotipo suelto, para lo que no puede montar el componente: una vista
        previa, un correo, una lámina. No carga Outfit —un SVG suelto no puede
        contar con una fuente web— así que cae en Arial Black, que es la negra
@@ -15,5 +15,5 @@
     font-size="48"
     letter-spacing="-2.4"
     fill="#0E1A15"
-  >CHOCÓ-<tspan fill="#126A44">UP</tspan></text>
+  >CHOCÓ <tspan fill="#1AB169">UP</tspan></text>
 </svg>
