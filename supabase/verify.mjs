@@ -212,6 +212,8 @@ const MIGRATIONS = [
   "migrations/0017_donaciones_preparadas.sql",
   "migrations/0018_tablero.sql",
   "migrations/0019_muro_de_ofertas.sql",
+  "migrations/0020_presupuesto.sql",
+  "migrations/0021_registro_de_donaciones.sql",
 ];
 const migration = (file) => readFileSync(join(HERE, file), "utf8");
 
@@ -323,7 +325,7 @@ check("El bucket fotos existe y es público", bucket?.public === true);
 const policyCount = await one(
   "select count(*)::int as n from pg_policies where schemaname in ('public','storage')",
 );
-check("Se crean las 44 políticas RLS", policyCount.n === 44, `n=${policyCount.n}`);
+check("Se crean las 52 políticas RLS", policyCount.n === 52, `n=${policyCount.n}`);
 
 // ===========================================================================
 // El permiso de tabla: la otra mitad de cada regla de acceso
@@ -359,6 +361,14 @@ const PUBLIC_TABLE_PRIVS = {
   // mandado desde la web no recibe cero filas, recibe un error de permisos. Que en
   // esta línea no haya ninguna letra más es la condición que no se negocia.
   donations:          { authenticated: "SELECT" },
+  // El registro público: importe, causa, municipio, fecha y el nombre solo si
+  // se autorizó. Es una vista, no la tabla: `anon` sigue sin poder leer
+  // `donations`. Sin `SELECT` aquí, las tres pantallas del registro no tendrían
+  // de dónde leer.
+  donation_log:       { anon: "SELECT", authenticated: "SELECT" },
+  budget_items:       { anon: "SELECT", authenticated: "DELETE,INSERT,SELECT,UPDATE" },
+  case_budget:        { anon: "SELECT", authenticated: "SELECT" },
+  support_offers:     { anon: "INSERT", authenticated: "DELETE,INSERT,SELECT" },
   // El buzón: el público inserta y NO lee. Documentación lee y no borra;
   // coordinación borra. `anon` sin SELECT es lo que impide pedir la bandeja.
   feedback:           { anon: "INSERT", authenticated: "DELETE,INSERT,SELECT" },
@@ -3511,6 +3521,37 @@ check(
   JSON.stringify(donationWritten),
 );
 
+// El registro público sale de la vista, no de la tabla. `anon` sigue sin poder
+// leer `public.donations` —está comprobado unas líneas más arriba— y aun así
+// tiene que ver el importe, la causa y el nombre autorizado. Lo que no tiene
+// que ver es la referencia del pago: no está en la vista, y pedirlo es un
+// error de columna, no una celda vacía.
+await asAnon();
+const namedLog = await one(`select donor_name, amount_cop, case_name, city_slug, publish_name
+  from public.donation_log
+  where amount_cop = 120000`);
+check(
+  "El público lee el registro: el nombre autorizado, el importe y la causa, no la tabla",
+  namedLog.donor_name === "Marta Palacios" &&
+    Number(namedLog.amount_cop) === 120000 &&
+    namedLog.case_name === "Familia Rentería" &&
+    namedLog.city_slug === "quibdo" &&
+    namedLog.publish_name === true,
+  JSON.stringify(namedLog),
+);
+
+await expectError(
+  "Del registro no sale la referencia del pago: esa columna no existe",
+  "select payment_ref from public.donation_log",
+  "column",
+);
+
+await expectError(
+  "Tampoco el proveedor: el registro no dice por qué pasarela llegó el dinero",
+  "select provider from public.donation_log",
+  "column",
+);
+
 // Un aviso repetido del proveedor no suma dos veces. Es la primera caída de red
 // del webhook convertida en una cifra que no cuadra con el extracto, y con el
 // índice único es un error en vez de un pago inventado.
@@ -3548,6 +3589,41 @@ check(
   "Quien documenta no ve ningún importe: la política es de coordinación",
   documentationDonations.n === 0,
   `n=${documentationDonations.n}`,
+);
+
+// Una donación anónima, una pendiente y un nombre que es un teléfono. Las tres
+// tienen que caer del lado correcto del recorte, y se comprueban juntas porque
+// son la regla que 0017 no pudo escribir a ciegas: cuáles nombres salen.
+await asService();
+await sql(`insert into public.donations
+  (case_id, amount_cop, status, provider, payment_ref, donor_name, publish_name, settled_at)
+  select id, 80000, 'confirmada', 'pasarela', 'pago-anon-001', 'Carlos Vélez', false, now()
+  from public.cases where display_name = 'Familia Rentería'`);
+await sql(`insert into public.donations
+  (case_id, amount_cop, status, provider, payment_ref, donor_name, publish_name)
+  select id, 50000, 'pendiente', 'pasarela', 'pago-pend-001', 'Nadie Publicado', true
+  from public.cases where display_name = 'Familia Rentería'`);
+await sql(`insert into public.donations
+  (case_id, amount_cop, status, provider, payment_ref, donor_name, publish_name, settled_at)
+  select id, 30000, 'confirmada', 'pasarela', 'pago-tel-001', 'Marta 3167778899', true, now()
+  from public.cases where display_name = 'Familia Rentería'`);
+
+await asAnon();
+const logCut = await one(`select
+  count(*)::int                                                    as n,
+  count(*) filter (where donor_name is not null)::int              as con_nombre,
+  count(*) filter (where donor_name is null)::int                  as anonimas,
+  count(*) filter (where amount_cop = 50000)::int                  as pendientes,
+  count(*) filter (where donor_name like '%316%')::int             as telefono
+  from public.donation_log`);
+check(
+  "Del registro salen las confirmadas, el nombre solo si se autorizó y no es un teléfono, y nunca lo pendiente",
+  logCut.n === 3 &&
+    logCut.con_nombre === 1 &&
+    logCut.anonimas === 2 &&
+    logCut.pendientes === 0 &&
+    logCut.telefono === 0,
+  JSON.stringify(logCut),
 );
 
 // --- La tercera barrera, con las dos primeras desarmadas a mano ----------
@@ -3734,6 +3810,13 @@ check(
   `n=${aidAfterUnpublish.n}`,
 );
 
+const donationAfterUnpublish = await one("select count(*)::int as n from public.donation_log");
+check(
+  "Al despublicar el municipio, sus donaciones salen del registro público",
+  donationAfterUnpublish.n === 0,
+  `n=${donationAfterUnpublish.n}`,
+);
+
 // Lo mismo con lo prometido, y hay que comprobarlo aparte: son dos vistas con dos
 // copias de la cascada, así que una puede quedarse sin ella sin que la otra lo
 // note. Lo que queda es la oferta sin municipio —un camión, un cupo de carga—,
@@ -3791,6 +3874,98 @@ check(
   "Al despublicar el municipio, su movimiento desaparece del tablero",
   activityAfterUnpublish.n === 0,
   `n=${activityAfterUnpublish.n}`,
+);
+
+// ===========================================================================
+// Presupuesto y las tres ofertas (0020)
+// ===========================================================================
+
+await asPostgres();
+await sql("update public.cities set published = true where slug = 'quibdo'");
+const daniela = await one("select id, city_id from public.cases where display_name = 'Familia Rentería'");
+
+await asUser("charlie@test.com");
+await sql(`insert into public.budget_items (case_id, city_id, title, amount_cop)
+  values ('${daniela.id}', '${daniela.city_id}', '40 tejas de zinc', 1600000)`);
+
+const item = await one("select title, amount_cop, purchased from public.budget_items where title = '40 tejas de zinc'");
+check(
+  "Coordinación anota un ítem del presupuesto con su precio",
+  item.title === "40 tejas de zinc" && Number(item.amount_cop) === 1600000 && item.purchased === false,
+  JSON.stringify(item),
+);
+
+await sql("update public.budget_items set purchased = true where title = '40 tejas de zinc'");
+const bought = await one("select purchased, purchased_on is not null as con_fecha from public.budget_items where title = '40 tejas de zinc'");
+check(
+  "Al marcar un ítem como comprado se le pone el día",
+  bought.purchased === true && bought.con_fecha === true,
+  JSON.stringify(bought),
+);
+
+await asAnon();
+const publicItem = await one("select title, amount_cop from public.budget_items where title = '40 tejas de zinc'");
+check(
+  "El público lee el ítem de una causa publicada, con su precio",
+  publicItem?.title === "40 tejas de zinc",
+  JSON.stringify(publicItem),
+);
+
+await expectError(
+  "El público no puede marcar un ítem como comprado",
+  "update public.budget_items set purchased = false where title = '40 tejas de zinc'",
+  "permission denied",
+);
+
+const raised = await one("select goal_cop, used_cop, donated_cop from public.case_budget where case_id = (select id from public.cases where display_name = 'Familia Rentería')");
+check(
+  "La vista pública suma meta, usado y lo donado confirmado, sin nombres de quien dona",
+  Number(raised.goal_cop) >= 1600000 && Number(raised.used_cop) >= 1600000 && Number(raised.donated_cop) >= 0,
+  JSON.stringify(raised),
+);
+
+await asAnon();
+await sql(`insert into public.support_offers (kind, person_name, contact, skills, availability)
+  values ('voluntario', 'Camila Hurtado', '3004412290', 'Olla común y censo', 'Fines de semana')`);
+
+await expectError(
+  "El público no lee las ofertas de apoyo: ni el contacto ni lo que ofreció",
+  "select person_name from public.support_offers",
+  "permission denied",
+);
+
+await asUser("charlie@test.com");
+const offerRead = await one("select kind, person_name, contact from public.support_offers where person_name = 'Camila Hurtado'");
+check(
+  "El equipo sí lee la oferta de apoyo, con el contacto",
+  offerRead.kind === "voluntario" && offerRead.contact === "3004412290",
+  JSON.stringify(offerRead),
+);
+
+await asUser("documenta@test.com");
+await sql("delete from public.support_offers where person_name = 'Camila Hurtado'");
+const stillThere = await one("select count(*)::int as n from public.support_offers where person_name = 'Camila Hurtado'");
+check(
+  "Quien documenta no borra una oferta de apoyo",
+  stillThere.n === 1,
+  `n=${stillThere.n}`,
+);
+
+await asUser("charlie@test.com");
+await sql("delete from public.support_offers where person_name = 'Camila Hurtado'");
+const afterDelete = await one("select count(*)::int as n from public.support_offers where person_name = 'Camila Hurtado'");
+check(
+  "Coordinación puede borrar una oferta de apoyo",
+  afterDelete.n === 0,
+  `n=${afterDelete.n}`,
+);
+
+await asPostgres();
+await expectError(
+  "Una oferta de apoyo no admite un tipo inventado",
+  `insert into public.support_offers (kind, person_name, contact)
+     values ('dinero', 'Nadie', '3000000000')`,
+  "support_offers_kind_valid",
 );
 
 // --- Informe -----------------------------------------------------------

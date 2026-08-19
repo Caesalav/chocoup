@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { NEED_CATEGORIES } from "@/lib/constants";
+import { looksLikeEmail } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/env";
 
@@ -125,7 +126,7 @@ export async function subscribeToUpdates(formData: FormData) {
   // y las dos hacen falta por lo de siempre: esto es para que el aviso se
   // entienda, y aquello para que valga también cuando la llamada no venga de esta
   // pantalla.
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) {
+  if (!looksLikeEmail(email)) {
     redirect(`${back}${separator}avisos=correo`);
   }
 

@@ -44,16 +44,6 @@ export const TIER_FILL: Record<NeedsTier, string> = {
   high: "fill-need-high",
 };
 
-/** El mismo tono en el trazo: cada pueblo sella sus juntas del color propio,
- *  para que entre dos formas no asome el papel. */
-export const TIER_STROKE: Record<NeedsTier, string> = {
-  blank: "stroke-need-blank",
-  none: "stroke-need-none",
-  low: "stroke-need-low",
-  mid: "stroke-need-mid",
-  high: "stroke-need-high",
-};
-
 /** El mismo tono como punto, para la leyenda y las tarjetas del listado. */
 export const TIER_DOT: Record<NeedsTier, string> = {
   blank: "bg-need-blank",

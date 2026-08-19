@@ -2,11 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { CaseBigCard } from "@/components/cards/CaseBigCard";
-import { parseCitySection, SectionTabs } from "@/components/city/SectionTabs";
 import { CityLead } from "@/components/city/CityLead";
 import { CaseProgressBar } from "@/components/case/CaseProgressBar";
+import { DonationLog } from "@/components/donations/DonationLog";
 import { ChocoMap } from "@/components/map/ChocoMap";
-import { NeedsList } from "@/components/NeedsList";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { ShareLink } from "@/components/ShareLink";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -21,10 +20,10 @@ import {
   screenTitle,
   shell,
 } from "@/components/ui/styles";
-import { getCityPage } from "@/lib/data";
+import { getCityPage, getDonationLog } from "@/lib/data";
 import { excerpt, formatDate, plural } from "@/lib/format";
-import { countCoveredNeeds, countOpenNeeds } from "@/lib/needs";
-import { cityProgress, progressPercent } from "@/lib/case-progress";
+import { mergeBudget } from "@/lib/budget";
+import { moneyProgress } from "@/lib/money-progress";
 import { savedFrame } from "@/lib/photo-frame";
 import { absoluteUrl } from "@/lib/site";
 
@@ -32,7 +31,6 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ ver?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -45,35 +43,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function CityPage({ params, searchParams }: Props) {
+export default async function CityPage({ params }: Props) {
   const { slug } = await params;
-  const { ver } = await searchParams;
   const data = await getCityPage(slug);
   if (!data) notFound();
 
-  const { city, photos, zoneNeeds, caseNeeds, cases } = data;
+  const { city, photos, cases } = data;
+  const donations = await getDonationLog({ cityId: city.id, limit: 12 });
+  const budget = mergeBudget(cases.map((row) => row.budget));
 
   /**
-   * Todo lo que hace falta en el municipio, de la zona y de cada caso, junto.
+   * El porcentaje del municipio, sobre lo mismo que mide el anillo de la barra
+   * que tiene justo debajo.
    *
-   * `getCityPage` las trae separadas porque el panel edita las de la zona en su
-   * propio formulario, y de ahí salía el fallo: la cabecera contaba solo esa
-   * mitad. Con Quibdó eso daba «0 necesidades abiertas» —no tiene ninguna de
-   * zona— mientras /municipios y el mapa decían diez del mismo municipio.
+   * Iba sobre `budget.ratio`, que es lo recaudado cuando hay algo recaudado y lo
+   * gastado cuando no. Al lado de una barra que cuenta lo entregado, eso ponía
+   * dos porcentajes «de la meta» distintos en la misma pantalla, que es
+   * exactamente el descuadre por el que existen las reglas de lib/needs.ts y
+   * lib/contributions.ts. Nulo cuando todavía no se ha comprado nada: entonces no
+   * hay porcentaje que dar y la frase se queda en los ítems pendientes.
    */
-  const listedNeeds = [...zoneNeeds, ...caseNeeds];
-
-  /**
-   * El número de la cabecera, y el que viaja en el título al compartir por
-   * WhatsApp. Sale de `countOpenNeeds` sobre el municipio entero, que es la
-   * misma cuenta exacta que hace `getCityCards` para la tarjeta de /municipios.
-   * El color del mapa sale del avance (`cityProgress`) sobre este mismo montón.
-   */
-  const openNeeds = countOpenNeeds(listedNeeds);
-  const coveredNeeds = countCoveredNeeds(listedNeeds);
-  const progress = cityProgress(listedNeeds);
-  const percent = progressPercent(progress.ratio);
-  const section = parseCitySection(ver);
+  const percentLabel = (() => {
+    const percent = moneyProgress(budget).percent;
+    return percent === null ? null : `${percent} % entregado`;
+  })();
 
   const cover = photos[0]?.storage_path ?? null;
   const shareUrl = await absoluteUrl(`/ciudades/${city.slug}`);
@@ -101,9 +94,7 @@ export default async function CityPage({ params, searchParams }: Props) {
               <ShareLink
                 url={shareUrl}
                 title={`${city.name}, Chocó · ${
-                  progress.total > 0
-                    ? `${percent} % cubierto`
-                    : plural(openNeeds, "necesidad abierta", "necesidades abiertas")
+                  percentLabel ?? plural(budget.pendingItems, "ítem pendiente", "ítems pendientes")
                 }`}
                 className={iconOnPhoto}
               >
@@ -117,13 +108,13 @@ export default async function CityPage({ params, searchParams }: Props) {
                 {city.name}, <span className="text-paper/65">Chocó</span>
               </h1>
               <p className="mt-2.5 text-[14px] text-paper/85">
-                {progress.total > 0 && `${percent} % cubierto · `}
-                {plural(openNeeds, "necesidad abierta", "necesidades abiertas")}
+                {percentLabel && `${percentLabel} · `}
+                {plural(budget.pendingItems, "ítem pendiente", "ítems pendientes")}
                 {cases.length > 0 && ` · ${plural(cases.length, "caso", "casos")}`}
               </p>
-              {progress.total > 0 && (
+              {budget.goal > 0 && (
                 <div className="mt-4 max-w-sm">
-                  <CaseProgressBar needs={listedNeeds} compact tone="photo" />
+                  <CaseProgressBar budget={budget} compact tone="photo" />
                 </div>
               )}
               {!city.published && (
@@ -157,9 +148,7 @@ export default async function CityPage({ params, searchParams }: Props) {
             <ShareLink
               url={shareUrl}
               title={`${city.name}, Chocó · ${
-                progress.total > 0
-                  ? `${percent} % cubierto`
-                  : plural(openNeeds, "necesidad abierta", "necesidades abiertas")
+                percentLabel ?? plural(budget.pendingItems, "ítem pendiente", "ítems pendientes")
               }`}
               className={iconOnPaper}
             >
@@ -173,13 +162,13 @@ export default async function CityPage({ params, searchParams }: Props) {
               {city.name}, <span className="text-faint">Chocó</span>
             </h1>
             <p className="mt-2.5 text-[14px] text-muted">
-              {progress.total > 0 && `${percent} % cubierto · `}
-              {plural(openNeeds, "necesidad abierta", "necesidades abiertas")}
+              {percentLabel && `${percentLabel} · `}
+              {plural(budget.pendingItems, "ítem pendiente", "ítems pendientes")}
               {cases.length > 0 && ` · ${plural(cases.length, "caso", "casos")}`}
             </p>
-            {progress.total > 0 && (
+            {budget.goal > 0 && (
               <div className="mt-4 max-w-sm">
-                <CaseProgressBar needs={listedNeeds} compact />
+                <CaseProgressBar budget={budget} compact />
               </div>
             )}
             {!city.published && (
@@ -232,80 +221,42 @@ export default async function CityPage({ params, searchParams }: Props) {
                 se leían como un muestrario de daños del pueblo. Ahora van dentro
                 de la tarjeta de quien es, en la sección de personas. */}
             <section className="mt-4">
-              <h2 className={screenTitle}>Contenido</h2>
+              <h2 className={screenTitle}>Causas</h2>
               <p className="mt-2 text-[13px] leading-relaxed text-muted lg:text-[15px]">
-                Las personas de {city.name} y lo que hace falta, de la zona y de cada caso.
+                Las personas, colegios y demás causas documentadas en {city.name}.
               </p>
-              {/* El número de la pestaña es cuántas filas hay en su lista, no
-                  cuántas están abiertas, y por eso puede ser mayor que el de la
-                  cabecera: la lista enseña también las cubiertas, marcadas y al
-                  final. Es el mismo criterio que /necesidades, donde ya se
-                  probó lo contrario: un contador de abiertas encima de una
-                  lista más larga hace que quien cuenta lo que ve encuentre otra
-                  cosa. Lo que no puede pasar es que la diferencia no se
-                  explique, y de eso se encarga el renglón de debajo. */}
-              <div className="mt-5">
-                <SectionTabs
-                  slug={city.slug}
-                  active={section}
-                  peopleCount={cases.length}
-                  needsCount={listedNeeds.length}
+              <div className="mt-6">
+                {cases.length === 0 ? (
+                  <p className={`${card} max-w-[68ch] p-5 text-[14px] leading-relaxed text-muted`}>
+                    Todavía no hay casos publicados de este municipio. Solo publicamos un caso
+                    cuando la persona da su consentimiento.
+                  </p>
+                ) : (
+                  <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {cases.map((caseRecord) => (
+                      <li key={caseRecord.id}>
+                        <CaseBigCard caseRecord={caseRecord} citySlug={city.slug} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+
+            <section className="mt-12">
+              <h2 className={screenTitle}>Donaciones a {city.name}</h2>
+              <p className="mt-2 text-[13px] leading-relaxed text-muted lg:text-[15px]">
+                Lo que ha llegado a las causas de este municipio. Si quien donó no autorizó su
+                nombre, la fila dice que es anónima.
+              </p>
+              <div className="mt-4">
+                <DonationLog
+                  initial={donations}
+                  scope="city"
+                  cityId={city.id}
+                  limit={12}
                 />
               </div>
-
-              {section === "personas" ? (
-                <div className="mt-6">
-                  {cases.length === 0 ? (
-                    <p className={`${card} max-w-[68ch] p-5 text-[14px] leading-relaxed text-muted`}>
-                      Todavía no hay casos publicados de este municipio. Solo publicamos un caso
-                      cuando la persona da su consentimiento.
-                    </p>
-                  ) : (
-                    /* Dos columnas como techo y no cuatro: cada tarjeta lleva
-                       ahora retrato, qué le está pasando y el carrusel de esa
-                       persona, y en una columna de 300 px el carrusel serían
-                       sellos de correos. */
-                    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {cases.map((caseRecord) => (
-                        <li key={caseRecord.id}>
-                          <CaseBigCard caseRecord={caseRecord} citySlug={city.slug} />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-6">
-                  {/* El renglón que cuadra los dos números de arriba. Sin él la
-                      cabecera dice una cifra, la pestaña dice otra mayor y nada
-                      en la pantalla explica por qué; con él la resta está
-                      escrita. Solo aparece cuando hay algo cubierto, que es
-                      cuando las dos cifras se separan. */}
-                  {coveredNeeds > 0 && (
-                    <p className="mb-5 max-w-[68ch] text-[13px] leading-relaxed text-muted">
-                      Las {listedNeeds.length} registradas en {city.name}:{" "}
-                      {plural(openNeeds, "sigue abierta", "siguen abiertas")} y{" "}
-                      {coveredNeeds === 1
-                        ? "1 ya está cubierta, que va al final"
-                        : `${coveredNeeds} ya están cubiertas, que van al final`}
-                      .
-                    </p>
-                  )}
-                  <NeedsList
-                    needs={listedNeeds.map((need) => ({
-                      ...need,
-                      cityName: city.name,
-                      citySlug: city.slug,
-                      caseName: need.case_id
-                        ? (cases.find((row) => row.id === need.case_id)?.display_name ?? null)
-                        : null,
-                    }))}
-                    emptyLabel="Todavía no hemos registrado necesidades de este municipio."
-                    showOrigin
-                    columns
-                  />
-                </div>
-              )}
             </section>
           </div>
 
@@ -361,10 +312,10 @@ export default async function CityPage({ params, searchParams }: Props) {
             </section>
 
             <Link
-              href={`/ofrecer?city=${city.slug}`}
+              href="/ofrecer"
               className="mt-12 flex min-h-13 w-full items-center justify-center rounded-full bg-accent px-6 text-[15px] font-medium text-paper transition-[background-color,scale] duration-150 hover:bg-accent-strong active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              Ofrecer un recurso para {city.name}
+              Ofrecer ayuda
             </Link>
 
             {/* La otra mitad del botón de arriba: lo que se puede dar y lo que ya

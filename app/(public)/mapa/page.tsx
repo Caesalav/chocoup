@@ -88,7 +88,7 @@ export default async function MapPage({ searchParams }: Props) {
   // conserva el alto entero, que es su única medida.
   return (
     <div
-      className={`${shell} screen-h flex flex-col pt-3 lg:grid lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)_auto] lg:gap-x-12 lg:pb-6 lg:pt-6`}
+      className={`map-board ${shell} screen-h flex flex-col pt-3 lg:grid lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)_auto] lg:gap-x-12 lg:pb-6 lg:pt-6`}
     >
       <header className="enters shrink-0 lg:col-start-1 lg:row-start-1">
         <h1 className="font-display text-[22px] leading-tight text-ink lg:text-[30px]">
@@ -121,6 +121,7 @@ export default async function MapPage({ searchParams }: Props) {
             <ChocoMap
               pins={pins}
               hrefFor={(pin) => `/ciudades/${pin.slug}`}
+              activeSlug={campaign?.city.slug}
               className="size-full"
             />
             <MapIntro />

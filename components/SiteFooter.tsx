@@ -26,7 +26,7 @@ export function SiteFooter() {
     <footer className="mt-20 border-t border-line">
       <div className={`${shell} py-12 lg:flex lg:gap-16`}>
         <div className="lg:max-w-[60ch]">
-          <Logo className="mb-6 h-9 w-auto text-faint" />
+          <Logo className="mb-5 text-[28px] text-faint" />
           <p className="max-w-prose text-sm leading-relaxed text-muted">
             {SITE_NAME} documenta la situación en municipios del Chocó tras el terremoto. Las fotos
             y los casos se publican con el consentimiento de las personas afectadas. El dinero no

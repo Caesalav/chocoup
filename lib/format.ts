@@ -147,6 +147,31 @@ export function relativeDays(iso: string): string {
   return `Actualizado hace ${days} días`;
 }
 
+/**
+ * Cuánto hace, en la medida más cercana.
+ *
+ * Una donación no es una factura: la hora exacta no demuestra nada y solo
+ * tiene que sonar a movimiento, que es lo que hace la referencia con «6 yrs».
+ * Las compras del presupuesto siguen yendo con el día entero.
+ */
+export function timeAgo(iso: string): string {
+  const elapsed = Math.max(0, Date.now() - new Date(iso).getTime());
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "hace un momento";
+  if (minutes < 60) return `hace ${plural(minutes, "minuto", "minutos")}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `hace ${plural(hours, "hora", "horas")}`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "ayer";
+  if (days < 14) return `hace ${plural(days, "día", "días")}`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 8) return `hace ${plural(weeks, "semana", "semanas")}`;
+  const months = Math.floor(days / 30);
+  if (months < 18) return `hace ${plural(months, "mes", "meses")}`;
+  const years = Math.max(1, Math.floor(days / 365));
+  return `hace ${plural(years, "año", "años")}`;
+}
+
 export function formatDateTime(iso: string): string {
   return timeFormatter.format(new Date(iso));
 }
@@ -157,14 +182,20 @@ export function excerpt(text: string, max = 160): string {
   return `${clean.slice(0, max).trimEnd()}…`;
 }
 
+/** La misma forma que exige `newsletter_email_shape` en la base. */
+export function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 200;
+}
+
 /**
  * La primera frase de una causa: la escrita a mano si la hay, y si no el recorte
  * de su historia.
  *
- * Es la misma decisión en los tres sitios donde esa frase se lee, y por eso está
- * escrita una vez: la tarjeta de /donaciones, la tarjeta grande de la ficha de un
- * municipio, y —la que de verdad importa— la descripción de la página, que es lo
- * que WhatsApp enseña en la vista previa cuando alguien pega el enlace.
+ * Es la misma decisión en los sitios donde esa frase se lee, y por eso está
+ * escrita una vez: la tarjeta de /donaciones, la fila del listado, la tarjeta
+ * grande de la ficha de un municipio, y —la que de verdad importa— la
+ * descripción de la página, que es lo que WhatsApp enseña en la vista previa
+ * cuando alguien pega el enlace.
  *
  * `cases.summary` (0016) existe justamente por ese tercer sitio. El recorte
  * automático corta donde cae, a mitad de frase o de palabra, y da igual dentro de
@@ -197,6 +228,22 @@ export function caseLead(row: { summary: string; story: string }, max: number): 
 /** Pluralización mínima en español, suficiente para los contadores del portal. */
 export function plural(count: number, singular: string, plural_: string): string {
   return `${count} ${count === 1 ? singular : plural_}`;
+}
+
+/**
+ * Un importe en pesos colombianos, como se lee: $ 1.200.000.
+ *
+ * Sin decimales: el peso no los usa en la práctica y un presupuesto de
+ * reconstrucción no se decide en centavos.
+ */
+const copFormatter = new Intl.NumberFormat("es-CO", {
+  style: "currency",
+  currency: "COP",
+  maximumFractionDigits: 0,
+});
+
+export function formatCOP(amount: number): string {
+  return copFormatter.format(Math.max(0, Math.round(amount)));
 }
 
 /**

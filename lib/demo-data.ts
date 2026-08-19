@@ -19,8 +19,13 @@ import {
 import { savedFrame } from "./photo-frame";
 import { NEED_CATEGORIES } from "./constants";
 import { EMPTY_FOCUS, type CampaignFocusRow } from "./campaign";
-import { cityProgress } from "./case-progress";
-import { countCoveredNeeds, countOpenCases, countOpenNeeds, isOpenNeed } from "./needs";
+import {
+  asCaseProgress,
+  budgetProgress,
+  countOpenBudgetCases,
+  type BudgetItem,
+} from "./budget";
+import { countOpenNeeds, isOpenNeed } from "./needs";
 import type {
   AdminCityRow,
   AidRecord,
@@ -48,8 +53,11 @@ import type {
   OfferWithContext,
   Photo,
   PortalTotals,
+  SupportOffer,
+  SupportOfferKind,
   TeamMemberEntry,
   TeamSession,
+  DonationLogEntry,
   FeedbackNote,
 } from "./types";
 
@@ -67,6 +75,9 @@ const OFFER = 6;
 const UPDATE = 7;
 const FEEDBACK = 8;
 const NEWSLETTER = 9;
+const BUDGET = 10;
+const SUPPORT = 11;
+const DONATION = 12;
 
 // El 2 era de las fundaciones y se queda libre. No se reaprovecha: los
 // identificadores de muestra salen en las direcciones y en las capturas, y
@@ -74,6 +85,10 @@ const NEWSLETTER = 9;
 // otra cosa señalaran a la misma fila.
 
 const day = (n: number) => `2026-08-${String(n).padStart(2, "0")}T14:30:00.000Z`;
+
+/** Un instante concreto, para el registro de donaciones: la hora sí se publica. */
+const at = (n: number, hour: number, minute: number) =>
+  `2026-08-${String(n).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00.000Z`;
 
 /**
  * El mismo día sin hora, como lo guarda una columna `date`: la fecha en que se
@@ -213,7 +228,7 @@ const linkChannel = (url: string, verifiedOn: string | null = null): DonationCol
  */
 export function demoGeneralChannel(): DonationChannel | null {
   return donationChannel(
-    keyChannel("@soschoco-muestra", "Bre-B", "Chocó-up (muestra)", dayOnly(12)),
+    keyChannel("@soschoco-muestra", "Bre-B", "ChocóUp (muestra)", dayOnly(12)),
   );
 }
 
@@ -565,6 +580,266 @@ export const demoNeeds: Need[] = needSeeds.map((seed, index) => ({
 }));
 
 const needByTitle = (title: string) => demoNeeds.find((need) => need.title === title)!;
+
+// ---------------------------------------------------------------------------
+// Presupuesto de cada causa
+// ---------------------------------------------------------------------------
+
+type BudgetSeed = {
+  caseName: string;
+  title: string;
+  amount_cop: number;
+  purchased?: boolean;
+};
+
+const budgetSeeds: BudgetSeed[] = [
+  {
+    caseName: DANIELA,
+    title: "Bloque, cemento, tejas y madera para reconstruir la casa",
+    amount_cop: 8_500_000,
+  },
+  {
+    caseName: DANIELA,
+    title: "Mercados para tres personas, un mes",
+    amount_cop: 480_000,
+  },
+  {
+    caseName: DANIELA,
+    title: "Colchonetas, sábanas y un fogón de dos puestos",
+    amount_cop: 320_000,
+    purchased: true,
+  },
+  {
+    caseName: "Familia Mosquera Palacios",
+    title: "300 bloques y 15 bultos de cemento para la pared del fondo",
+    amount_cop: 4_200_000,
+  },
+  {
+    caseName: "Familia Mosquera Palacios",
+    title: "Nevera de icopor y balanza para volver a vender pescado",
+    amount_cop: 380_000,
+    purchased: true,
+  },
+  {
+    caseName: "Doña Bernarda Rentería",
+    title: "Medicación para la tensión, tres meses",
+    amount_cop: 180_000,
+    purchased: true,
+  },
+  {
+    caseName: "Doña Bernarda Rentería",
+    title: "Evaluación técnica de la casa antes de repararla",
+    amount_cop: 650_000,
+  },
+  {
+    caseName: "Familia Asprilla Moreno",
+    title: "Revisión del gas y arreglo del piso de la cocina",
+    amount_cop: 2_100_000,
+  },
+  {
+    caseName: "Familia Perea Córdoba",
+    title: "40 tejas y madera para reforzar dos muros de carga",
+    amount_cop: 1_600_000,
+  },
+  {
+    caseName: "Yeison Córdoba y su hermana",
+    title: "Útiles escolares y dos uniformes",
+    amount_cop: 420_000,
+  },
+  {
+    caseName: "Familia Klinger Valencia",
+    title: "Madera para tres pilotes y reparación del motor de la lancha",
+    amount_cop: 5_400_000,
+  },
+];
+
+export const demoBudgetItems: BudgetItem[] = budgetSeeds.map((seed, index) => {
+  const caseRecord = caseByName(seed.caseName);
+  return {
+    id: demoId(BUDGET, index),
+    case_id: caseRecord.id,
+    city_id: caseRecord.city_id,
+    title: seed.title,
+    amount_cop: seed.amount_cop,
+    purchased: seed.purchased ?? false,
+    purchased_on: seed.purchased ? dayOnly(10) : null,
+    sort_order: index,
+    created_at: day(8 + (index % 6)),
+  };
+});
+
+/**
+ * Donaciones de muestra. Los importes por causa suman lo que la barra enseña:
+ * la lista y el total salen del mismo arreglo, así que no pueden contradecirse.
+ *
+ * En modo real esas filas las escribe el webhook y el público las lee de
+ * `donation_log`, no de la tabla.
+ */
+type DonationSeed = {
+  caseName: string;
+  amount_cop: number;
+  donor_name: string;
+  publish_name: boolean;
+  at: string;
+};
+
+const donationSeeds: DonationSeed[] = [
+  { caseName: DANIELA, amount_cop: 1_500_000, donor_name: "Lucía Restrepo", publish_name: true, at: at(19, 11, 20) },
+  { caseName: DANIELA, amount_cop: 1_000_000, donor_name: "Carlos Vélez", publish_name: false, at: at(18, 16, 5) },
+  { caseName: DANIELA, amount_cop: 700_000, donor_name: "Andrés Palacios", publish_name: true, at: at(17, 9, 40) },
+  { caseName: "Familia Mosquera Palacios", amount_cop: 1_200_000, donor_name: "Carmen Lozano", publish_name: true, at: at(18, 19, 12) },
+  { caseName: "Familia Mosquera Palacios", amount_cop: 600_000, donor_name: "", publish_name: false, at: at(15, 8, 30) },
+  { caseName: "Doña Bernarda Rentería", amount_cop: 400_000, donor_name: "Marta Hinestroza", publish_name: false, at: at(16, 13, 45) },
+  { caseName: "Familia Asprilla Moreno", amount_cop: 250_000, donor_name: "Diego Murillo", publish_name: true, at: at(14, 10, 15) },
+  { caseName: "Familia Perea Córdoba", amount_cop: 650_000, donor_name: "Ana Isabel Córdoba", publish_name: true, at: at(17, 21, 8) },
+  { caseName: "Familia Perea Córdoba", amount_cop: 500_000, donor_name: "", publish_name: false, at: at(13, 7, 50) },
+  { caseName: "Yeison Córdoba y su hermana", amount_cop: 350_000, donor_name: "Un vecino de Istmina", publish_name: true, at: at(16, 18, 22) },
+  { caseName: "Familia Klinger Valencia", amount_cop: 800_000, donor_name: "Wilmer Caicedo", publish_name: true, at: at(15, 12, 0) },
+];
+
+const demoDonationRows = donationSeeds.map((seed, index) => {
+  const caseRecord = caseByName(seed.caseName);
+  return {
+    id: demoId(DONATION, index),
+    case_id: caseRecord.id,
+    city_id: caseRecord.city_id,
+    amount_cop: seed.amount_cop,
+    donor_name: seed.donor_name,
+    publish_name: seed.publish_name,
+    donated_at: seed.at,
+  };
+});
+
+const demoDonatedByCase: Record<string, number> = {};
+for (const row of demoDonationRows) {
+  demoDonatedByCase[row.case_id] = (demoDonatedByCase[row.case_id] ?? 0) + row.amount_cop;
+}
+
+function itemsOf(caseId: string): BudgetItem[] {
+  return demoBudgetItems.filter((item) => item.case_id === caseId);
+}
+
+export function demoBudgetOf(caseId: string) {
+  return budgetProgress(itemsOf(caseId), demoDonatedByCase[caseId] ?? 0);
+}
+
+type SupportSeed = {
+  kind: SupportOfferKind;
+  person_name: string;
+  contact: string;
+  email?: string;
+  city_name?: string;
+  message?: string;
+  availability?: string;
+  skills?: string;
+  duration?: string;
+  has_transport?: boolean;
+  profession?: string;
+  experience?: string;
+  modality?: SupportOffer["modality"];
+  credentials?: string;
+  resource?: string;
+  quantity?: string;
+  condition?: SupportOffer["condition"];
+  can_deliver?: boolean;
+  category?: string;
+};
+
+const supportSeeds: SupportSeed[] = [
+  {
+    kind: "voluntario",
+    person_name: "Camila Hurtado",
+    contact: "300 441 2290",
+    email: "camila.h@example.com",
+    city_name: "Medellín",
+    availability: "Fines de semana y una semana completa en septiembre",
+    skills: "Inventario, olla común, acompañamiento a familias en el albergue",
+    duration: "Puedo quedarme 10 días",
+    has_transport: true,
+    message: "He ido dos veces a Quibdó. Puedo llevar un cupo de carga.",
+  },
+  {
+    kind: "voluntario",
+    person_name: "Andrés Palacios",
+    contact: "312 880 1144",
+    city_name: "Quibdó",
+    availability: "Tardes, de lunes a viernes",
+    skills: "Reparto de mercados y censo en barrios",
+    duration: "Mientras dure el albergue",
+    has_transport: false,
+  },
+  {
+    kind: "profesion",
+    person_name: "Dra. Lucía Córdoba",
+    contact: "315 220 9088",
+    email: "lucia.cordoba@example.com",
+    city_name: "Cali",
+    profession: "Médica internista",
+    experience: "Ocho años en hospital público. Atención de hipertensión y diabetes.",
+    modality: "ambos",
+    credentials: "RM 384920",
+    availability: "Teleconsulta dos noches por semana; una visita en octubre",
+    message: "Puedo priorizar a adultas mayores con tratamiento interrumpido.",
+  },
+  {
+    kind: "profesion",
+    person_name: "Julián Rivas",
+    contact: "304 119 6671",
+    city_name: "Istmina",
+    profession: "Maestro de obra",
+    experience: "Apuntalamiento y techos de zinc. Trabajo con cuadrillas del pueblo.",
+    modality: "presencial",
+    availability: "Ya estoy en Istmina",
+  },
+  {
+    kind: "recurso",
+    person_name: "Cooperativa El Atrato",
+    contact: "318 555 0142",
+    city_name: "Medellín",
+    resource: "Tejas de zinc de 2,44 m",
+    quantity: "200 tejas",
+    condition: "nuevo",
+    can_deliver: false,
+    category: "techo",
+    message: "Están en la bodega de Guayabal. Hay que coordinar el camión.",
+  },
+  {
+    kind: "recurso",
+    person_name: "Marta Vélez",
+    contact: "301 772 4401",
+    city_name: "Pereira",
+    resource: "Mercados secos",
+    quantity: "40 mercados",
+    condition: "nuevo",
+    can_deliver: true,
+    category: "alimentos",
+    message: "Puedo subirlos yo el 28 si hay quién reciba en Quibdó.",
+  },
+];
+
+export const demoSupportOffers: SupportOffer[] = supportSeeds.map((seed, index) => ({
+  id: demoId(SUPPORT, index),
+  kind: seed.kind,
+  person_name: seed.person_name,
+  contact: seed.contact,
+  email: seed.email ?? "",
+  city_name: seed.city_name ?? "",
+  message: seed.message ?? "",
+  availability: seed.availability ?? "",
+  skills: seed.skills ?? "",
+  duration: seed.duration ?? "",
+  has_transport: seed.has_transport ?? false,
+  profession: seed.profession ?? "",
+  experience: seed.experience ?? "",
+  modality: seed.modality ?? "",
+  credentials: seed.credentials ?? "",
+  resource: seed.resource ?? "",
+  quantity: seed.quantity ?? "",
+  condition: seed.condition ?? "",
+  can_deliver: seed.can_deliver ?? false,
+  category: seed.category ?? "",
+  created_at: day(12 + index),
+}));
 
 // ---------------------------------------------------------------------------
 // Fotos
@@ -1157,28 +1432,29 @@ export function demoCityCards(): CityCardData[] {
     .filter((city) => city.published)
     .map((city) => {
       const needs = visibleNeeds(city.id, false);
+      const cases = visibleCases(city.id, false);
+      const items = demoBudgetItems.filter((item) =>
+        cases.some((row) => row.id === item.case_id),
+      );
+      const donated = cases.reduce((sum, row) => sum + (demoDonatedByCase[row.id] ?? 0), 0);
+      const budget = budgetProgress(items, donated);
       const covers = demoPhotos.filter((photo) => photo.city_id === city.id && photo.case_id === null);
-      const progress = cityProgress(needs);
       return {
         ...city,
         coverPath: coverOf(covers),
         coverFrame: savedFrame(
           [...covers].sort((a, b) => a.sort_order - b.sort_order)[0] ?? null,
         ),
-        openNeeds: countOpenNeeds(needs),
-        openCases: countOpenCases(needs),
-        caseCount: visibleCases(city.id, false).length,
+        openNeeds: budget.pendingItems,
+        openCases: countOpenBudgetCases(items),
+        caseCount: cases.length,
         needs: needs.map((need) => ({
           category: need.category,
           status: need.status,
           case_id: need.case_id,
         })),
-        progress: {
-          total: progress.total,
-          covered: progress.covered,
-          partial: progress.partial,
-          ratio: progress.ratio,
-        },
+        progress: asCaseProgress(budget),
+        budget,
         standingOffers: demoOffers.filter(
           (offer) =>
             offer.city_id === city.id &&
@@ -1213,6 +1489,7 @@ export function demoCityPage(slug: string, includeDrafts: boolean): CityPage | n
 /** Un caso con lo que necesitan sus tarjetas: portada, retrato, cuántas faltan y de qué. */
 function summarizeCase(row: Case): CaseSummary {
   const needs = demoNeeds.filter((need) => need.case_id === row.id);
+  const budget = demoBudgetOf(row.id);
   const allPhotos = photosOf(row.id);
   const photos = situationPhotos(
     allPhotos,
@@ -1227,12 +1504,10 @@ function summarizeCase(row: Case): CaseSummary {
     coverFrame: savedFrame(
       [...photos].sort((a, b) => a.sort_order - b.sort_order)[0] ?? null,
     ),
-    // La misma regla que en la capa de datos de verdad: el retrato se busca entre
-    // las fotos de este caso y no por identificador contra todas, así que ningún
-    // puntero descolocado puede acabar enseñando la cara de otra familia.
     portraitPath: portrait ? portrait.thumb_path || portrait.storage_path : null,
     portraitFrame: savedFrame(portrait ?? null),
-    openNeeds: countOpenNeeds(needs),
+    openNeeds: budget.pendingItems,
+    budget,
     categories: categoriesOf(needs),
   };
 }
@@ -1272,6 +1547,8 @@ export function demoCasePage(
     caseRecord,
     photos: demoPhotos.filter((row) => row.case_id === caseRecord.id),
     needs: demoNeeds.filter((row) => row.case_id === caseRecord.id),
+    budgetItems: itemsOf(caseRecord.id),
+    budget: demoBudgetOf(caseRecord.id),
     updates,
     generalChannel: demoGeneralChannel(),
     // La misma función que la capa de datos de verdad, y por eso se importa en vez
@@ -1333,18 +1610,18 @@ const publishedCities = () => demoCities.filter((city) => city.published);
 
 export function demoPortalTotals(): PortalTotals {
   const cities = publishedCities();
-  // Municipio a municipio y con el filtro del público, que es como se arma la
-  // suma en modo real (`getPortalTotals` suma lo que sirve `getCityCards`): si
-  // aquí se cogieran todas las necesidades de la ciudad, el inicio contaría lo
-  // de un caso que no sale en ninguna pantalla.
-  const needs = cities.flatMap((city) => visibleNeeds(city.id, false));
+  const cases = cities.flatMap((city) => visibleCases(city.id, false));
+  const items = demoBudgetItems.filter((item) => cases.some((row) => row.id === item.case_id));
+  const donated = cases.reduce((sum, row) => sum + (demoDonatedByCase[row.id] ?? 0), 0);
+  const budget = budgetProgress(items, donated);
 
   return {
     cities: cities.length,
-    cases: cities.reduce((sum, city) => sum + visibleCases(city.id, false).length, 0),
-    needs: needs.length,
-    coveredNeeds: countCoveredNeeds(needs),
-    openNeeds: countOpenNeeds(needs),
+    cases: cases.length,
+    needs: budget.itemCount,
+    coveredNeeds: budget.purchasedItems,
+    openNeeds: budget.pendingItems,
+    budget,
     updatedAt:
       cities.map((city) => city.updated_at).sort((a, b) => b.localeCompare(a))[0] ?? null,
   };
@@ -1539,6 +1816,50 @@ function publishableName(offer: Offer): string | null {
   if (!offer.publish_name) return null;
   if (/[0-9]{7}/.test(offer.offerer_name) || offer.offerer_name.includes("@")) return null;
   return offer.offerer_name;
+}
+
+export function demoDonationLog(filters: {
+  caseId?: string;
+  cityId?: string;
+  limit?: number;
+} = {}): DonationLogEntry[] {
+  // Reproduce lo que hace la vista `public.donation_log`: solo lo confirmado
+  // —aquí todas lo son—, solo de causas publicadas con consentimiento, solo de
+  // municipios publicados, y el nombre únicamente con autorización. El recorte
+  // del teléfono y del correo no hace falta: estas filas de muestra no los
+  // llevan, y en producción lo hace la vista.
+  const rows = demoDonationRows
+    .filter((row) => {
+      const caseRecord = demoCases.find((entry) => entry.id === row.case_id);
+      const city = demoCities.find((entry) => entry.id === row.city_id);
+      if (!caseRecord || !city) return false;
+      if (!caseRecord.published || !caseRecord.consent_to_publish || !city.published) {
+        return false;
+      }
+      if (filters.caseId && row.case_id !== filters.caseId) return false;
+      if (filters.cityId && row.city_id !== filters.cityId) return false;
+      return true;
+    })
+    .map((row) => {
+      const caseRecord = demoCases.find((entry) => entry.id === row.case_id)!;
+      const city = demoCities.find((entry) => entry.id === row.city_id)!;
+      const name = row.publish_name && row.donor_name.trim() ? row.donor_name : null;
+      return {
+        id: row.id,
+        amount_cop: row.amount_cop,
+        donated_at: row.donated_at,
+        donor_name: name,
+        publish_name: row.publish_name,
+        case_id: caseRecord.id,
+        case_name: caseRecord.display_name,
+        city_id: city.id,
+        city_name: city.name,
+        city_slug: city.slug,
+      };
+    })
+    .sort((a, b) => b.donated_at.localeCompare(a.donated_at) || b.id.localeCompare(a.id));
+
+  return rows.slice(0, filters.limit ?? rows.length);
 }
 
 export function demoAidRecords(): AidRecord[] {

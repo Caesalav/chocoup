@@ -1,5 +1,8 @@
+import type { BudgetItem, BudgetProgress } from "./budget";
 import type { DonationChannel } from "./donation-channel";
 import type { PhotoFrame } from "./photo-frame";
+
+export type { BudgetItem, BudgetProgress };
 
 export type NeedCategory =
   | "agua"
@@ -45,6 +48,33 @@ export type CaseKind = "persona" | "colegio" | "animal" | "fundacion";
  * `pendiente` y `aceptada`. Ver supabase/migrations/0012_registro_de_lo_ofrecido.sql.
  */
 export type OfferStatus = "pendiente" | "aceptada" | "rechazada" | "retirada";
+
+/** Las tres formas de ofrecer ayuda desde /ofrecer. */
+export type SupportOfferKind = "voluntario" | "profesion" | "recurso";
+
+export type SupportOffer = {
+  id: string;
+  kind: SupportOfferKind;
+  person_name: string;
+  contact: string;
+  email: string;
+  city_name: string;
+  message: string;
+  availability: string;
+  skills: string;
+  duration: string;
+  has_transport: boolean;
+  profession: string;
+  experience: string;
+  modality: "" | "presencial" | "remoto" | "ambos";
+  credentials: string;
+  resource: string;
+  quantity: string;
+  condition: "" | "nuevo" | "usado";
+  can_deliver: boolean;
+  category: string;
+  created_at: string;
+};
 
 /**
  * El estado de una oferta como lo lee cualquiera en el registro público.
@@ -351,6 +381,34 @@ export type OfferRecord = {
   need_title: string | null;
 };
 
+/**
+ * Una donación confirmada, como la ve cualquiera desde el inicio, un municipio
+ * o la ficha de una causa.
+ *
+ * Es lo que devuelve la vista `public.donation_log` (0021), y de ahí viene todo
+ * lo que no está aquí: ni la referencia del pago, ni el proveedor, ni una
+ * donación pendiente. Esas columnas no existen en la vista, así que este tipo
+ * no puede tenerlas ni por descuido.
+ *
+ * El nombre llega nulo cuando la donación es anónima —porque no se autorizó, o
+ * porque el campo no era un nombre— y la plantilla lo dice. No se deduce: si
+ * llegara la cadena vacía fingiendo un nombre, también se leería como anónima.
+ */
+export type DonationLogEntry = {
+  id: string;
+  amount_cop: number;
+  /** Cuándo se confirmó el pago, con hora. */
+  donated_at: string;
+  /** Nulo si la donación es anónima. */
+  donor_name: string | null;
+  publish_name: boolean;
+  case_id: string;
+  case_name: string;
+  city_id: string;
+  city_name: string;
+  city_slug: string;
+};
+
 /** Oferta con el contexto al que apunta, para la bandeja del equipo. */
 export type OfferWithContext = Offer & {
   cities: Pick<City, "name" | "slug"> | null;
@@ -376,6 +434,7 @@ export type NeedFacet = {
 export type CityCardData = City & {
   coverPath: string | null;
   coverFrame: PhotoFrame | null;
+  /** Ítems del presupuesto todavía sin comprar. */
   openNeeds: number;
   /**
    * Casos con algo sin cubrir, que no es lo mismo que `caseCount`. El mapa
@@ -386,8 +445,8 @@ export type CityCardData = City & {
   caseCount: number;
   needs: NeedFacet[];
   /**
-   * El avance del pueblo, sobre el montón de sus necesidades. De aquí sale el
-   * color del mapa y la barra de la tarjeta. Ver `cityProgress`.
+   * El avance del pueblo, sobre el presupuesto de sus causas. `total` es la
+   * meta en pesos. De aquí sale el color del mapa y la barra de la tarjeta.
    */
   progress: {
     total: number;
@@ -395,6 +454,7 @@ export type CityCardData = City & {
     partial: number;
     ratio: number;
   };
+  budget: BudgetProgress;
   /**
    * Aportes en pie que todavía no han llegado. Es movimiento, no cobertura:
    * no pinta el mapa. Ver lib/city-activity.ts.
@@ -415,6 +475,7 @@ export type CaseSummary = Case & {
   /** Encuadre del retrato, o nulo si esa foto sigue con el recorte por omisión. */
   portraitFrame: PhotoFrame | null;
   openNeeds: number;
+  budget: BudgetProgress;
   /** Categorías con algo abierto. Son las etiquetas de la tarjeta del caso:
    *  dicen de un vistazo si lo que falta es agua, techo o medicinas. */
   categories: NeedCategory[];
@@ -452,10 +513,11 @@ export type NeedCard = Need & {
 export type PortalTotals = {
   cities: number;
   cases: number;
-  /** Necesidades registradas: el total, cubiertas incluidas. */
+  /** Ítems de presupuesto registrados: el total, comprados incluidos. */
   needs: number;
   coveredNeeds: number;
   openNeeds: number;
+  budget: BudgetProgress;
   updatedAt: string | null;
 };
 
@@ -499,6 +561,8 @@ export type CasePage = {
   caseRecord: Case;
   photos: Photo[];
   needs: Need[];
+  budgetItems: BudgetItem[];
+  budget: BudgetProgress;
   updates: CaseUpdate[];
   /**
    * El canal general del portal, que es lo que recibe este caso si no trae uno

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CaseRow } from "@/components/cards/CaseRow";
 import { CityRailCard } from "@/components/cards/CityRailCard";
+import { DonationLog } from "@/components/donations/DonationLog";
 import { HomeBoard } from "@/components/home/HomeBoard";
 import { ProgressCard } from "@/components/home/ProgressCard";
 import { SectionLinks } from "@/components/home/SectionLinks";
@@ -8,7 +9,7 @@ import { Logo } from "@/components/Logo";
 import { screenTitle, shell } from "@/components/ui/styles";
 import { byCampaignPriority, resolveCampaign } from "@/lib/campaign";
 import { SITE_NAME } from "@/lib/constants";
-import { getCampaignFocusRow, getCaseCards, getCityCards, getPortalTotals } from "@/lib/data";
+import { getCampaignFocusRow, getCaseCards, getCityCards, getDonationLog, getPortalTotals } from "@/lib/data";
 import { relativeDays } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +18,12 @@ export const dynamic = "force-dynamic";
 const CASES_ON_HOME = 4;
 
 export default async function HomePage() {
-  const [cities, cases, totals, focusRow] = await Promise.all([
+  const [cities, cases, totals, focusRow, donations] = await Promise.all([
     getCityCards(),
     getCaseCards(),
     getPortalTotals(),
     getCampaignFocusRow(),
+    getDonationLog({ limit: 8 }),
   ]);
   const campaign = resolveCampaign(focusRow, cities, cases);
   const ranked = byCampaignPriority(cities, campaign?.city.id ?? null);
@@ -51,11 +53,8 @@ export default async function HomePage() {
           del registro. En el móvil se queda: es lo primero que hay que saber al
           abrir esto, y allí sí tiene la marca al lado. */}
       <header className="enters flex items-center justify-between gap-4 lg:justify-end">
-        <h1 className="flex items-center gap-2 text-[22px] leading-none lg:sr-only">
-          <Logo className="h-[1.05em] w-auto shrink-0 text-ink" />
-          <span className="font-display text-ink">
-            Chocó<span className="text-accent">-up</span>
-          </span>
+        <h1 className="text-[24px] leading-none lg:sr-only">
+          <Logo className="text-ink" />
           <span className="sr-only">
             , documentación de la situación en el Chocó tras el terremoto
           </span>
@@ -158,6 +157,17 @@ export default async function HomePage() {
           este portal.
         </p>
       </div>
+
+      <section className="enters enters-3 mt-10 lg:mt-14">
+        <h2 className={screenTitle}>Donaciones recientes</h2>
+        <p className="mt-2 max-w-[68ch] text-[13px] leading-relaxed text-muted lg:text-[15px]">
+          Quién donó, a qué causa y cuánto. Si quien donó no autorizó su nombre, la fila dice que
+          es anónima.
+        </p>
+        <div className="mt-4 max-w-[68ch]">
+          <DonationLog initial={donations} scope="portal" limit={8} />
+        </div>
+      </section>
     </div>
   );
 }

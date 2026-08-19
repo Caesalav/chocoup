@@ -1,4 +1,4 @@
-export const SITE_NAME = "Chocó-up";
+export const SITE_NAME = "ChocóUp";
 export const SITE_TAGLINE = "Documentación del viaje a Chocó";
 
 export const PHOTO_BUCKET = "fotos";

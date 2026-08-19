@@ -46,7 +46,7 @@ export function Photo({
       <div
         className={`flex flex-col items-center justify-center gap-2 bg-land px-4 ${className}`}
       >
-        <Logo className="h-5 w-auto text-contour" />
+        <Logo className="text-[17px] text-contour" />
         {emptyLabel && (
           <p className="text-center text-[11px] leading-snug text-muted">{emptyLabel}</p>
         )}

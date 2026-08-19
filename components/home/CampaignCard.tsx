@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CaseProgressBar } from "@/components/case/CaseProgressBar";
 import { card } from "@/components/ui/styles";
 import { campaignHref, type ResolvedCampaign } from "@/lib/campaign";
-import { progressPercent } from "@/lib/case-progress";
+import { moneyProgress } from "@/lib/money-progress";
 
 /**
  * El recado largo: a dónde ir ahora, y por qué.
@@ -13,7 +13,9 @@ import { progressPercent } from "@/lib/case-progress";
 export function CampaignCard({ campaign }: { campaign: ResolvedCampaign }) {
   const { city, source, caseName, note } = campaign;
   const href = campaignHref(campaign);
-  const percent = progressPercent(city.progress.ratio);
+  // La misma cuenta que el anillo de la barra que va debajo. Con
+  // `city.progress.ratio` esta frase decía un porcentaje y la barra otro.
+  const progress = moneyProgress(city.budget);
 
   return (
     <article className={`${card} p-5`}>
@@ -30,17 +32,21 @@ export function CampaignCard({ campaign }: { campaign: ResolvedCampaign }) {
       </h2>
       <p className="mt-2.5 text-[14px] leading-relaxed text-muted">
         {note ||
-          (city.progress.total > 0
-            ? `Va al ${percent} %. ${
+          (city.budget.goal === 0
+            ? "Todavía no hay presupuesto anotado; el equipo ya documentó el municipio."
+            : `${
+                progress.percent === null
+                  ? "Todavía no se ha comprado nada."
+                  : `Va al ${progress.percent} % de lo entregado.`
+              } ${
                 source === "editorial"
                   ? "Coordinación pidió concentrar la ayuda aquí."
                   : "Es el pueblo documentado donde más queda por cubrir."
-              }`
-            : "Todavía no hay necesidades anotadas; el equipo ya documentó el municipio.")}
+              }`)}
       </p>
-      {city.progress.total > 0 && (
+      {city.budget.goal > 0 && (
         <div className="mt-4">
-          <CaseProgressBar needs={city.needs} compact />
+          <CaseProgressBar budget={city.budget} compact />
         </div>
       )}
       <div className="mt-5 flex flex-wrap items-center gap-3">

@@ -285,6 +285,10 @@
      necesidad. Es superficie, como `brote`: 1,41:1 contra el papel, y con tinta
      `ink` encima 11,67:1. Registro abierto solamente. */
   --color-lavanda: #dcc8fe;
+  /* El oscuro de esa misma familia: el bloque de /ofrecer, con las cintas de
+     lavanda encima, como `selva` lo es de las cintas de `liana`. Misma hue,
+     más peso. Tinta clara encima. */
+  --color-ciruela: #2a1844;
 
   /* Sombras con el matiz del papel dentro, no negras. Sobre un papel que tira a
      verde una sombra neutra se lee como suciedad gris; con el mismo tono dentro
@@ -374,6 +378,17 @@
   background-size: cover;
 }
 
+/* Las mismas cuatro ondas, en la familia de la lavanda: ciruela de fondo y
+   tres morados de cinta. Es el bloque de /ofrecer, para que no copie el
+   verde de «El Chocó ahora». Las opacidades se quedan cerca del 35 % de
+   `.cintas` para que el título en blanco siga leyéndose encima. */
+.cintas-lavanda {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 260'%3E%3Cg fill='none' stroke-width='38' stroke-linecap='round'%3E%3Cpath stroke='%235c3d8f' stroke-opacity='.5' d='M-60 28 C 66 -20 156 66 256 26 S 400 -22 540 22'/%3E%3Cpath stroke='%239b7ad4' stroke-opacity='.42' d='M-60 96 C 72 52 150 140 262 98 S 404 46 540 92'/%3E%3Cpath stroke='%23dcc8fe' stroke-opacity='.38' d='M-60 166 C 66 122 158 210 256 168 S 398 116 540 162'/%3E%3Cpath stroke='%237a58b5' stroke-opacity='.45' d='M-60 236 C 74 192 148 280 268 238 S 410 186 540 232'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
 .has-strip {
   --strip-h: 76px;
 }
@@ -407,12 +422,22 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* Titulares: grotesk construida, como el logo. Semibold y tracking
-   cerrado para que «Chocó-up» y los municipios pesen como marca. */
+/* Titulares: grotesk construida. Semibold y tracking cerrado para que
+   los municipios pesen como nombres, no como rótulos. */
 .font-display {
   font-optical-sizing: auto;
   font-weight: 600;
   letter-spacing: -0.04em;
+}
+
+/* La marca: el letrero CHOCÓ-UP. Extra negra, versales, tracking cerrado.
+   Es la misma Outfit del cuerpo, empujada al peso del original: una serif
+   aparte era otra voz, y este letrero pide la geométrica. */
+.font-brand {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
 }
 
 /* La voz del panel del equipo: la misma familia en versalitas, más aire. Es lo
@@ -653,22 +678,231 @@ body {
 
 /* ---------------------------------------------------------------------------
  * Mapa
+ *
+ * El mosaico va en capas por oficio —color, canal de papel, elegido, frente y
+ * rótulos— y el motivo está escrito entero en components/map/ChocoMap.tsx: en
+ * SVG no hay z-index, así que el orden del documento ES el orden de pintado, y
+ * mientras cada municipio fue una pieza con su relleno y su filete, resaltar
+ * uno solo servía para que los treinta siguientes le pintaran encima.
+ *
+ * De ahí salen los dos únicos sitios donde se dibuja un estado:
+ *
+ *   .map-shape   la capa de frente. Invisible en reposo y lo único que recibe
+ *                el cursor. Bajo el puntero se enciende ENCIMA de todo el
+ *                mosaico, y como aquí nunca hay dos encendidos a la vez, nadie
+ *                puede taparlo.
+ *   .map-chosen  el municipio del recado, en su propia capa bajo la de frente.
+ *
+ * Y de ahí sale también que los dos estados no se parezcan. El cursor es LUZ:
+ * la pieza se levanta del papel, con su filete y su sombra, y se va cuando
+ * apartas la mano. El elegido es TINTA: una línea que lo rodea y se queda.
+ * Antes los dos eran "lo mismo pero más", y el cursor pesaba más que la
+ * selección, que es al revés de lo que dicen.
+ *
+ * La leyenda y el mosaico se hablan por CSS (`.map-board:has(...)`): pasar
+ * por «Prioritario» apaga lo que no lo es. Sin JavaScript, y por eso sirve
+ * con la señal del Chocó.
  * ------------------------------------------------------------------------- */
 
-/* Municipio documentado: lo que recibe el clic es la forma entera, que se
-   acierta mucho mejor que un punto. Al pasar por encima se oscurece su relleno
-   en vez de dibujarle un contorno porque los 30 municipios se pintan en cadena
-   y el trazo de separación de los siguientes taparía el del que está debajo. */
-.map-region {
+/* El color entra escalonado, un municipio cada 14 ms. Es la única animación del
+   mosaico y va en la capa de abajo: las de arriba son estados, y un estado que
+   aparece con retardo se siente roto. */
+.map-fill {
+  animation: map-settle 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 14ms);
+  transition: opacity 0.2s ease;
+}
+
+/* El canal de separación, para los treinta de una vez y por encima de todos los
+   colores. Va centrado en cada linde, así que entre dos vecinos se ve el doble
+   de su mitad y siempre lo mismo, venga quien venga escrito antes.
+   Los grosores están en PÍXELES, no en unidades del dibujo: ver `NON_SCALING`
+   en components/map/ChocoMap.tsx. */
+.map-channel {
+  fill: none;
+  stroke: var(--color-paper);
+  stroke-width: 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.map-body,
+.map-channel,
+.map-chosen {
+  pointer-events: none;
+}
+
+/* --- El municipio bajo el cursor, o con el foco ---------------------------- */
+
+.map-piece {
+  cursor: default;
+}
+.map-link {
   cursor: pointer;
-  outline: none;
 }
-.map-region path {
-  transition: filter 0.18s ease;
+
+.map-shape {
+  opacity: 0;
+  /* `fill` responde al interior y NUNCA al trazo: así el filete de papel que se
+     dibuja al pasar no agranda la zona sensible tres unidades hacia el vecino,
+     que es lo que hace que un municipio se quede pegado al cursor. */
+  pointer-events: fill;
+  paint-order: stroke fill;
+  stroke: var(--color-paper);
+  stroke-width: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 0.18s ease,
+    stroke-width 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.map-region:hover path,
-.map-region:focus-visible path {
-  filter: brightness(0.93) saturate(1.06);
+
+/* Levantar la pieza es su color entero, un filete de papel que ensancha el canal
+   a su alrededor y una sombra que cae sobre los vecinos. No se oscurece ni se
+   satura: un filtro sobre estos cinco colores no hace lo mismo en los cinco
+   —el gris de "sin documentar" se va a blanco y el rojo apenas se mueve— y el
+   mapa necesita que el gesto se lea igual en cualquier municipio. */
+@media (hover: hover) {
+  .map-link:hover .map-shape {
+    opacity: 1;
+    stroke-width: 6;
+    transform: scale(1.02);
+    filter: drop-shadow(0 3px 8px oklch(0.28 0.03 160 / 0.34));
+  }
+  .map-link:active .map-shape {
+    transform: scale(0.995);
+  }
+
+  /* Un municipio sin documentar no lleva a ninguna parte, así que no se levanta:
+     se dibuja su contorno y nada más. Dice "esta forma es Lloró" —que es lo que
+     el <title> está contando a la vez— sin prometer un enlace que no existe, y
+     sin tocarle el relleno, porque el relleno es el dato. El trazo es el gris del
+     contorno y la mitad de grueso que la tinta del elegido: son dos cosas y se
+     tienen que leer como dos. */
+  .map-piece:not(.map-link):hover .map-shape {
+    opacity: 1;
+    fill: none;
+    stroke: var(--color-contour);
+    stroke-width: 1.5;
+  }
+}
+
+/* El foco del teclado va FUERA del bloque de hover, y es de las dos cosas que
+   más se han arreglado aquí: estaba dentro, y con él un `outline: none`, así que
+   quien recorre el mapa con el tabulador no veía absolutamente nada —ni en un
+   teléfono, donde no hay hover que valga, ni con prefers-reduced-motion, que
+   además le quitaba el único rastro que quedaba—. El aro es de la marca y va
+   sobre la caja: no se confunde con el filete de papel del cursor ni con la
+   línea de tinta del elegido. */
+.map-link:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.map-link:focus-visible .map-shape {
+  opacity: 1;
+  stroke-width: 6;
+}
+
+/* --- El municipio elegido -------------------------------------------------- */
+
+.map-chosen-pulse,
+.map-chosen-pad,
+.map-chosen-line {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.map-chosen-pad {
+  stroke: var(--color-paper);
+  stroke-width: 10;
+}
+.map-chosen-line {
+  stroke: var(--color-ink);
+  stroke-width: 4;
+}
+/* La cuarta pasada: el color del municipio otra vez, sin trazo, tapando la mitad
+   interior de la línea. Lo que queda a la vista son 2,5 unidades de tinta por
+   fuera de la forma y el dato intacto por dentro. */
+.map-chosen-face {
+  stroke: none;
+}
+.map-chosen-pulse {
+  stroke: var(--color-ink);
+  stroke-width: 4;
+  opacity: 0;
+  animation: map-pulse 2.1s cubic-bezier(0.22, 1, 0.36, 1) 3 both;
+}
+
+@keyframes map-settle {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* El aro llama y se va; lo que dice "este es" cuando termina es la línea de
+   tinta de debajo, que no se mueve. Por eso acaba en cero y no en un residuo:
+   un halo a medio gas al lado de un contorno de tinta son dos señales para un
+   solo estado. */
+@keyframes map-pulse {
+  0% {
+    opacity: 0.32;
+    stroke-width: 4;
+  }
+  60% {
+    opacity: 0.1;
+    stroke-width: 14;
+  }
+  100% {
+    opacity: 0;
+    stroke-width: 18;
+  }
+}
+
+/* --- La leyenda apaga lo que no es de su color ----------------------------- */
+
+.map-board:has(.legend-step[data-tier="blank"]:is(:hover, :focus-visible))
+  .map-fill:not([data-tier="blank"]),
+.map-board:has(.legend-step[data-tier="none"]:is(:hover, :focus-visible))
+  .map-fill:not([data-tier="none"]),
+.map-board:has(.legend-step[data-tier="low"]:is(:hover, :focus-visible))
+  .map-fill:not([data-tier="low"]),
+.map-board:has(.legend-step[data-tier="mid"]:is(:hover, :focus-visible))
+  .map-fill:not([data-tier="mid"]),
+.map-board:has(.legend-step[data-tier="high"]:is(:hover, :focus-visible))
+  .map-fill:not([data-tier="high"]) {
+  opacity: 0.22;
+}
+
+.map-board:has(.legend-step[data-tier="blank"]:is(:hover, :focus-visible))
+  :is(.map-pin, .map-leader):not([data-tier="blank"]),
+.map-board:has(.legend-step[data-tier="none"]:is(:hover, :focus-visible))
+  :is(.map-pin, .map-leader):not([data-tier="none"]),
+.map-board:has(.legend-step[data-tier="low"]:is(:hover, :focus-visible))
+  :is(.map-pin, .map-leader):not([data-tier="low"]),
+.map-board:has(.legend-step[data-tier="mid"]:is(:hover, :focus-visible))
+  :is(.map-pin, .map-leader):not([data-tier="mid"]),
+.map-board:has(.legend-step[data-tier="high"]:is(:hover, :focus-visible))
+  :is(.map-pin, .map-leader):not([data-tier="high"]) {
+  opacity: 0.2;
+}
+
+/* La guía que une un punto con su nombre cuando el nombre se ha tenido que
+   apartar. Un pelo de tinta aguada, y en píxeles como el resto de las líneas del
+   mapa: es una aclaración, no un trazo del dibujo. */
+.map-leader {
+  stroke: var(--color-line-strong);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  transition: opacity 0.2s ease;
+}
+.map-pin {
+  transition: opacity 0.2s ease;
 }
 
 /* ---------------------------------------------------------------------------
@@ -751,11 +985,21 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .enters,
   .draws-check,
-  .pulse-ring::after {
+  .pulse-ring::after,
+  .map-fill,
+  .map-chosen-pulse {
     animation: none;
   }
   .draws-check {
     stroke-dasharray: none;
+  }
+  /* Se quita el movimiento y NADA MÁS. El filete de papel, la sombra y el aro
+     del foco no son movimiento: son cómo se sabe qué municipio está bajo el
+     cursor y cuál tiene el foco. Antes este bloque los borraba todos con un
+     `filter: none`, y el mapa se quedaba sin un solo estado visible para quien
+     pide menos animación. */
+  .map-shape {
+    transform: none !important;
   }
   *,
   *::before,

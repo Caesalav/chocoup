@@ -1,8 +1,12 @@
+import "server-only";
+
 import { createSupabaseServerClient } from "./supabase/server";
 import { isDemoMode } from "./supabase/env";
-import { caseProgress, type CaseProgress } from "./case-progress";
+import { asCaseProgress, budgetProgress, type BudgetItem } from "./budget";
 import {
   demoAdminCities,
+  demoBudgetItems,
+  demoBudgetOf,
   demoCaseUpdates,
   demoCases,
   demoCities,
@@ -13,8 +17,10 @@ import {
   demoNewsletterSignups,
   demoOffersFor,
   demoPhotos,
+  demoSupportOffers,
   demoTeamDirectory,
 } from "./demo-data";
+import type { AdminCaseResource, AdminCaseRow } from "./admin-case";
 import { getGeneralChannel } from "./data";
 import { donationChannel, moneyDestinationsOf, type MoneyDestination } from "./donation-channel";
 import { countOpenNeeds, isOpenNeed, OPEN_STATUSES } from "./needs";
@@ -31,10 +37,14 @@ import type {
   NeedStatus,
   NewsletterSignup,
   OfferStatus,
+  SupportOffer,
+  SupportOfferKind,
   OfferWithContext,
   Photo,
   TeamMemberEntry,
 } from "./types";
+
+export type { AdminCaseResource, AdminCaseRow };
 
 /**
  * Consultas del panel. Las RLS dan al equipo lectura completa del material, así
@@ -80,77 +90,6 @@ export async function getAdminCities(): Promise<AdminCityRow[]> {
 }
 
 /**
- * Un recurso que todavía falta en una causa, para enseñarlo en la lista.
- *
- * Es el presupuesto de esta pantalla: no hay recaudo en pesos que se pueda
- * leer —la pasarela no está, y un cero fingido diría que nadie ha ayudado—
- * así que el plan son estas líneas (tejas, mercados, tanques) y lo recopilado
- * es cuántas ya están cubiertas. Ver `caseProgress`.
- */
-export type AdminCaseResource = {
-  title: string;
-  quantity: string;
-  category: NeedCategory;
-  status: NeedStatus;
-  urgent: boolean;
-};
-
-/**
- * Una causa en la lista de /admin/casos, reducida a lo que hace falta para
- * elegirla de un vistazo.
- *
- * El tipo vive aquí y no en lib/types.ts porque no lo consume nadie más: es la
- * forma de una pantalla del panel, como `AdminCityRow`, y aquélla está allí solo
- * porque nació antes de que hubiera un archivo de consultas del panel.
- *
- * Lo que lleva y lo que no está decidido por una sola pregunta: ¿esto ayuda a
- * saber en qué causa hay que entrar? El municipio y el tipo la identifican; el
- * retrato la reconoce; sin publicar y sin consentimiento dicen qué le falta
- * para salir; el avance dice cuánto del plan está cubierto; los recursos
- * abiertos dicen qué falta todavía, con nombre y cantidad; y el último avance
- * es el dato por el que existe esta pantalla —quien vuelve el jueves a
- * escribir busca la que lleva más tiempo sin ninguno—.
- *
- * No lleva el destino del dinero escrito ni su fecha de comprobación. Eso se
- * repasa entero en `MONEY_REVIEW_PATH`, que es de coordinación, y esta lista la
- * ve también quien documenta: una columna de llaves aquí sería publicar catorce
- * destinos en una pantalla que no existe para eso.
- */
-export type AdminCaseRow = {
-  id: string;
-  displayName: string;
-  kind: CaseKind;
-  household: string;
-  summary: string;
-  createdAt: string;
-  cityId: string;
-  cityName: string;
-  citySlug: string;
-  cityPublished: boolean;
-  published: boolean;
-  consent: boolean;
-  /** Con canal propio, o recibiendo por el general. Ver `caseDonation()`. */
-  ownChannel: boolean;
-  openNeeds: number;
-  /** Cuánto del plan de recursos está cubierto. Sin necesidades, total 0. */
-  progress: CaseProgress;
-  /** Lo que todavía falta, urgentes primero. Lo cubierto no se lista aquí. */
-  resources: AdminCaseResource[];
-  portraitPath: string | null;
-  portraitFrame: PhotoFrame | null;
-  /**
-   * El día del último avance del diario, o nulo si todavía no hay ninguno.
-   *
-   * Es `max(case_updates.happened_on)` y no `cases.updated_at`, por lo mismo que
-   * en `CasePage.lastUpdateOn`: esa columna se mueve al corregir una tilde, así
-   * que la lista diría que hay noticias de una familia el día en que alguien
-   * arregló una errata. Nulo es frecuente y es una respuesta —esta causa está
-   * documentada y todavía no ha pasado nada— y no un hueco.
-   */
-  lastUpdateOn: string | null;
-};
-
-/**
  * Las causas de todos los municipios, en una lista.
  *
  * Hasta aquí a una causa solo se llegaba entrando por su municipio, que es el
@@ -178,40 +117,52 @@ export async function getAdminCases(): Promise<AdminCaseRow[]> {
         row,
         city,
         demoNeeds.filter((need) => need.case_id === row.id),
+        demoBudgetItems.filter((item) => item.case_id === row.id),
         demoCaseUpdates.filter((update) => update.case_id === row.id),
         demoPhotos.filter((photo) => photo.case_id === row.id),
+        demoBudgetOf(row.id).donated,
       );
     });
   }
 
   const supabase = await createSupabaseServerClient();
 
-  // Retrato, recursos y avances van en la misma consulta: son lo que la tarjeta
-  // enseña, y pedirlos por separado en una lista de cuarenta causas es cómo
-  // esta pantalla dejaría de abrirse con la señal del Chocó. De los avances se
-  // pide solo el día. De las fotos, lo que hace falta para el retrato —la
-  // grande no cabe aquí—.
   const { data } = await supabase
     .from("cases")
     .select(
-      "*, cities(name, slug, published), needs(id, status, title, quantity, category, urgent), case_updates(happened_on), photos!photos_case_id_fkey(id, storage_path, thumb_path, focus_x, focus_y, zoom)",
+      "*, cities(name, slug, published), needs(id, status, title, quantity, category, urgent), budget_items(id, case_id, city_id, title, amount_cop, purchased, purchased_on, sort_order, created_at), case_updates(happened_on), photos!photos_case_id_fkey(id, storage_path, thumb_path, focus_x, focus_y, zoom)",
     )
     .order("created_at", { ascending: false });
 
+  const { data: raised } = await supabase.from("case_budget").select("case_id, donated_cop");
+  const donatedByCase = new Map(
+    ((raised ?? []) as { case_id: string; donated_cop: number }[]).map((row) => [
+      row.case_id,
+      Number(row.donated_cop),
+    ]),
+  );
+
   type Row = Case & {
     cities: Pick<City, "name" | "slug" | "published"> | null;
-    needs: Pick<Need, "id" | "status" | "title" | "quantity" | "category" | "urgent">[];
+    needs: NeedSlice[];
+    budget_items: BudgetItem[];
     case_updates: { happened_on: string }[];
-    photos: Pick<Photo, "id" | "storage_path" | "thumb_path" | "focus_x" | "focus_y" | "zoom">[];
+    photos: PhotoSlice[];
   };
 
   return ((data ?? []) as Row[])
-    // Una causa sin municipio no existe —`cases.city_id` es obligatorio— pero el
-    // embebido puede llegar nulo si la política del municipio no lo deja leer, y
-    // entonces la fila no se puede situar en ninguna parte. Se cae de la lista en
-    // vez de inventarle un «Sin municipio» que no llevaría a ningún sitio.
     .filter((row) => row.cities)
-    .map((row) => toAdminCase(row, row.cities!, row.needs, row.case_updates, row.photos ?? []));
+    .map((row) =>
+      toAdminCase(
+        row,
+        row.cities!,
+        row.needs,
+        row.budget_items ?? [],
+        row.case_updates,
+        row.photos ?? [],
+        donatedByCase.get(row.id) ?? 0,
+      ),
+    );
 }
 
 type NeedSlice = Pick<Need, "id" | "status" | "title" | "quantity" | "category" | "urgent">;
@@ -221,12 +172,15 @@ function toAdminCase(
   row: Case,
   city: Pick<City, "name" | "slug" | "published">,
   needs: NeedSlice[],
+  items: Pick<BudgetItem, "title" | "amount_cop" | "purchased">[],
   updates: { happened_on: string }[],
   photos: PhotoSlice[],
+  donated = 0,
 ): AdminCaseRow {
   const portrait = row.portrait_photo_id
     ? photos.find((photo) => photo.id === row.portrait_photo_id)
     : undefined;
+  const budget = budgetProgress(items, donated);
 
   return {
     id: row.id,
@@ -242,17 +196,16 @@ function toAdminCase(
     published: row.published,
     consent: row.consent_to_publish,
     ownChannel: donationChannel(row) !== null,
-    openNeeds: countOpenNeeds(needs),
-    progress: caseProgress(needs),
-    resources: needs
-      .filter(isOpenNeed)
-      .sort((a, b) => Number(b.urgent) - Number(a.urgent))
-      .map((need) => ({
-        title: need.title,
-        quantity: need.quantity,
-        category: need.category,
-        status: need.status,
-        urgent: need.urgent,
+    openNeeds: budget.pendingItems,
+    progress: asCaseProgress(budget),
+    resources: items
+      .filter((item) => !item.purchased)
+      .map((item) => ({
+        title: item.title,
+        quantity: String(item.amount_cop),
+        category: "otro",
+        status: "abierta",
+        urgent: false,
       })),
     portraitPath: portrait ? portrait.thumb_path || portrait.storage_path : null,
     portraitFrame: portrait ? savedFrame(portrait) : null,
@@ -455,6 +408,18 @@ export async function getTeamDirectory(): Promise<TeamMemberEntry[]> {
  * Lo lee todo el equipo. Borrarlo es de coordinación, igual que las ofertas
  * que no apuntan a ningún municipio: no hay un pueblo asignado al que recortar.
  */
+export async function getSupportOffers(kind?: SupportOfferKind): Promise<SupportOffer[]> {
+  if (isDemoMode()) {
+    return demoSupportOffers.filter((row) => (kind ? row.kind === kind : true));
+  }
+
+  const supabase = await createSupabaseServerClient();
+  let query = supabase.from("support_offers").select("*").order("created_at", { ascending: false });
+  if (kind) query = query.eq("kind", kind);
+  const { data } = await query;
+  return (data ?? []) as SupportOffer[];
+}
+
 export async function getFeedback(): Promise<FeedbackNote[]> {
   if (isDemoMode()) return demoFeedback();
   const supabase = await createSupabaseServerClient();

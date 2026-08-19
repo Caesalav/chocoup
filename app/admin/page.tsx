@@ -6,7 +6,7 @@ import {
   getAdminCities,
   getFeedback,
   getMoneyDestinations,
-  getOffers,
+  getSupportOffers,
 } from "@/lib/admin-data";
 import { ADMIN_SECTIONS, ADMIN_UTILITIES, MONEY_REVIEW_PATH } from "@/lib/admin-sections";
 import { teamRoleLabel } from "@/lib/constants";
@@ -35,15 +35,11 @@ export const dynamic = "force-dynamic";
  * crear y situar, y los casos se abren en su sección.
  */
 export default async function AdminHomePage() {
-  const [team, cities, cases, pendingOffers, inbox, focus] = await Promise.all([
+  const [team, cities, cases, supportOffers, inbox, focus] = await Promise.all([
     currentTeam(),
     getAdminCities(),
     getAdminCases(),
-    // La bandeja entera y no la suma de los contadores de cada municipio, que es
-    // como se contaba antes y dejaba fuera las ofertas sin municipio —«un camión
-    // disponible», sin destino todavía—. Ese número tiene que ser el mismo que el
-    // de la barra, y la barra cuenta filas.
-    getOffers("pendiente"),
+    getSupportOffers(),
     getFeedback(),
     getCampaignFocusRow(),
   ]);
@@ -77,7 +73,6 @@ export default async function AdminHomePage() {
    * a `ADMIN_SECTIONS` no obligue a acordarse de esta lista: sin su entrada, la
    * tarjeta sale sin números en vez de salir descolocada.
    */
-  const unreadOnWall = pendingOffers.filter((offer) => offer.on_wall !== false).length;
   const waiting: Record<
     string,
     { count: number; one: string; many: string; calm: string; note: string | null }
@@ -114,18 +109,11 @@ export default async function AdminHomePage() {
             : null,
     },
     recursos: {
-      count: pendingOffers.length,
-      one: "oferta sin revisar",
-      many: "ofertas sin revisar",
-      calm: "Nada esperando respuesta",
-      note:
-        unreadOnWall > 0
-          ? unreadOnWall === pendingOffers.length
-            ? "Ya están en el muro sin que nadie las haya leído"
-            : "Algunas ya están en el muro sin que nadie las haya leído"
-          : pendingOffers.length > 0
-            ? "Fuera del muro, pendientes de revisar"
-            : null,
+      count: supportOffers.length,
+      one: "oferta recibida",
+      many: "ofertas recibidas",
+      calm: "Todavía no ha llegado ninguna",
+      note: supportOffers.length > 0 ? "Voluntarios, profesiones y recursos" : null,
     },
   };
 

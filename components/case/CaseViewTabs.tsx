@@ -1,45 +1,31 @@
 import Link from "next/link";
 
-export type CaseView = "necesidades" | "seguimiento";
+export type CaseView = "presupuesto" | "seguimiento";
 
-/**
- * Lo que falta es la vista por defecto y vive en la ficha a secas.
- *
- * El seguimiento puede ser largo —cinco fotos con texto ya empujan «qué
- * necesita» fuera de la primera pantalla— y por eso son pestañas y no dos
- * bloques uno debajo del otro. El parámetro solo aparece cuando se mira el
- * diario: la dirección que se comparte es la de las necesidades, que es a lo
- * que se viene a ayudar.
- */
 export function parseCaseView(value: string | undefined): CaseView {
-  return value === "seguimiento" ? "seguimiento" : "necesidades";
+  return value === "seguimiento" ? "seguimiento" : "presupuesto";
 }
 
 /**
- * Las dos lecturas de un caso: qué le falta y qué ha pasado.
- *
- * Dos enlaces, no un componente con estado: sin JavaScript funcionan igual, y
- * cada pestaña se puede pegar en un WhatsApp y abre lo que quien la mandó
- * estaba mirando. Es la misma pastilla que el municipio y las donaciones.
+ * Las dos lecturas de un caso: el presupuesto y lo que ha pasado.
  */
 export function CaseViewTabs({
   href,
   active,
-  needsCount,
+  itemCount,
   updateCount,
 }: {
-  /** La ficha a secas, sin parámetro. */
   href: string;
   active: CaseView;
-  needsCount: number;
+  itemCount: number;
   updateCount: number;
 }) {
   const tabs: { id: CaseView; label: string; to: string }[] = [
-    { id: "necesidades", label: "Qué necesita", to: `${href}#contenido` },
+    { id: "presupuesto", label: "Presupuesto", to: `${href}#contenido` },
     { id: "seguimiento", label: "Seguimiento", to: `${href}?ver=seguimiento#contenido` },
   ];
   const counts: Record<CaseView, number> = {
-    necesidades: needsCount,
+    presupuesto: itemCount,
     seguimiento: updateCount,
   };
 

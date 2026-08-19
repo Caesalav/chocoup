@@ -1,4 +1,4 @@
-# La marca de Chocó-up
+# La marca de ChocóUp
 
 Este documento es la identidad visual del portal: los colores con sus valores, el papel que
 juega cada uno, cuándo el sistema habla alto y cuándo baja la voz, y las reglas que impiden
@@ -409,7 +409,7 @@ de titular más construida que la de texto.
 | Titulares, cifras, el nombre de un municipio | `--font-display` (Bricolage Grotesque) | `600`, `letter-spacing: -0.04em` |
 | Texto, campos, pastillas | `--font-sans` (Outfit) | `letter-spacing: 0.01em` |
 
-El tracking cerrado del titular es lo que hace que «Chocó-up» y un nombre de pueblo pesen como
+El tracking cerrado del titular es lo que hace que «ChocóUp» y un nombre de pueblo pesen como
 marca. La `.smallcaps` que queda es la voz del panel del equipo y **no se usa en las pantallas
 públicas**: unas mayúsculas apretadas a 11 px pesan más que la frase que acompañan, y en
 `/ofrecer` se leían peor que una frase normal.

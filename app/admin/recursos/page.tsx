@@ -1,75 +1,69 @@
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { OfferCard } from "@/components/admin/OfferCard";
 import { PledgeIcon, SearchIcon } from "@/components/ui/icons";
-import { button, field } from "@/components/ui/styles";
-import { getNeedOptions, getOffers } from "@/lib/admin-data";
+import { field, panel } from "@/components/ui/styles";
+import { getSupportOffers } from "@/lib/admin-data";
 import { SIGNUPS_PATH } from "@/lib/admin-sections";
 import { NEED_CATEGORIES } from "@/lib/constants";
-import { plural } from "@/lib/format";
-import { currentTeam } from "@/lib/team";
-import type { OfferStatus } from "@/lib/types";
+import { contactHref, formatDate, plural } from "@/lib/format";
+import { SUPPORT_KINDS } from "@/lib/support";
+import type { SupportOfferKind } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS = [
-  { value: "pendiente", label: "Sin revisar" },
-  { value: "aceptada", label: "Aceptadas" },
-  { value: "rechazada", label: "Negadas" },
-  { value: "retirada", label: "Retiradas" },
-  { value: "todas", label: "Todas" },
-] as const;
-
 type Props = {
-  searchParams: Promise<{ estado?: string; q?: string; etiqueta?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string; lugar?: string }>;
 };
 
-function matchesQuery(
-  offer: Awaited<ReturnType<typeof getOffers>>[number],
-  q: string,
-  tag: string,
-) {
-  if (tag && offer.category !== tag) return false;
-  if (!q) return true;
-  const haystack = [
-    offer.resource,
-    offer.offerer_name,
-    offer.offerer_contact,
-    offer.message,
-    offer.cities?.name,
-    offer.cases?.display_name,
-    offer.needs?.title,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(q);
+function isKind(value: string | undefined): value is SupportOfferKind {
+  return value === "voluntario" || value === "profesion" || value === "recurso";
 }
 
 export default async function ResourcesPage({ searchParams }: Props) {
-  const { estado, q: rawQ, etiqueta } = await searchParams;
-  const active = FILTERS.some((filter) => filter.value === estado) ? estado! : "pendiente";
-  const status = active === "todas" ? undefined : (active as OfferStatus);
+  const { tab, q: rawQ, lugar: rawPlace } = await searchParams;
+  const kind: SupportOfferKind = isKind(tab) ? tab : "voluntario";
   const q = (rawQ ?? "").trim().toLowerCase().slice(0, 80);
-  const tag = NEED_CATEGORIES.some((item) => item.value === etiqueta) ? etiqueta! : "";
+  const place = (rawPlace ?? "").trim().toLowerCase().slice(0, 80);
 
-  const [allOffers, needOptions, team] = await Promise.all([
-    getOffers(status),
-    getNeedOptions(),
-    currentTeam(),
+  const [volunteers, professions, resources] = await Promise.all([
+    getSupportOffers("voluntario"),
+    getSupportOffers("profesion"),
+    getSupportOffers("recurso"),
   ]);
 
-  const offers = allOffers.filter((offer) => matchesQuery(offer, q, tag));
-  const pending = active === "pendiente" ? allOffers.length : (await getOffers("pendiente")).length;
+  const byKind = { voluntario: volunteers, profesion: professions, recurso: resources };
+  const counts = {
+    voluntario: volunteers.length,
+    profesion: professions.length,
+    recurso: resources.length,
+  };
+  const rows = byKind[kind].filter((row) => {
+    if (place && !row.city_name.toLowerCase().includes(place)) return false;
+    if (!q) return true;
+    const haystack = [
+      row.person_name,
+      row.contact,
+      row.email,
+      row.city_name,
+      row.message,
+      row.skills,
+      row.profession,
+      row.resource,
+      row.availability,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(q);
+  });
 
-  const queryFor = (next: { estado?: string; q?: string; etiqueta?: string }) => {
+  const queryFor = (next: { tab?: string; q?: string; lugar?: string }) => {
     const params = new URLSearchParams();
-    const nextEstado = next.estado ?? active;
-    if (nextEstado !== "pendiente") params.set("estado", nextEstado);
+    const nextTab = next.tab ?? kind;
+    if (nextTab !== "voluntario") params.set("tab", nextTab);
     const nextQ = next.q ?? q;
     if (nextQ) params.set("q", nextQ);
-    const nextTag = next.etiqueta === undefined ? tag : next.etiqueta;
-    if (nextTag) params.set("etiqueta", nextTag);
+    const nextPlace = next.lugar ?? place;
+    if (nextPlace) params.set("lugar", nextPlace);
     const qs = params.toString();
     return qs ? `/admin/recursos?${qs}` : "/admin/recursos";
   };
@@ -78,120 +72,121 @@ export default async function ResourcesPage({ searchParams }: Props) {
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
       <AdminHeader
         backHref="/admin"
-        backLabel="Panel del equipo"
-        title="Verificación de recursos"
+        backLabel="Panel"
+        title="Ofertas recibidas"
         Icon={PledgeIcon}
-        description={
-          <>
-            Llama, comprueba que es legítimo y acepta o niega. Eso decide qué se publica en{" "}
-            <Link href="/ofrecido" className="text-accent hover:underline">
-              el muro
-            </Link>
-            . El nombre solo sale si la persona lo autorizó y tú ya aceptaste.
-            {team?.role !== "documentacion" && (
-              <>
-                {" "}
-                Los correos de avisos están en{" "}
-                <Link href={SIGNUPS_PATH} className="text-accent hover:underline">
-                  la lista
-                </Link>
-                .
-              </>
-            )}
-          </>
-        }
-        actions={
-          <Link href="/admin/recursos/nuevo" className={button.primary}>
-            Añadir recurso
-          </Link>
-        }
       />
-
-      <div className="mt-8 rounded-xl border border-line bg-panel p-4 sm:p-5">
-        <form action="/admin/recursos" method="get">
-          {active !== "pendiente" && <input type="hidden" name="estado" value={active} />}
-          {tag && <input type="hidden" name="etiqueta" value={tag} />}
-          <label className="block">
-            <span className={field.label}>Buscar</span>
-            <span className="relative mt-2 block">
-              <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
-              <input
-                type="search"
-                name="q"
-                defaultValue={q}
-                placeholder="Nombre, recurso, municipio, caso…"
-                enterKeyHint="search"
-                className={`${field.input} mt-0 pl-10`}
-              />
-            </span>
-          </label>
-        </form>
-
-        <nav aria-label="Bandejas" className="mt-4 flex flex-wrap gap-2">
-          {FILTERS.map((filter) => (
-            <Link
-              key={filter.value}
-              href={queryFor({ estado: filter.value })}
-              aria-current={active === filter.value ? "page" : undefined}
-              className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-[14px] transition-colors ${
-                active === filter.value
-                  ? "bg-accent text-paper"
-                  : "border border-line text-muted hover:border-line-strong hover:text-ink"
-              }`}
-            >
-              {filter.label}
-              {filter.value === "pendiente" && pending > 0 && (
-                <span
-                  className={`tabular-nums ${
-                    active === "pendiente" ? "text-paper/80" : "text-need-mid-strong"
-                  }`}
-                >
-                  {pending}
-                </span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <Link
-            href={queryFor({ etiqueta: "" })}
-            className={`rounded-full px-3 py-1.5 text-[12px] ${
-              !tag ? "bg-ink text-paper" : "border border-line text-muted hover:text-ink"
-            }`}
-          >
-            Todas las etiquetas
-          </Link>
-          {NEED_CATEGORIES.map((item) => (
-            <Link
-              key={item.value}
-              href={queryFor({ etiqueta: item.value })}
-              className={`rounded-full px-3 py-1.5 text-[12px] ${
-                tag === item.value
-                  ? "bg-ink text-paper"
-                  : "border border-line text-muted hover:text-ink"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      <p className="mt-5 text-sm text-muted">
-        {offers.length === 0
-          ? q || tag
-            ? "Ningún recurso coincide con esa búsqueda."
-            : "No hay recursos en esta bandeja."
-          : `${plural(offers.length, "recurso", "recursos")}${
-              q || tag ? " que coinciden" : ""
-            }.`}
+      <p className="mt-3 max-w-prose text-[14px] leading-relaxed text-muted">
+        Lo que la gente deja en /ofrecer. No se acepta ni se niega: se busca y se llama. Los avisos
+        de correo siguen en{" "}
+        <Link href={SIGNUPS_PATH} className="text-accent hover:underline">
+          avisos
+        </Link>
+        .
       </p>
 
-      {offers.length > 0 && (
+      <nav aria-label="Tipo de oferta" className="mt-8 flex flex-wrap gap-2">
+        {SUPPORT_KINDS.map((entry) => (
+          <Link
+            key={entry.value}
+            href={queryFor({ tab: entry.value })}
+            aria-current={kind === entry.value ? "page" : undefined}
+            className={`inline-flex min-h-11 items-center rounded-full px-4 text-[14px] ${
+              kind === entry.value
+                ? "bg-ink text-paper"
+                : "border border-line text-muted hover:text-ink"
+            }`}
+          >
+            {entry.label}
+            <span className={`ml-2 tabular-nums ${kind === entry.value ? "text-paper/70" : "text-faint"}`}>
+              {counts[entry.value]}
+            </span>
+          </Link>
+        ))}
+      </nav>
+
+      <form className={`${panel} mt-6 p-4 sm:p-5`} action="/admin/recursos" method="get">
+        <input type="hidden" name="tab" value={kind} />
+        <label className="block">
+          <span className={field.label}>Buscar</span>
+          <span className="relative mt-2 block">
+            <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
+            <input
+              type="search"
+              name="q"
+              defaultValue={q}
+              placeholder="Nombre, teléfono, tejas, médica…"
+              className={`${field.input} mt-0 pl-10`}
+            />
+          </span>
+        </label>
+        <label className="mt-4 block">
+          <span className={field.label}>Lugar</span>
+          <input
+            type="search"
+            name="lugar"
+            defaultValue={place}
+            placeholder="Quibdó, Medellín…"
+            className={field.input}
+          />
+        </label>
+        <button type="submit" className="mt-4 text-[14px] font-medium text-accent hover:underline">
+          Filtrar
+        </button>
+      </form>
+
+      <p className="mt-6 text-sm text-muted">
+        {plural(rows.length, "oferta", "ofertas")}
+        {q || place ? " con este filtro" : ` en ${SUPPORT_KINDS.find((entry) => entry.value === kind)?.label.toLowerCase()}`}
+      </p>
+
+      {rows.length === 0 ? (
+        <p className={`${panel} mt-4 p-5 text-sm text-muted`}>Todavía no hay nada en esta pestaña.</p>
+      ) : (
         <ul className="mt-4 space-y-3">
-          {offers.map((offer) => (
-            <OfferCard key={offer.id} offer={offer} needOptions={needOptions} />
+          {rows.map((row) => (
+            <li key={row.id} className={`${panel} p-4`}>
+              <p className="text-[12px] text-faint">{formatDate(row.created_at)}</p>
+              <h2 className="mt-1 font-display text-[20px] leading-tight text-ink">{row.person_name}</h2>
+              <p className="mt-1 text-sm text-muted">
+                {contactHref(row.contact) ? (
+                  <a href={contactHref(row.contact)!} className="text-accent hover:underline">
+                    {row.contact}
+                  </a>
+                ) : (
+                  row.contact
+                )}
+                {row.email && ` · ${row.email}`}
+                {row.city_name && ` · ${row.city_name}`}
+              </p>
+              {kind === "voluntario" && (
+                <p className="mt-3 text-[14px] leading-relaxed text-body">
+                  {row.skills}
+                  {row.availability && ` · ${row.availability}`}
+                  {row.has_transport && " · Tiene transporte"}
+                </p>
+              )}
+              {kind === "profesion" && (
+                <p className="mt-3 text-[14px] leading-relaxed text-body">
+                  {row.profession}
+                  {row.modality && ` · ${row.modality}`}
+                  {row.experience && `. ${row.experience}`}
+                </p>
+              )}
+              {kind === "recurso" && (
+                <p className="mt-3 text-[14px] leading-relaxed text-body">
+                  {row.resource}
+                  {row.quantity && ` · ${row.quantity}`}
+                  {row.condition && ` · ${row.condition}`}
+                  {row.category &&
+                    ` · ${NEED_CATEGORIES.find((item) => item.value === row.category)?.label ?? row.category}`}
+                  {row.can_deliver && " · Puede llevarlo"}
+                </p>
+              )}
+              {row.message && (
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">{row.message}</p>
+              )}
+            </li>
           ))}
         </ul>
       )}

@@ -5,11 +5,6 @@ import { Photo } from "@/components/ui/Photo";
 import { savedFrame } from "@/lib/photo-frame";
 import type { Photo as PhotoRow } from "@/lib/types";
 
-type Props = {
-  photos: Pick<PhotoRow, "id" | "storage_path" | "caption" | "focus_x" | "focus_y" | "zoom">[];
-  className?: string;
-};
-
 /**
  * Las fotos del caso, a sangre y una detrás de otra.
  *
@@ -22,7 +17,16 @@ type Props = {
  * Tramos y no puntos, como en la referencia: con cuatro fotos los puntos son
  * cuatro motas de dos píxeles y no se distingue cuál está encendida.
  */
-export function PhotoGallery({ photos, className = "" }: Props) {
+export function PhotoGallery({
+  photos,
+  className = "",
+  showCaption = true,
+}: {
+  photos: Pick<PhotoRow, "id" | "storage_path" | "caption" | "focus_x" | "focus_y" | "zoom">[];
+  className?: string;
+  /** En la ficha el titular va sobre la foto y el pie se comería. */
+  showCaption?: boolean;
+}) {
   const rail = useRef<HTMLUListElement>(null);
   const [index, setIndex] = useState(0);
 
@@ -74,7 +78,7 @@ export function PhotoGallery({ photos, className = "" }: Props) {
 
       {/* El pie va alto porque la hoja de contenido sube sobre la galería con la
           esquina redondeada y se comería la última línea. */}
-      {caption && (
+      {showCaption && caption && (
         <p className="pointer-events-none absolute inset-x-0 bottom-16 px-6 text-center text-[12px] leading-snug text-paper/90">
           {caption}
         </p>

@@ -3,22 +3,18 @@ import { notFound } from "next/navigation";
 import { deleteCase, saveCaseDonationChannel, updateCase } from "@/app/admin/actions";
 import { ChannelCheck, channelCheckNote } from "@/components/admin/ChannelCheck";
 import { DonationChannelForm } from "@/components/admin/DonationChannelForm";
-import { NeedsManager } from "@/components/admin/NeedsManager";
+import { BudgetManager } from "@/components/admin/BudgetManager";
 import { PhotoManager } from "@/components/admin/PhotoManager";
 import { ProgressManager } from "@/components/admin/ProgressManager";
 import { CaseFields } from "@/components/admin/CaseFields";
 import { FormSection } from "@/components/admin/FormSection";
-import { CaseProgressBar } from "@/components/case/CaseProgressBar";
 import { DangerSubmitButton, SubmitButton } from "@/components/admin/SubmitButton";
-import { CategoryChip, DraftChip, OfferStatusChip } from "@/components/ui/Chip";
+import { DraftChip } from "@/components/ui/Chip";
 import { CasesIcon } from "@/components/ui/icons";
 import { field, panel } from "@/components/ui/styles";
-import { getOffersForCase } from "@/lib/admin-data";
 import { getCasePage } from "@/lib/data";
 import { caseDonation, channelCheck, channelOriginLabel } from "@/lib/donation-channel";
-import { contactHref, formatDay } from "@/lib/format";
 import { canWriteCity, currentTeam } from "@/lib/team";
-import type { OfferWithContext } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +22,13 @@ type Props = { params: Promise<{ slug: string; id: string }> };
 
 export default async function AdminCasePage({ params }: Props) {
   const { slug, id } = await params;
-  const [data, team, offers] = await Promise.all([
+  const [data, team] = await Promise.all([
     getCasePage(slug, id, { includeDrafts: true }),
     currentTeam(),
-    getOffersForCase(id),
   ]);
   if (!data) notFound();
 
-  const { city, caseRecord, photos, needs, updates, generalChannel } = data;
+  const { city, caseRecord, photos, budgetItems, budget, updates, generalChannel } = data;
   const isCoordination = team?.role === "coordinacion";
 
   // El canal que esta ficha tiene delante, con su procedencia y su comprobación.
@@ -103,7 +98,7 @@ export default async function AdminCasePage({ params }: Props) {
 
           <FormSection
             title="La ficha"
-            hint="Lo que sale en público: nombre, tipo, frase de WhatsApp e historia. El retrato y las necesidades van más abajo."
+            hint="Lo que sale en público: nombre, tipo, frase de WhatsApp e historia. El retrato y el presupuesto van más abajo."
           >
             <CaseFields
               values={{
@@ -181,18 +176,15 @@ export default async function AdminCasePage({ params }: Props) {
       <div className="mt-10">
         <FormSection
           framed={false}
-          title="Progreso"
-          hint="La barra sale de las necesidades: cubierta llena, parcial a la mitad. Lo que el público ve es lo mismo."
+          title="Presupuesto"
+          hint="La meta es la suma de los precios. Marca un ítem cuando ya se haya comprado con lo donado."
         >
-          <div className={`${panel} p-5`}>
-            {needs.length === 0 ? (
-              <p className="text-sm text-muted">
-                Todavía no hay necesidades. Añádelas abajo: sin ellas no hay barra que mostrar.
-              </p>
-            ) : (
-              <CaseProgressBar needs={needs} />
-            )}
-          </div>
+          <BudgetManager
+            cityId={city.id}
+            caseId={caseRecord.id}
+            items={budgetItems}
+            donated={budget.donated}
+          />
         </FormSection>
       </div>
 
@@ -214,38 +206,10 @@ export default async function AdminCasePage({ params }: Props) {
       <div className="mt-10">
         <FormSection
           framed={false}
-          title="Qué le falta"
-          hint="Estas necesidades aparecen en la página del caso, con su propio botón para ofrecer, y son las que mueven la barra de progreso."
-        >
-          <NeedsManager cityId={city.id} caseId={caseRecord.id} needs={needs} />
-        </FormSection>
-      </div>
-
-      <div className="mt-10">
-        <FormSection
-          framed={false}
           title="Seguimiento"
           hint="El historial del caso, en orden. Cada avance lleva título, qué se hizo y una fotografía."
         >
           <ProgressManager cityId={city.id} caseId={caseRecord.id} updates={updates} />
-        </FormSection>
-      </div>
-
-      <div className="mt-10">
-        <FormSection
-          framed={false}
-          title="Lo que le han ofrecido"
-          hint={
-            <>
-              Ofertas dirigidas a esta causa. Se aceptan y se anotan en{" "}
-              <Link href="/admin/recursos" className="text-accent hover:underline">
-                verificación de recursos
-              </Link>
-              .
-            </>
-          }
-        >
-          <CaseOffers offers={offers} />
         </FormSection>
       </div>
 
@@ -288,77 +252,3 @@ function CaseCrumbs({ slug, cityName }: { slug: string; cityName: string }) {
   );
 }
 
-/**
- * Las ofertas de esta causa, en lectura.
- *
- * No repite las acciones de la bandeja a propósito: dos sitios donde aceptar o
- * negar la misma oferta son dos sitios donde dejarla a medias, y el que manda
- * tiene que ser uno. Aquí se responde a "qué le han ofrecido" y desde ahí se va a
- * resolverlo.
- *
- * El contacto sí se muestra, porque es lo que hace útil la pantalla: quien está
- * con la familia puede llamar a quien ofreció sin salir a buscarlo. Y solo llega
- * aquí quien tiene el municipio asignado, que es lo mismo que exige la política
- * de lectura de la tabla.
- */
-function CaseOffers({ offers }: { offers: OfferWithContext[] }) {
-  if (offers.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed border-line-strong bg-panel px-3.5 py-3 text-sm text-muted">
-        Todavía nadie ha ofrecido nada para esta causa.
-      </p>
-    );
-  }
-
-  return (
-    <ul className="space-y-3">
-      {offers.map((offer) => {
-        const href = contactHref(offer.offerer_contact);
-
-        return (
-          <li key={offer.id} className={`${panel} p-4`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <OfferStatusChip status={offer.status} />
-              <CategoryChip category={offer.category} />
-              {offer.on_wall !== false &&
-                offer.status !== "rechazada" &&
-                offer.status !== "retirada" &&
-                !offer.delivered_on && (
-                  <span className="rounded-full bg-accent-soft px-3 py-1 text-[12px] text-accent-strong">
-                    En el muro
-                  </span>
-                )}
-              {offer.delivered_on && (
-                <span className="text-xs text-accent-strong">
-                  Llegó el {formatDay(offer.delivered_on)}
-                </span>
-              )}
-            </div>
-
-            <p className="mt-2 font-medium leading-snug text-ink">{offer.resource}</p>
-
-            <p className="mt-1 text-sm text-muted">
-              {offer.offerer_name} ·{" "}
-              {href ? (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="text-accent hover:underline"
-                >
-                  {offer.offerer_contact}
-                </a>
-              ) : (
-                offer.offerer_contact
-              )}
-            </p>
-
-            {offer.needs && (
-              <p className="mt-1.5 text-xs text-faint">Para: {offer.needs.title}</p>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}

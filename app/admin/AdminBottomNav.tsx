@@ -9,7 +9,7 @@ import { ADMIN_HOME, ADMIN_SECTIONS, activeAdminSection } from "@/lib/admin-sect
  * La misma barra inferior del portal, con las tres secciones del equipo.
  *
  * Abajo en el móvil, donde llega el pulgar; a partir de `lg` la sustituye la
- * barra de arriba, igual que en Chocó-up. Inicio es la puerta del panel.
+ * barra de arriba, igual que en ChocóUp. Inicio es la puerta del panel.
  */
 export function AdminBottomNav({ pendingOffers }: { pendingOffers: number }) {
   const pathname = usePathname();

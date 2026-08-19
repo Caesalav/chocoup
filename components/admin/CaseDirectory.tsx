@@ -9,8 +9,8 @@ import { field, panel } from "@/components/ui/styles";
 import { foldName } from "@/lib/choco-towns";
 import { caseKindLabel } from "@/lib/constants";
 import { progressPercent } from "@/lib/case-progress";
-import { formatDay, plural } from "@/lib/format";
-import type { AdminCaseRow } from "@/lib/admin-data";
+import { formatDay, formatCOP, plural } from "@/lib/format";
+import type { AdminCaseRow } from "@/lib/admin-case";
 
 const FILTERS = [
   { value: "todas", label: "Todas" },
@@ -22,8 +22,8 @@ const FILTERS = [
 const SORTS = [
   { value: "reciente", label: "Más recientes" },
   { value: "antiguo", label: "Más antiguas" },
-  { value: "necesidades-mas", label: "Más necesidades" },
-  { value: "necesidades-menos", label: "Menos necesidades" },
+  { value: "necesidades-mas", label: "Más ítems pendientes" },
+  { value: "necesidades-menos", label: "Menos ítems pendientes" },
   { value: "avance-mas", label: "Mayor avance" },
   { value: "avance-menos", label: "Menor avance" },
   { value: "presupuesto-mas", label: "Mayor presupuesto" },
@@ -179,8 +179,7 @@ function CaseCard({ row, canWrite }: { row: AdminCaseRow; canWrite: boolean }) {
           <div className="mt-2.5">
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-[12px] text-muted">
-                {row.progress.covered} de {row.progress.total}{" "}
-                {row.progress.total === 1 ? "recurso cubierto" : "recursos cubiertos"}
+                {formatCOP(row.progress.covered)} de {formatCOP(row.progress.total)}
               </p>
               <p className="shrink-0 text-[12px] tabular-nums text-ink">{percent} %</p>
             </div>

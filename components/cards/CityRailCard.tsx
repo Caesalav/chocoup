@@ -81,7 +81,7 @@ export function CityRailCard({
             )}
             {hasBar
               ? `${percent} % cubierto`
-              : plural(city.openNeeds, "necesidad abierta", "necesidades abiertas")}
+              : `${percent} % de la meta`}
             {city.standingOffers > 0 && (
               <>
                 <span aria-hidden> · </span>

@@ -188,6 +188,43 @@ export function BackIcon(props: IconProps) {
   );
 }
 
+/** Cerrar. La X de cancelar el buscador de la barra. */
+export function CloseIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Glyph>
+  );
+}
+
+/**
+ * Ofrecer la profesión: un maletín. Distinto de la mano de voluntario y del
+ * recurso, que son tiempo y cosas.
+ */
+export function ProfessionIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4.4 9.2h15.2a1.4 1.4 0 0 1 1.4 1.4v7.8a1.4 1.4 0 0 1-1.4 1.4H4.4A1.4 1.4 0 0 1 3 18.4v-7.8a1.4 1.4 0 0 1 1.4-1.4z" />
+      <path d="M8.4 9.2V6.8A1.6 1.6 0 0 1 10 5.2h4a1.6 1.6 0 0 1 1.6 1.6v2.4" />
+      <path d="M3 13.2h18" />
+    </Glyph>
+  );
+}
+
+/**
+ * Ofrecer un recurso: tablas apiladas, material que se puede llevar.
+ * No es un paquete con flecha —eso competiría con Donar—.
+ */
+export function ResourceIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4.4 16.4h15.2v3.2H4.4z" />
+      <path d="M6 12.4h12v3.2H6z" />
+      <path d="M7.6 8.4h8.8v3.2H7.6z" />
+    </Glyph>
+  );
+}
+
 /**
  * Copiar. Solo aparece en la llave de transferencia, y solo cuando hay
  * JavaScript: sin él no existe el botón que lo acompaña, porque copiar al

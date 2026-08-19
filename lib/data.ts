@@ -1,8 +1,11 @@
+import "server-only";
+
 import { createSupabaseServerClient } from "./supabase/server";
 import { isDemoMode } from "./supabase/env";
 import {
   demoAidRecords,
   demoCampaignFocus,
+  demoDonationLog,
   demoCasePage,
   demoCaseCards,
   demoCityCards,
@@ -17,7 +20,13 @@ import {
 import { EMPTY_FOCUS, type CampaignFocusRow } from "./campaign";
 import { situationPhotos, withUpdatePhotos } from "./case-photos";
 import { lastUpdateOn } from "./case-updates";
-import { cityProgress } from "./case-progress";
+import {
+  asCaseProgress,
+  budgetProgress,
+  countOpenBudgetCases,
+  mergeBudget,
+  type BudgetItem,
+} from "./budget";
 import {
   CITY_OFFER_ACTIVITY_VIEW,
   type CityOfferActivity,
@@ -28,13 +37,8 @@ import {
   type ContributionTally,
 } from "./contributions";
 import { donationChannel, type DonationChannel } from "./donation-channel";
-import {
-  countCoveredNeeds,
-  countOpenCases,
-  countOpenNeeds,
-  isCoveredNeed,
-  isOpenNeed,
-} from "./needs";
+import { DONATION_LOG_LIMIT, DONATION_LOG_VIEW } from "./donation-log";
+import { isCoveredNeed, isOpenNeed } from "./needs";
 import { savedFrame, type PhotoFrame } from "./photo-frame";
 import type {
   AidRecord,
@@ -46,6 +50,7 @@ import type {
   City,
   CaseUpdate,
   DonationColumns,
+  DonationLogEntry,
   Need,
   NeedCard,
   NeedCategory,
@@ -68,9 +73,13 @@ type Options = { includeDrafts?: boolean };
 
 type NestedCityRow = City & {
   needs: Pick<Need, "id" | "category" | "status" | "case_id">[];
-  cases: Pick<Case, "id">[];
+  cases: (Pick<Case, "id"> & {
+    budget_items: Pick<BudgetItem, "case_id" | "amount_cop" | "purchased">[];
+  })[];
   photos: Pick<Photo, "storage_path" | "thumb_path" | "sort_order" | "case_id" | "focus_x" | "focus_y" | "zoom">[];
 };
+
+const CASE_BUDGET_VIEW = "case_budget";
 
 /** Las portadas se muestran pequeñas: siempre la miniatura si existe. */
 function coverOf(photos: Pick<Photo, "storage_path" | "thumb_path" | "sort_order">[]) {
@@ -171,19 +180,16 @@ export async function getCampaignFocusRow(): Promise<CampaignFocusRow> {
 }
 
 function cityBoard(
-  needs: Pick<Need, "status" | "case_id">[],
+  items: Pick<BudgetItem, "case_id" | "amount_cop" | "purchased">[],
+  donated: number,
   standingOffers: number,
 ) {
-  const progress = cityProgress(needs);
+  const budget = budgetProgress(items, donated);
   return {
-    openNeeds: countOpenNeeds(needs),
-    openCases: countOpenCases(needs),
-    progress: {
-      total: progress.total,
-      covered: progress.covered,
-      partial: progress.partial,
-      ratio: progress.ratio,
-    },
+    openNeeds: budget.pendingItems,
+    openCases: countOpenBudgetCases(items),
+    progress: asCaseProgress(budget),
+    budget,
     standingOffers,
   };
 }
@@ -225,14 +231,15 @@ export async function getCityCards(): Promise<CityCardData[]> {
   if (isDemoMode()) return demoCityCards();
   const supabase = await createSupabaseServerClient();
 
-  const [{ data, error }, activity] = await Promise.all([
+  const [{ data, error }, activity, raised] = await Promise.all([
     supabase
       .from("cities")
       .select(
-        "*, needs(id, category, status, case_id), cases(id), photos(storage_path, thumb_path, sort_order, case_id, focus_x, focus_y, zoom)",
+        "*, needs(id, category, status, case_id), cases(id, budget_items(case_id, amount_cop, purchased)), photos(storage_path, thumb_path, sort_order, case_id, focus_x, focus_y, zoom)",
       )
       .order("name"),
     supabase.from(CITY_OFFER_ACTIVITY_VIEW).select("city_id, en_camino"),
+    supabase.from(CASE_BUDGET_VIEW).select("case_id, city_id, donated_cop"),
   ]);
 
   if (error || !data) return [];
@@ -240,19 +247,26 @@ export async function getCityCards(): Promise<CityCardData[]> {
   const onTheWay = new Map(
     ((activity.data ?? []) as CityOfferActivity[]).map((row) => [row.city_id, row.en_camino]),
   );
+  const donatedByCity = new Map<string, number>();
+  for (const row of (raised.data ?? []) as { city_id: string; donated_cop: number }[]) {
+    donatedByCity.set(row.city_id, (donatedByCity.get(row.city_id) ?? 0) + Number(row.donated_cop));
+  }
 
-  return (data as NestedCityRow[]).map((city) => ({
-    ...city,
-    coverPath: coverOf(city.photos.filter((photo) => photo.case_id === null)),
-    coverFrame: coverFrameOf(city.photos.filter((photo) => photo.case_id === null)),
-    caseCount: city.cases.length,
-    needs: city.needs.map((need) => ({
-      category: need.category,
-      status: need.status,
-      case_id: need.case_id,
-    })),
-    ...cityBoard(city.needs, onTheWay.get(city.id) ?? 0),
-  }));
+  return (data as NestedCityRow[]).map((city) => {
+    const items = city.cases.flatMap((row) => row.budget_items ?? []);
+    return {
+      ...city,
+      coverPath: coverOf(city.photos.filter((photo) => photo.case_id === null)),
+      coverFrame: coverFrameOf(city.photos.filter((photo) => photo.case_id === null)),
+      caseCount: city.cases.length,
+      needs: city.needs.map((need) => ({
+        category: need.category,
+        status: need.status,
+        case_id: need.case_id,
+      })),
+      ...cityBoard(items, donatedByCity.get(city.id) ?? 0, onTheWay.get(city.id) ?? 0),
+    };
+  });
 }
 
 export async function getCityPage(slug: string, options: Options = {}): Promise<CityPage | null> {
@@ -267,7 +281,7 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
 
   if (!city) return null;
 
-  const [photos, needs, cases, updateLinks] = await Promise.all([
+  const [photos, needs, cases, updateLinks, raised] = await Promise.all([
     supabase
       .from("photos")
       .select("*")
@@ -289,19 +303,27 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
       // queda sin casos sin que se note, porque el error viaja en `error` y aquí
       // solo se lee `data`.
       .select(
-        "*, photos!photos_case_id_fkey(id, storage_path, thumb_path, caption, sort_order, focus_x, focus_y, zoom), needs(id, status, category)",
+        "*, photos!photos_case_id_fkey(id, storage_path, thumb_path, caption, sort_order, focus_x, focus_y, zoom), budget_items(id, case_id, city_id, title, amount_cop, purchased, purchased_on, sort_order, created_at)",
       )
       .eq("city_id", city.id)
       .order("created_at", { ascending: false }),
     supabase.from("case_updates").select("case_id, photo_id").eq("city_id", city.id),
+    supabase.from(CASE_BUDGET_VIEW).select("case_id, donated_cop").eq("city_id", city.id),
   ]);
+
+  const donatedByCase = new Map(
+    ((raised.data ?? []) as { case_id: string; donated_cop: number }[]).map((row) => [
+      row.case_id,
+      Number(row.donated_cop),
+    ]),
+  );
 
   const allNeeds = (needs.data ?? []) as Need[];
   const allPhotos = (photos.data ?? []) as Photo[];
 
   type NestedCaseRow = Case & {
     photos: Pick<Photo, "id" | "storage_path" | "thumb_path" | "caption" | "sort_order" | "focus_x" | "focus_y" | "zoom">[];
-    needs: Pick<Need, "id" | "status" | "category">[];
+    budget_items: BudgetItem[];
   };
 
   return {
@@ -318,6 +340,7 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
         .map((link) => ({ photo_id: link.photo_id }));
       const nestedPhotos = bySortOrder(row.photos ?? []);
       const casePhotos = situationPhotos(nestedPhotos, row.portrait_photo_id, progress);
+      const budget = budgetProgress(row.budget_items ?? [], donatedByCase.get(row.id) ?? 0);
       return {
         ...row,
         photos: casePhotos,
@@ -325,8 +348,9 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
         coverFrame: coverFrameOf(casePhotos),
         portraitPath: portraitOf(row.portrait_photo_id, nestedPhotos),
         portraitFrame: portraitFrameOf(row.portrait_photo_id, nestedPhotos),
-        openNeeds: countOpenNeeds(row.needs),
-        categories: openCategories(row.needs),
+        openNeeds: budget.pendingItems,
+        budget,
+        categories: [],
       };
     }),
   };
@@ -357,7 +381,7 @@ export async function getCasePage(
 
   if (!caseRecord) return null;
 
-  const [photos, needs, updateRows, generalChannel] = await Promise.all([
+  const [photos, needs, items, raised, updateRows, generalChannel] = await Promise.all([
     supabase
       .from("photos")
       .select("*")
@@ -366,17 +390,24 @@ export async function getCasePage(
       .order("created_at"),
     supabase.from("needs").select("*").eq("case_id", caseRecord.id).order("created_at"),
     supabase
+      .from("budget_items")
+      .select("*")
+      .eq("case_id", caseRecord.id)
+      .order("sort_order")
+      .order("created_at"),
+    supabase.from(CASE_BUDGET_VIEW).select("donated_cop").eq("case_id", caseRecord.id).maybeSingle(),
+    supabase
       .from("case_updates")
       .select("*")
       .eq("case_id", caseRecord.id)
       .order("happened_on", { ascending: true })
       .order("created_at", { ascending: true }),
-    // Va en la misma tanda y no en la página: la ficha no puede pintar la sección
-    // del dinero sin saber si el canal que enseña es de esta persona o el general.
     getGeneralChannel(),
   ]);
 
   const allPhotos = (photos.data ?? []) as Photo[];
+  const budgetItems = (items.data ?? []) as BudgetItem[];
+  const donated = Number((raised.data as { donated_cop?: number } | null)?.donated_cop ?? 0);
   const updates = withUpdatePhotos(
     (updateRows.data ?? []) as Omit<CaseUpdate, "photoPath" | "photoFrame">[],
     allPhotos,
@@ -387,6 +418,8 @@ export async function getCasePage(
     caseRecord,
     photos: allPhotos,
     needs: (needs.data ?? []) as Need[],
+    budgetItems,
+    budget: budgetProgress(budgetItems, donated),
     updates,
     generalChannel,
     lastUpdateOn: lastUpdateOn(updates),
@@ -408,15 +441,15 @@ export async function getCasePage(
 export async function getPortalTotals(): Promise<PortalTotals> {
   if (isDemoMode()) return demoPortalTotals();
   const cities = await getCityCards();
-
-  const needs = cities.flatMap((city) => city.needs);
+  const budget = mergeBudget(cities.map((city) => city.budget));
 
   return {
     cities: cities.length,
     cases: cities.reduce((sum, city) => sum + city.caseCount, 0),
-    needs: needs.length,
-    coveredNeeds: countCoveredNeeds(needs),
-    openNeeds: countOpenNeeds(needs),
+    needs: budget.itemCount,
+    coveredNeeds: budget.purchasedItems,
+    openNeeds: budget.pendingItems,
+    budget,
     updatedAt:
       cities.map((city) => city.updated_at).sort((a, b) => b.localeCompare(a))[0] ?? null,
   };
@@ -427,34 +460,43 @@ export async function getCaseCards(): Promise<CaseCard[]> {
   if (isDemoMode()) return demoCaseCards();
   const supabase = await createSupabaseServerClient();
 
-  const { data } = await supabase
-    .from("cases")
-    // Igual que en getCityPage: `photos` a secas es ambiguo desde 0003.
-    .select(
-      "*, cities(name, slug), photos!photos_case_id_fkey(id, storage_path, thumb_path, sort_order, focus_x, focus_y, zoom), needs(id, status, category)",
-    )
-    .order("updated_at", { ascending: false });
+  const [{ data }, raised] = await Promise.all([
+    supabase
+      .from("cases")
+      .select(
+        "*, cities(name, slug), photos!photos_case_id_fkey(id, storage_path, thumb_path, sort_order, focus_x, focus_y, zoom), budget_items(id, case_id, amount_cop, purchased)",
+      )
+      .order("updated_at", { ascending: false }),
+    supabase.from(CASE_BUDGET_VIEW).select("case_id, donated_cop"),
+  ]);
+
+  const donatedByCase = new Map(
+    ((raised.data ?? []) as { case_id: string; donated_cop: number }[]).map((row) => [
+      row.case_id,
+      Number(row.donated_cop),
+    ]),
+  );
 
   type Row = Case & {
     cities: Pick<City, "name" | "slug"> | null;
     photos: Pick<Photo, "id" | "storage_path" | "thumb_path" | "sort_order" | "focus_x" | "focus_y" | "zoom">[];
-    needs: Pick<Need, "id" | "status" | "category">[];
+    budget_items: Pick<BudgetItem, "id" | "case_id" | "amount_cop" | "purchased">[];
   };
 
   return ((data ?? []) as Row[])
     .filter((row) => row.cities)
     .map((row) => {
       const first = [...(row.photos ?? [])].sort((a, b) => a.sort_order - b.sort_order)[0];
+      const budget = budgetProgress(row.budget_items ?? [], donatedByCase.get(row.id) ?? 0);
       return {
         ...row,
-        // La grande: estas fotos ahora llenan una tarjeta de /donaciones, y la
-        // miniatura de 400 px se queda corta.
         coverPath: first?.storage_path ?? null,
         coverFrame: first ? savedFrame(first) : null,
         portraitPath: portraitOf(row.portrait_photo_id, row.photos),
         portraitFrame: portraitFrameOf(row.portrait_photo_id, row.photos),
-        openNeeds: countOpenNeeds(row.needs),
-        categories: openCategories(row.needs),
+        openNeeds: budget.pendingItems,
+        budget,
+        categories: [],
         cityName: row.cities!.name,
         citySlug: row.cities!.slug,
       };
@@ -512,6 +554,43 @@ export function sortNeeds<T extends Pick<Need, "status" | "urgent" | "created_at
  * función se escribiera mal no podría sacar de aquí nada de eso: el recorte está
  * en la vista y no en esta consulta.
  */
+/**
+ * El registro público de donaciones confirmadas.
+ *
+ * Lee `donation_log` y no `donations`, por lo mismo que `getAidRecords()`: es
+ * una vista sin referencia de pago, sin proveedor y sin las donaciones que
+ * todavía no se confirmaron. El público no tiene permiso sobre la tabla, así
+ * que aunque esta función se escribiera mal no podría sacar de aquí ni un
+ * nombre sin autorizar: el recorte está en la vista y no en esta consulta.
+ */
+export async function getDonationLog(filters: {
+  caseId?: string;
+  cityId?: string;
+  limit?: number;
+} = {}): Promise<DonationLogEntry[]> {
+  const limit = Math.min(Math.max(filters.limit ?? DONATION_LOG_LIMIT, 1), 50);
+  if (isDemoMode()) return demoDonationLog({ ...filters, limit });
+  const supabase = await createSupabaseServerClient();
+
+  let query = supabase
+    .from(DONATION_LOG_VIEW)
+    .select(
+      "id, amount_cop, donated_at, donor_name, publish_name, case_id, case_name, city_id, city_name, city_slug",
+    )
+    .order("donated_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (filters.caseId) query = query.eq("case_id", filters.caseId);
+  if (filters.cityId) query = query.eq("city_id", filters.cityId);
+
+  const { data } = await query;
+  return ((data ?? []) as DonationLogEntry[]).map((row) => ({
+    ...row,
+    amount_cop: Number(row.amount_cop),
+  }));
+}
+
 export async function getAidRecords(): Promise<AidRecord[]> {
   if (isDemoMode()) return demoAidRecords();
   const supabase = await createSupabaseServerClient();

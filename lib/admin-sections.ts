@@ -11,7 +11,7 @@ import { CasesIcon, PledgeIcon, TownIcon } from "@/components/ui/icons";
  *   * VERIFICACIÓN DE RECURSOS es contestar a lo que llega de fuera.
  *
  * Los iconos son los del portal público —municipios, casos, lo ofrecido— para
- * que el panel y Chocó-up se reconozcan como la misma herramienta.
+ * que el panel y ChocóUp se reconozcan como la misma herramienta.
  *
  * El canal de cada caso y el diario de avances viven en la ficha, en Casos.
  * El canal general se repasa en MONEY_REVIEW_PATH, también en Casos. Los
@@ -58,15 +58,15 @@ export const ADMIN_SECTIONS: AdminSection[] = [
     href: "/admin/casos",
     label: "Casos",
     title: "Casos",
-    blurb: "Historia, retrato, necesidades, avances y a dónde va el dinero.",
+    blurb: "Historia, retrato, presupuesto, avances y a dónde va el dinero.",
     Icon: CasesIcon,
   },
   {
     key: "recursos",
     href: "/admin/recursos",
-    label: "Verificación",
-    title: "Verificación de recursos",
-    blurb: "Lo que ofrece la gente: comprobarlo, aceptarlo o negarlo, y decidir si sale en el muro.",
+    label: "Ofertas",
+    title: "Ofertas recibidas",
+    blurb: "Voluntarios, profesiones y recursos: un listado para encontrarlos.",
     Icon: PledgeIcon,
   },
 ];

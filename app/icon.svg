@@ -1,10 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Los valores van incrustados: el icono se sirve suelto y no ve las fichas
-       del tema. La marca va en el rojo del sistema y no en tinta porque a 16 px
-       lo que distingue la pestaña es el color, antes que la forma. -->
-  <rect width="32" height="32" rx="6" fill="#F6F3EE"/>
-  <g fill="#C4441E" transform="translate(8.3 7) scale(0.103)">
-    <path d="M100 0 150 25v50L100 50 50 75V25Z"/>
-    <path d="M50 75 0 100v50l50 25 50-25 50 25v-50l-50-25-50 25V75Z"/>
-  </g>
+  <!-- Favicon tipográfico: una C negra geométrica. El SVG va suelto y no carga
+       Outfit, así que cae en Arial Black. -->
+  <rect width="32" height="32" rx="8" fill="#F4F7F2"/>
+  <text
+    x="16"
+    y="24"
+    text-anchor="middle"
+    font-family="'Arial Black', 'Helvetica Neue', Helvetica, sans-serif"
+    font-weight="800"
+    font-size="20"
+    fill="#126A44"
+  >C</text>
 </svg>

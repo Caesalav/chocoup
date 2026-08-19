@@ -82,11 +82,8 @@ export function AdminNav({
   return (
     <>
       <div className="sticky top-0 z-40 flex h-12 items-center justify-between gap-3 border-b border-line bg-paper/90 px-5 backdrop-blur lg:hidden">
-        <Link href="/" className="flex min-w-0 items-center gap-1.5 text-[18px] leading-none">
-          <Logo className="h-[0.95em] w-auto shrink-0 text-accent" />
-          <span className="font-display text-ink">
-            Chocó<span className="text-accent">-up</span>
-          </span>
+        <Link href="/" className="min-w-0">
+          <Logo className="text-[18px] text-ink" />
         </Link>
         <div className="flex items-center gap-3">
           {utilityLinks()}

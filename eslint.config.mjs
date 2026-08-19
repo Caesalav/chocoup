@@ -72,12 +72,17 @@ const eslintConfig = defineConfig([
           message:
             "El movimiento hacia un pueblo sale de getCityCards() y de ningún otro sitio: el nombre de la vista se escribe una vez, en lib/city-activity.ts.",
         },
+        {
+          selector: 'Literal[value="donation_log"]',
+          message:
+            "El registro de donaciones sale de getDonationLog() y de ningún otro sitio: el nombre de la vista se escribe una vez, en lib/donation-log.ts.",
+        },
       ],
     },
   },
   {
     // Los archivos que definen la palabra tienen que poder escribirla.
-    files: ["lib/needs.ts", "lib/contributions.ts", "lib/city-activity.ts"],
+    files: ["lib/needs.ts", "lib/contributions.ts", "lib/city-activity.ts", "lib/donation-log.ts"],
     rules: { "no-restricted-syntax": "off" },
   },
   {
@@ -131,25 +136,20 @@ const eslintConfig = defineConfig([
         "error",
         {
           selector:
-            "Literal[value=/(cintas|bg-brote|bg-liana|bg-lavanda|border-brote|border-lavanda|text-brote)/]",
+            "Literal[value=/(cintas|bg-brote|bg-liana|bg-lavanda|bg-ciruela|border-brote|border-lavanda|text-brote)/]",
           message:
             "Registro sobrio: en la ficha de una persona no van cintas ni campos de brote, liana o lavanda. La foto y el nombre son lo único que puede levantar la voz aquí. Usa `selva`, `accent` y la escala de necesidad. Ver MARCA.md, «Los dos registros».",
         },
         {
           selector:
-            "TemplateElement[value.raw=/(cintas|bg-brote|bg-liana|bg-lavanda|border-brote|border-lavanda|text-brote)/]",
+            "TemplateElement[value.raw=/(cintas|bg-brote|bg-liana|bg-lavanda|bg-ciruela|border-brote|border-lavanda|text-brote)/]",
           message:
             "Registro sobrio: en la ficha de una persona no van cintas ni campos de brote, liana o lavanda. Ver MARCA.md, «Los dos registros».",
         },
         {
-          selector: "Identifier[name=/^(blockDark|blockLive|blockInvite)$/]",
+          selector: "Identifier[name=/^(blockDark|blockLive|blockInvite|blockOffer)$/]",
           message:
             "Las tres superficies de bloque son del registro abierto: llevan cintas o color a plena potencia. En la ficha de una persona se usan `card` y `panel`. Ver MARCA.md, «Los dos registros».",
-        },
-        {
-          selector: 'MemberExpression[object.name="button"][property.name="invite"]',
-          message:
-            "`button.invite` es el botón de brote del registro abierto. En la ficha de una persona la acción principal es `button.primary`, que es el bloque de selva. Ver MARCA.md, «Los dos registros».",
         },
       ],
     },

@@ -4,7 +4,11 @@ import { useActionState, useState, useSyncExternalStore } from "react";
 import { submitOffer, type OfferFormState } from "./actions";
 import { NEED_CATEGORIES } from "@/lib/constants";
 import { alertBox, button, field, panel } from "@/components/ui/styles";
-import type { OfferTargetWithSource } from "@/lib/data";
+import type { OfferRecord, OfferTarget } from "@/lib/types";
+
+type OfferTargetWithSource = OfferTarget & {
+  completes: Pick<OfferRecord, "id" | "category" | "resource" | "offered_on" | "state"> | null;
+};
 
 /** Ejemplos que se pueden tocar: quien no sabe qué escribir, copia uno. */
 const EXAMPLES = [

@@ -1,4 +1,4 @@
-# Chocó-up
+# ChocóUp
 
 Portal para documentar la situación en municipios del Chocó tras el terremoto, y para
 que cualquier persona pueda ofrecer un recurso concreto.

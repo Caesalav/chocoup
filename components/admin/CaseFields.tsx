@@ -134,7 +134,7 @@ export function CaseFields({
         <span>
           Hay consentimiento para publicar esta causa y sus fotos
           <span className="mt-0.5 block text-xs text-muted">
-            Sin esta casilla se guarda, pero no se puede publicar. Las necesidades y el canal se
+            Sin esta casilla se guarda, pero no se puede publicar. El presupuesto y el canal se
             añaden en el paso siguiente.
           </span>
         </span>

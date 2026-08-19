@@ -19,8 +19,8 @@ export default async function LoginPage({
 
   return (
     <div className="mx-auto max-w-md px-5 pb-8 pt-10 lg:pb-24 lg:pt-16">
-      <Logo className="mb-6 h-10 w-auto text-accent" />
-      <p className="text-[13px] text-faint">Equipo Chocó-up</p>
+      <Logo className="mb-6 text-[32px] text-ink" />
+      <p className="text-[13px] text-faint">Equipo ChocóUp</p>
       <h1 className="mt-2 font-display text-3xl leading-tight text-ink">Entrar al panel</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted">
         Escribe tu correo y tu contraseña.

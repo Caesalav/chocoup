@@ -67,14 +67,40 @@ export const button = {
      `brote` de la referencia, con tinta `selva` encima a 9,52:1. Lleva filete de
      `selva` porque su frontera contra el papel es de 1,30:1 y un control tiene
      que verse dónde empieza; sin el filete es una mancha de color sin borde.
-     No se usa en la ficha de una persona —lo comprueba el `lint`—. */
+     Donar no es esta receta: Donar es `primary`, el mismo `selva` en la ficha,
+     en las tarjetas de causa y en la cabecera. `invite` se queda en /ofrecer. */
   invite: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-selva bg-brote px-6 py-3 text-sm font-medium text-selva hover:bg-liana ${pressable}`,
+  /* Compartir, al lado de Donar: el oscuro de la familia lavanda. `ciruela` es
+     a `lavanda` lo que `selva` es a `liana` —misma hue, más peso— y con tinta
+     `luz` encima se lee como el gemelo frío del botón principal, no como una
+     pastilla hueca. `lavanda` a plena potencia no sirve aquí: es superficie,
+     1,41:1 contra el papel, y un control de ese tono tendría que llevar filete. */
+  share: `inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-ciruela px-6 py-3 text-sm font-medium text-luz hover:bg-ciruela/80 ${pressable}`,
   /* Borrar va en el rojo de la escala y no en el verde de marca: el verde es el
      color de lo que se hace a favor, y un «Borrar este municipio» pintado igual
      que «Donar dinero» es exactamente la confusión que no se puede permitir en
      el panel. Y menos ahora, que el botón de marca es un bloque macizo y llama
      más. `need-high` sobre panel alto da 9,22:1, y 7,12:1 sobre su lavado. */
   danger: `inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-transparent px-4 py-2 text-sm font-medium text-need-high hover:border-need-high hover:bg-need-high-soft ${pressable}`,
+};
+
+/**
+ * Los tres tramos de la pista de dinero.
+ *
+ * Lo donado va en `liana`, el verde vivo: aquí es dato, no cinta. Lo utilizado
+ * va en `selva`, más oscuro, el dinero que ya salió. El resto de la meta queda
+ * en `canvas`. `liana` contra `canvas` da 2,37:1 y no llega a WCAG 1.4.11, así
+ * que entre tramos va un filo de papel —el mismo dibujo que separa «Abierta» de
+ * «Cubierta»—. `selva` contra `liana` sí llega, 4,81:1.
+ *
+ * La receta vive aquí y no en `components/case` porque el `lint` del registro
+ * sobrio mira `bg-liana` escrito en esos archivos. Ver MARCA.md, «Los dos
+ * registros».
+ */
+export const moneyTrack = {
+  rest: "bg-canvas",
+  donated: "bg-liana",
+  used: "bg-selva",
 };
 
 /**
@@ -187,6 +213,13 @@ export const blockLive = "rounded-3xl bg-brote cintas text-selva";
  * una tercera cosa que no hace falta.
  */
 export const blockInvite = "rounded-3xl bg-lavanda text-ink";
+
+/**
+ * El encabezado de /ofrecer: las mismas cintas que «El Chocó ahora», en la
+ * familia de la lavanda. El verde de donar no se toca: vive en el botón, no
+ * en este bloque.
+ */
+export const blockOffer = "rounded-3xl bg-ciruela cintas-lavanda text-panel-high";
 
 /**
  * La tarjeta grande de este diseño: radio generoso, blanco puro y sombra de

@@ -30,7 +30,7 @@ export function MapStatus({
         <span aria-hidden> · </span>
         {plural(openCases, "caso abierto", "casos abiertos")}
         <span aria-hidden> · </span>
-        {plural(openNeeds, "necesidad abierta", "necesidades abiertas")}
+        {plural(openNeeds, "ítem pendiente", "ítems pendientes")}
       </p>
       {updatedAt && <p>Actualizado {formatDate(updatedAt)}</p>}
     </div>

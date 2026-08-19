@@ -5,7 +5,6 @@ import {
   FeedbackIcon,
   HomeIcon,
   MapIcon,
-  NeedsIcon,
   OfferIcon,
   PledgeIcon,
   SearchIcon,
@@ -40,15 +39,15 @@ export type Destination = {
  */
 export const SECTIONS: readonly Destination[] = [
   { href: "/municipios", label: "Municipios", Icon: TownIcon, owns: ["/ciudades"] },
-  { href: "/necesidades", label: "Necesidades", Icon: NeedsIcon },
   { href: "/casos", label: "Casos", Icon: CasesIcon },
   { href: "/donaciones", label: "Donaciones", Icon: DonationIcon },
 ] as const;
 
 /**
  * Las cuatro cosas que se hacen desde cualquier pantalla. No repiten las
- * secciones: aquí no se entra a mirar material, se vuelve al principio, se
- * sitúa uno, se busca o se ofrece algo.
+ * secciones: aquí se vuelve al principio, se sitúa uno, se busca o se ofrece
+ * algo. Buscar abre el campo en la barra; /buscar queda para quien no tiene
+ * JavaScript y para enviar el formulario.
  */
 export const TABS: readonly Destination[] = [
   { href: "/", label: "Inicio", Icon: HomeIcon },

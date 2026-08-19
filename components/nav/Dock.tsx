@@ -11,16 +11,22 @@ import Link from "next/link";
 export function Dock({
   label,
   children,
+  wide = false,
 }: {
   label: string;
   children: ReactNode;
+  wide?: boolean;
 }) {
   return (
     <nav
       aria-label={label}
       className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden"
     >
-      <ul className="flex items-center gap-0.5 rounded-full bg-selva/95 p-1.5 shadow-float backdrop-blur">
+      <ul
+        className={`flex items-center gap-0.5 rounded-full bg-selva/95 p-1.5 shadow-float backdrop-blur ${
+          wide ? "w-full max-w-xl" : ""
+        }`}
+      >
         {children}
       </ul>
     </nav>
@@ -77,12 +83,15 @@ export function DockAction({
   active: boolean;
   Icon: (props: { className?: string }) => React.ReactElement;
 }) {
+  /* Donar es `selva` con tinta `luz` en todo el portal. Aquí el suelo ya es
+     `selva`, así que la pastilla se invierte —`luz` con tinta `selva`— para
+     que se recorte; son los mismos dos colores, no un tercer verde. */
   return (
     <li>
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-brote px-3.5 text-selva transition-colors hover:bg-liana focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-luz"
+        className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-luz px-3.5 text-selva transition-colors hover:bg-panel-high focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-luz"
       >
         <Icon className="size-[20px] shrink-0" />
         <span className="text-[13px] font-medium">{label}</span>

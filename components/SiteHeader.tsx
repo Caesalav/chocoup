@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { NavSearch, SearchTabLink, useNavSearch } from "@/components/nav/NavSearch";
 import { activeHref, DONATE, SECTIONS, TABS, type Destination } from "@/components/nav/destinations";
 import { shell } from "@/components/ui/styles";
 
@@ -12,6 +13,8 @@ import { shell } from "@/components/ui/styles";
  * Es el mismo mapa que la barra inferior del móvil, repartido como cabe arriba:
  * la marca es el inicio, las secciones van a la izquierda y a la derecha
  * quedan las acciones —situarse, buscar, ofrecer— y el botón de donar.
+ *
+ * Buscar convierte esta fila en un campo. Cancelar la devuelve.
  *
  * Aquí van en palabras y abajo en iconos, que es lo que pide cada sitio: en una
  * barra de 60 px cabe un dibujo, en una cabecera de 1400 cabe el nombre. Lo que
@@ -24,41 +27,64 @@ import { shell } from "@/components/ui/styles";
  * JavaScript funciona igual.
  */
 
-/** Las secciones de la cabecera, sin donar: eso va como botón a la derecha. */
 const HEADER_SECTIONS = SECTIONS.filter((item) => item.href !== DONATE.href);
 
-/** Las acciones, que son las de la barra inferior menos el inicio: eso ya lo es
- *  la marca, y repetirlo al lado sería el mismo enlace dos veces. */
 const ACTIONS = TABS.filter((tab) => tab.href !== "/");
 
 const item =
   "flex min-h-10 items-center rounded-full px-3.5 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const idle = "text-body hover:bg-line hover:text-ink";
-/* La sección abierta es una pastilla de `selva` con tinta `luz`, 12,77:1. Era de
-   tinta neutra: el mismo negro que el texto, que marcaba bien pero no decía de
-   quién es esta web. */
-const open = "bg-selva font-medium text-luz";
+const openClass = "bg-selva font-medium text-luz";
+const donateClass = `${item} bg-selva font-medium text-luz hover:bg-accent-strong`;
 
 export function SiteHeader({ className = "" }: { className?: string }) {
   const pathname = usePathname();
+  const search = useNavSearch();
   const branch = activeHref(pathname, [...SECTIONS, ...ACTIONS]);
   const atHome = pathname === "/";
-  // Donar sale de la fila de secciones y va como botón, así que su estado
-  // abierto se marca aquí y no en `branch`.
   const onDonate = branch === DONATE.href;
 
   const links = (items: readonly Destination[]) =>
-    items.map(({ href, label }) => (
-      <li key={href}>
-        <Link
-          href={href}
-          aria-current={href === branch ? "page" : undefined}
-          className={`${item} ${href === branch ? open : idle}`}
-        >
-          {label}
-        </Link>
-      </li>
-    ));
+    items.map(({ href, label }) => {
+      if (href === "/buscar") {
+        return (
+          <li key={href}>
+            <SearchTabLink
+              href={href}
+              label={label}
+              onOpen={search.openSearch}
+              className={`${item} ${idle}`}
+            >
+              {label}
+            </SearchTabLink>
+          </li>
+        );
+      }
+      if (href === DONATE.href) {
+        return (
+          <li key={href}>
+            <Link
+              href={href}
+              aria-current={onDonate ? "page" : undefined}
+              className={donateClass}
+            >
+              {label}
+            </Link>
+          </li>
+        );
+      }
+      return (
+        <li key={href}>
+          <Link
+            href={href}
+            aria-current={href === branch ? "page" : undefined}
+            className={`${item} ${href === branch ? openClass : idle}`}
+          >
+            {label}
+          </Link>
+        </li>
+      );
+    });
 
   return (
     <header
@@ -68,45 +94,25 @@ export function SiteHeader({ className = "" }: { className?: string }) {
         <Link
           href="/"
           aria-current={atHome ? "page" : undefined}
-          className="group flex shrink-0 items-center gap-2 text-[22px] leading-none"
+          className="shrink-0"
         >
-          <Logo
-            className={`h-[1.05em] w-auto shrink-0 transition-colors ${
-              atHome ? "text-accent" : "text-ink group-hover:text-accent"
-            }`}
-          />
-          <span className="font-display text-ink">
-            Chocó<span className="text-accent">-up</span>
-          </span>
+          <Logo className="text-[24px] text-ink" />
         </Link>
 
-        <nav aria-label="Secciones del portal" className="hidden lg:block">
-          <ul className="flex items-center gap-1">{links(HEADER_SECTIONS)}</ul>
-        </nav>
+        {search.open ? (
+          <NavSearch variant="header" onClose={search.closeSearch} />
+        ) : (
+          <>
+            <nav aria-label="Secciones del portal" className="hidden lg:block">
+              <ul className="flex items-center gap-1">{links(HEADER_SECTIONS)}</ul>
+            </nav>
 
-        <nav aria-label="Acciones" className="ml-auto hidden lg:block">
-          <ul className="flex items-center gap-1">
-            {links(ACTIONS)}
-            {/* Donar es la acción de la cabecera y va en `brote`, el bloque vivo
-                de la referencia, con tinta `selva` a 9,52:1 y filete del mismo
-                verde: la frontera de brote contra el papel es de 1,30:1 y sin el
-                filete no se vería dónde empieza el botón. Es lo que lo separa de
-                la pastilla de la sección abierta, que es `selva` maciza. */}
-            <li>
-              <Link
-                href={DONATE.href}
-                aria-current={onDonate ? "page" : undefined}
-                className={`${item} border border-selva bg-brote font-medium text-selva hover:bg-liana hover:text-selva`}
-              >
-                {DONATE.label}
-              </Link>
-            </li>
-          </ul>
-        </nav>
+            <nav aria-label="Acciones" className="ml-auto hidden lg:block">
+              <ul className="flex items-center gap-1">{links([...ACTIONS, DONATE])}</ul>
+            </nav>
+          </>
+        )}
 
-        {/* Menú sin JavaScript para cuando la cabecera es lo único que hay, en
-            pantallas estrechas. En el portal público no llega a verse —por debajo
-            de `lg` manda la barra inferior— y el panel hace lo mismo. */}
         <details className="group relative ml-auto lg:hidden">
           <summary
             className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-line-strong bg-panel-high [&::-webkit-details-marker]:hidden"

@@ -43,8 +43,8 @@ export function CityRow({ city }: { city: CityCardData }) {
 
         <p className="mt-1.5 text-[13px] text-muted">
           {hasBar
-            ? `${percent} % cubierto · ${plural(city.openNeeds, "necesidad abierta", "necesidades abiertas")}`
-            : plural(city.openNeeds, "necesidad abierta", "necesidades abiertas")}
+            ? `${percent} % de la meta · ${plural(city.openNeeds, "ítem pendiente", "ítems pendientes")}`
+            : plural(city.openNeeds, "ítem pendiente", "ítems pendientes")}
         </p>
         <p className="mt-0.5 text-[12px] text-faint">
           {plural(city.caseCount, "caso documentado", "casos documentados")}

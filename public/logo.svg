@@ -1,4 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 175" fill="currentColor" aria-hidden="true">
-  <path d="M100 0 150 25v50L100 50 50 75V25Z"/>
-  <path d="M50 75 0 100v50l50 25 50-25 50 25v-50l-50-25-50 25V75Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 72" fill="none">
+  <!-- El logotipo suelto, para lo que no puede montar el componente: una vista
+       previa, un correo, una lámina. No carga Outfit —un SVG suelto no puede
+       contar con una fuente web— así que cae en Arial Black, que es la negra
+       geométrica de respaldo.
+
+       El «UP» va en un <tspan> dentro del mismo <text>: el color es lo único
+       que lo distingue, y el flujo del texto coloca el sufijo sin una `x`
+       escrita a mano. -->
+  <text
+    x="0"
+    y="54"
+    font-family="'Arial Black', 'Helvetica Neue', Helvetica, sans-serif"
+    font-weight="800"
+    font-size="48"
+    letter-spacing="-2.4"
+    fill="#0E1A15"
+  >CHOCÓ-<tspan fill="#126A44">UP</tspan></text>
 </svg>

@@ -24,11 +24,11 @@ export function ProgressCard({ totals }: { totals: PortalTotals }) {
         <p className="font-display text-[26px] leading-none tabular-nums text-ink">
           {totals.coveredNeeds}
           <span className="text-faint"> /{totals.needs}</span>{" "}
-          <span className="font-sans text-[15px] font-normal text-muted">necesidades</span>
+          <span className="font-sans text-[15px] font-normal text-muted">ítems</span>
         </p>
 
         <Link
-          href="/necesidades"
+          href="/casos"
           className="shrink-0 rounded-full border border-line-strong px-4 py-2 text-[13px] font-medium text-body transition-[border-color,color,scale] duration-150 hover:border-ink/40 hover:text-ink active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Ver
@@ -39,15 +39,15 @@ export function ProgressCard({ totals }: { totals: PortalTotals }) {
           tarjeta blanca es el único hueco que se ve sin dibujarle un borde. */}
       <div
         role="img"
-        aria-label={`${totals.coveredNeeds} de ${totals.needs} necesidades cubiertas`}
+        aria-label={`${totals.coveredNeeds} de ${totals.needs} ítems comprados`}
         className="mt-4 h-2 overflow-hidden rounded-full bg-canvas"
       >
         <div className="h-full rounded-full bg-accent" style={{ width: `${done}%` }} />
       </div>
 
       <p className="mt-2.5 text-[12px] text-faint">
-        {totals.coveredNeeds} cubiertas ·{" "}
-        {plural(totals.openNeeds, "abierta", "abiertas")} en{" "}
+        {totals.coveredNeeds} comprados ·{" "}
+        {plural(totals.openNeeds, "pendiente", "pendientes")} en{" "}
         {plural(totals.cities, "municipio", "municipios")}
       </p>
 

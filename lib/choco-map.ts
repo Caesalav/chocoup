@@ -80,18 +80,78 @@ export type MapPin = {
   progress?: { total: number; ratio: number };
 };
 
+/**
+ * De qué lado del punto cae el nombre. `start` es hacia el este, `end` hacia el
+ * oeste y `middle` es centrado justo encima o debajo del punto, que es lo que
+ * salva la zona apretada del San Juan sin trazar una guía larguísima.
+ */
+export type LabelAnchor = "start" | "middle" | "end";
+
 export type PlacedPin = MapPin & {
   x: number;
   y: number;
   labelX: number;
   labelY: number;
-  anchor: "start" | "end";
+  anchor: LabelAnchor;
 };
 
 const LABEL_GAP = 14;
-const MIN_LABEL_SPACING = 30;
-const MAX_X = LAND.width + GUTTER;
 const MIN_X = -GUTTER;
+
+/**
+ * Radio del punto de una ciudad con su filete de papel, en unidades del
+ * viewBox. Es lo que un rótulo ajeno no puede pisar: un nombre encima de un
+ * punto que no es el suyo miente sobre qué pueblo está nombrando.
+ */
+const DOT_REACH = 10;
+
+/**
+ * Cuánto se puede alejar un rótulo de la latitud de su pueblo, y cada cuánto se
+ * prueba una altura.
+ *
+ * El paso es media línea: más fino solo afinaría lo que no se ve y
+ * multiplicaría las pruebas. El alcance da para apilar unos cinco rótulos por
+ * columna alrededor de una misma latitud, que es el nudo que forman los
+ * municipios pequeños del San Juan cuando estén los treinta documentados.
+ */
+const LABEL_STEP = 7;
+const LABEL_REACH = 154;
+
+/**
+ * Lo que cuesta mandar un rótulo al margen contrario, medido en las mismas
+ * unidades que el desvío vertical.
+ *
+ * Cruzar de lado obliga a la guía a atravesar el departamento entero, así que
+ * sale más caro que bajar el rótulo nueve pasos. Se paga cuando no queda otra
+ * —"El Carmen de Atrato" no cabe por el este— y no por gusto.
+ */
+const SIDE_COST = 145;
+
+/**
+ * Lo que cuesta poner el nombre centrado justo encima o debajo de su punto, en
+ * vez de a un lado.
+ *
+ * Es la tercera familia de sitios y existe para el nudo del San Juan, donde una
+ * docena de municipios diminutos se apilan en doscientas unidades de latitud.
+ * Ahí el margen se agota, y la alternativa era una guía de cien unidades
+ * cruzando tres municipios para llegar a un hueco: el nombre pegado a su punto
+ * dice lo mismo sin trazar nada. Cuesta un poco más que quedarse en el margen a
+ * su misma altura, para que los dos carriles del dibujo sigan siendo lo normal y
+ * esto sea la excepción de la zona apretada.
+ */
+const MIDDLE_COST = 12;
+
+/**
+ * Y la cuarta libertad: separar el nombre de su punto hacia el margen, con la
+ * guía siguiéndolo.
+ *
+ * Es lo que le da al mapa una columna de nombres cuando la zona se llena, que es
+ * como resuelve esto un mapa impreso. Sin ella, y con los treinta documentados,
+ * a cuatro pueblos no les quedaba más sitio que posar su nombre sobre el punto de
+ * un vecino. Cuesta lo que se aparte, así que a nadie le compensa hasta que no
+ * queda hueco cerca.
+ */
+const OUT_STEPS = [0, 34, 68, 102];
 
 /**
  * Tipografía de los dos rótulos del mapa.
@@ -101,23 +161,60 @@ const MIN_X = -GUTTER;
  * cuerpo en un archivo y la medida en otro, el día que alguien suba una letra el
  * cálculo deja de valer sin avisar.
  */
-export const CITY_LABEL = { fontSize: 21, letterSpacing: 2 };
-export const OCEAN_LABEL = { text: "OCÉANO PACÍFICO", fontSize: 20, letterSpacing: 5 };
+export const CITY_LABEL = { fontSize: 20, letterSpacing: 0.6 };
+export const OCEAN_LABEL = { text: "Océano Pacífico", fontSize: 18, letterSpacing: 2.4 };
 
 type LabelType = { fontSize: number; letterSpacing: number };
 
 /**
- * Cuánto mide un rótulo escrito en mayúsculas.
+ * Lo que avanza cada letra, en fracción del cuerpo, por clases de anchura.
  *
- * El 0,6 del cuerpo es el avance medio de una mayúscula en esta familia; medido
- * contra lo que dibuja el navegador, el error no pasa de siete unidades
- * ("QUIBDÓ" se queda corto por la Q y la Ó, "ISTMINA" se pasa por las íes). Es
- * una estimación a propósito: medir de verdad exige una caja de texto y esto se
- * calcula en el servidor, así que todo lo que decide con ella lleva holgura por
- * encima de ese error.
+ * Medido en el navegador sobre la familia del portal —Outfit, peso 500, que es
+ * con la que se dibujan estos rótulos— y redondeado SIEMPRE hacia arriba dentro
+ * de cada clase, para que la estimación no pueda quedarse corta.
+ *
+ * Sustituye a un 0,58 plano para todas las letras, y no es afinar por afinar:
+ * con el número plano, «El Litoral del San Juan» se reservaba 281 unidades para
+ * ocupar 211, un 33 % de más. Ese 33 % lo pagaba la colocación, porque un sitio
+ * que en realidad servía se descartaba por no caber, y de ahí salían los últimos
+ * rótulos pisando el punto de un vecino cuando el mapa se llena. Ahora el error
+ * es del 5 % y sigue siendo por exceso.
+ *
+ * Se estima y no se mide porque esto se calcula en el servidor, donde no hay
+ * caja de texto que preguntar. SI CAMBIA LA FAMILIA HAY QUE VOLVER A MEDIR, y la
+ * receta es esta, en la consola sobre cualquier mapa del portal:
+ *
+ *   const p = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+ *   p.setAttribute('font-size', '20'); p.setAttribute('font-weight', '500');
+ *   document.querySelector('svg').append(p);
+ *   const w = (s) => { p.textContent = s; return p.getComputedTextLength(); };
+ *   [...'abc…'].map((c) => [c, (w('nn' + c + 'nn') - w('nnnn')) / 20]);
+ */
+const ADVANCE: [string, number][] = [
+  [" ", 0.2],
+  ["iíljIÍ", 0.27],
+  ["tfr", 0.41],
+  ["szckJvxyuTúeé", 0.53],
+  ["hnLñoSógFabdpqYáEZÉP", 0.6],
+  ["BVRKXCUÚAÁHNÑD", 0.74],
+];
+
+/** Las letras que no están en la tabla —una ese larga, un dígito, un guion— se
+ *  cobran como la clase más ancha: sobrar es lo correcto aquí. */
+const WIDEST = 0.92;
+
+/**
+ * Cuánto mide un rótulo, en unidades del viewBox.
+ *
+ * Se estima por exceso a propósito: de esta cuenta dependen los choques, y un
+ * rótulo que se creyera más estrecho de lo que es se colocaría encima de otro.
  */
 function labelWidth(text: string, { fontSize, letterSpacing }: LabelType): number {
-  return text.length * (fontSize * 0.6 + letterSpacing);
+  let advance = 0;
+  for (const letter of text) {
+    advance += ADVANCE.find(([set]) => set.includes(letter))?.[1] ?? WIDEST;
+  }
+  return advance * fontSize + letterSpacing * text.length;
 }
 
 /** Alto del renglón. Un pelo más que la tinta —mayúsculas acentuadas incluidas—
@@ -129,52 +226,30 @@ const lineHeight = ({ fontSize }: LabelType) => fontSize * 1.4;
  *  dos razones a la vez. */
 const LABEL_PAD = 8;
 
+/** Cuánto sube o baja el nombre centrado respecto a su punto: el radio del punto
+ *  con su halo, la mitad del renglón y un aire. Solo existen estas dos alturas,
+ *  así que un nombre centrado nunca necesita guía. */
+export const MIDDLE_RISE = DOT_REACH + lineHeight(CITY_LABEL) / 2 + 6;
+
 /**
- * Sitúa cada ciudad y coloca su etiqueta hacia el margen más cercano, separando
- * en vertical las que se pisarían.
+ * La guía que une un punto con su nombre, o null cuando el nombre está pegado a
+ * él y se entiende sin trazar nada.
  *
- * Un nombre largo cerca del borde se voltea al otro lado: "El Carmen de Atrato"
- * está al este del departamento y su etiqueta no cabe por la derecha.
+ * Vive aquí y no en el componente porque la decisión es de la colocación: solo
+ * ella sabe si ese rótulo se ha tenido que apartar, y de cuánto. El extremo cae
+ * en el propio rótulo a propósito: los nombres se pintan después y con halo de
+ * papel, así que le tapan la punta y la guía no le entra en la tinta.
  */
-export function placePins(pins: MapPin[]): PlacedPin[] {
-  const placed = pins.map((pin) => {
-    const { x, y } = projectToMap(pin.lat, pin.lng);
-    const width = labelWidth(pin.name, CITY_LABEL);
+export function leaderFor(pin: PlacedPin): { x1: number; y1: number; x2: number; y2: number } | null {
+  const nudged =
+    pin.anchor === "middle"
+      ? Math.abs(pin.labelY - pin.y) > MIDDLE_RISE + 2
+      : Math.abs(pin.labelY - pin.y) > 2 || Math.abs(Math.abs(pin.labelX - pin.x) - LABEL_GAP) > 2;
 
-    const fitsRight = x + LABEL_GAP + width <= MAX_X;
-    const fitsLeft = x - LABEL_GAP - width >= MIN_X;
-
-    let toLeft = x >= LAND.width / 2 ? false : true;
-    if (toLeft && !fitsLeft && fitsRight) toLeft = false;
-    if (!toLeft && !fitsRight && fitsLeft) toLeft = true;
-
-    return {
-      ...pin,
-      x,
-      y,
-      labelX: toLeft ? x - LABEL_GAP : x + LABEL_GAP,
-      labelY: y,
-      anchor: (toLeft ? "end" : "start") as "start" | "end",
-    };
-  });
-
-  for (const side of ["end", "start"] as const) {
-    const column = placed
-      .filter((pin) => pin.anchor === side)
-      .sort((a, b) => a.labelY - b.labelY);
-
-    for (let index = 1; index < column.length; index += 1) {
-      const gap = column[index].labelY - column[index - 1].labelY;
-      if (gap < MIN_LABEL_SPACING) {
-        column[index].labelY = column[index - 1].labelY + MIN_LABEL_SPACING;
-      }
-    }
-  }
-
-  return placed;
+  return nudged ? { x1: pin.x, y1: pin.y, x2: pin.labelX, y2: pin.labelY } : null;
 }
 
-/** Lo que un rótulo ya colocado le quita al mapa, en unidades del viewBox. */
+/** Lo que un rótulo ocupa del mapa, en unidades del viewBox. */
 type Box = { x1: number; y1: number; x2: number; y2: number };
 
 /** El renglón se dibuja siete unidades por debajo del punto de anclaje, que es lo
@@ -182,16 +257,209 @@ type Box = { x1: number; y1: number; x2: number; y2: number };
  *  la caja se puede tomar centrada en `labelY`. */
 export const LABEL_BASELINE = 7;
 
-function cityBox(pin: PlacedPin): Box {
-  const width = labelWidth(pin.name, CITY_LABEL);
+const overlaps = (a: Box, b: Box) => a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1;
+
+const overlapArea = (a: Box, b: Box) =>
+  Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)) *
+  Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+
+const insideFrame = (box: Box) =>
+  box.x1 >= VIEW_BOX.minX &&
+  box.x2 <= VIEW_BOX.minX + VIEW_BOX.width &&
+  box.y1 >= VIEW_BOX.minY &&
+  box.y2 <= VIEW_BOX.minY + VIEW_BOX.height;
+
+/**
+ * La caja de un rótulo puesto a esa altura y con ese anclaje.
+ *
+ * Es la única cuenta de geometría de rótulo que hay en el archivo: la usan la
+ * colocación, el rótulo del océano y `cityBox`. Cuando la caja la calculaba cada
+ * uno por su cuenta, la colocación resolvía choques con una medida y el océano
+ * los buscaba con otra.
+ */
+function labelBox(labelX: number, width: number, anchor: LabelAnchor, labelY: number): Box {
   const half = lineHeight(CITY_LABEL) / 2;
+  const left = anchor === "end" ? labelX - width : anchor === "start" ? labelX : labelX - width / 2;
 
   return {
-    x1: (pin.anchor === "end" ? pin.labelX - width : pin.labelX) - LABEL_PAD,
-    x2: (pin.anchor === "end" ? pin.labelX : pin.labelX + width) + LABEL_PAD,
-    y1: pin.labelY - half - LABEL_PAD,
-    y2: pin.labelY + half + LABEL_PAD,
+    x1: left - LABEL_PAD,
+    x2: left + width + LABEL_PAD,
+    y1: labelY - half - LABEL_PAD,
+    y2: labelY + half + LABEL_PAD,
   };
+}
+
+function cityBox(pin: PlacedPin): Box {
+  return labelBox(pin.labelX, labelWidth(pin.name, CITY_LABEL), pin.anchor, pin.labelY);
+}
+
+/**
+ * La caja del nombre de una ciudad ya colocada, para que el mapa la pueda hacer
+ * tocable.
+ *
+ * En un teléfono el nombre es el blanco más grande y más fácil que tiene un
+ * municipio: «Quibdó» mide unos 30 × 10 px, y la forma de Bahía Solano, 21 px de
+ * ancho en su parte más gruesa. Quien va a abrir un pueblo apunta a su nombre, no
+ * a un polígono de veintiún píxeles.
+ */
+export function labelHitBox(pin: PlacedPin): { x: number; y: number; width: number; height: number } {
+  const box = cityBox(pin);
+  return { x: box.x1, y: box.y1, width: box.x2 - box.x1, height: box.y2 - box.y1 };
+}
+
+/** Alturas que se prueban en los márgenes, de la propia hacia fuera y arriba
+ *  antes que abajo. */
+const HEIGHTS = (() => {
+  const steps = [0];
+  for (let step = LABEL_STEP; step <= LABEL_REACH; step += LABEL_STEP) steps.push(-step, step);
+  return steps;
+})();
+
+type Slot = {
+  anchor: LabelAnchor;
+  labelX: number;
+  labelY: number;
+  box: Box;
+  cost: number;
+  onDot: boolean;
+};
+
+/**
+ * Sitúa cada ciudad y coloca su rótulo donde no pise a nadie.
+ *
+ * ES UN COLOCADOR, NO UNA CORRECCIÓN. Antes se ponía cada rótulo al lado de su
+ * punto y luego se empujaban hacia abajo los de la misma columna que se
+ * solapaban, y eso se rompía por tres sitios a la vez: dos rótulos de columnas
+ * distintas —uno mirando al este, otro volteado al oeste— podían caer en la
+ * misma banda y nadie los miraba; el empujón solo iba hacia abajo, así que el
+ * último de una cola se salía del marco por el pie (con los treinta
+ * documentados, "Sipí" acababa 18 unidades fuera); y ningún rótulo miraba los
+ * puntos de las demás ciudades, así que "Atrato" se posaba sobre el punto del
+ * vecino. Con cuatro municipios documentados eso casi no se veía. Con treinta se
+ * ve todo, y van a entrar más.
+ *
+ * Ahora cada pueblo trae una lista de sitios posibles —los dos márgenes, y
+ * dentro de cada uno las alturas de `HEIGHTS`— ordenada por lo que cuesta cada
+ * uno: quedarse a su latitud es gratis, alejarse cuesta lo que se aleje, y
+ * cruzarse al margen contrario cuesta más que cualquier desvío vertical. Se
+ * reparten los sitios de una pasada, y los pueblos con menos sitios libres
+ * eligen primero: el que está encajonado se queda sin nada si va detrás, y el
+ * que tiene el margen entero para él encuentra hueco igual.
+ *
+ * El resultado no depende del orden en que lleguen las ciudades ni de la hora:
+ * todo sale de las coordenadas y de los nombres, así que el servidor y el
+ * navegador dibujan el mismo mapa.
+ */
+export function placePins(pins: MapPin[]): PlacedPin[] {
+  const seats = pins.map((pin) => {
+    const { x, y } = projectToMap(pin.lat, pin.lng);
+    return { pin, x, y, width: labelWidth(pin.name, CITY_LABEL), near: x < LAND.width / 2 };
+  });
+
+  const dots = seats.map(({ x, y }) => ({
+    x1: x - DOT_REACH,
+    x2: x + DOT_REACH,
+    y1: y - DOT_REACH,
+    y2: y + DOT_REACH,
+  }));
+
+  const slots = seats.map((seat, index) => {
+    const list: Slot[] = [];
+    // El punto propio queda pegado al rótulo por definición; los ajenos no.
+    const add = (anchor: LabelAnchor, labelX: number, labelY: number, cost: number) => {
+      const box = labelBox(labelX, seat.width, anchor, labelY);
+      if (!insideFrame(box)) return;
+      list.push({
+        anchor,
+        labelX,
+        labelY,
+        box,
+        cost,
+        onDot: dots.some((dot, other) => other !== index && overlaps(box, dot)),
+      });
+    };
+
+    const near: LabelAnchor = seat.near ? "end" : "start";
+    const far: LabelAnchor = seat.near ? "start" : "end";
+    const reach = (anchor: LabelAnchor, out: number) =>
+      anchor === "end" ? seat.x - LABEL_GAP - out : seat.x + LABEL_GAP + out;
+
+    for (const dy of HEIGHTS) {
+      for (const out of OUT_STEPS) {
+        add(near, reach(near, out), seat.y + dy, Math.abs(dy) + out);
+        add(far, reach(far, out), seat.y + dy, Math.abs(dy) + out + SIDE_COST);
+      }
+      // Centrado nunca puede quedar a la altura de su propio punto: la primera
+      // altura posible es justo encima o justo debajo, y de ahí hacia fuera.
+      for (const sign of [-1, 1]) {
+        const rise = MIDDLE_RISE + Math.abs(dy);
+        add("middle", seat.x, seat.y + sign * rise, rise + MIDDLE_COST);
+      }
+    }
+
+    // Un nombre tan largo que no cabe en ningún sitio se queda a la latitud de
+    // su pueblo y asomando: un rótulo de menos sería un municipio sin nombre.
+    if (list.length === 0) {
+      const labelX = reach(near, 0);
+      list.push({
+        anchor: near,
+        labelX,
+        labelY: seat.y,
+        box: labelBox(labelX, seat.width, near, seat.y),
+        cost: 0,
+        onDot: false,
+      });
+    }
+
+    return list.sort((a, b) => Number(a.onDot) - Number(b.onDot) || a.cost - b.cost);
+  });
+
+  // Los encajonados eligen primero. El desempate es por latitud y luego por el
+  // orden de llegada, para que el reparto no dependa de nada más.
+  const turns = seats
+    .map((seat, index) => ({ index, free: slots[index].filter((slot) => !slot.onDot).length, y: seat.y }))
+    .sort((a, b) => a.free - b.free || a.y - b.y || a.index - b.index)
+    .map((turn) => turn.index);
+
+  const picked: (Slot | undefined)[] = new Array(seats.length);
+
+  /** El mejor sitio para este pueblo contando con lo que ya han cogido los
+   *  demás. Sin ningún hueco limpio gana el que menos pisa: roza, pero no
+   *  esconde un nombre. */
+  const bestFor = (index: number) => {
+    const others = picked.filter((slot, other) => slot && other !== index).map((slot) => slot!.box);
+    const list = slots[index];
+    const clean = list.find((slot) => !others.some((box) => overlaps(box, slot.box)));
+    if (clean) return clean;
+
+    const spillOf = (slot: Slot) => others.reduce((sum, box) => sum + overlapArea(box, slot.box), 0);
+    return list.reduce((best, slot) => (spillOf(slot) < spillOf(best) ? slot : best), list[0]);
+  };
+
+  for (const index of turns) picked[index] = bestFor(index);
+
+  // Y una segunda vuelta, que es la que arregla lo que el reparto de una pasada
+  // no puede ver: el primero en elegir se queda con el hueco que era la única
+  // salida del último. Cada pueblo suelta su sitio y vuelve a elegir contando
+  // con los demás ya colocados; en cuanto una vuelta no mueve a nadie, se para.
+  // Con los treinta documentados converge en tres.
+  for (let round = 0; round < 6; round += 1) {
+    let moved = false;
+    for (const index of turns) {
+      const before = picked[index];
+      const after = bestFor(index);
+      if (after !== before) {
+        picked[index] = after;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+
+  return seats.map((seat, index) => {
+    const { anchor, labelX, labelY } = picked[index]!;
+    return { ...seat.pin, x: seat.x, y: seat.y, labelX, labelY, anchor };
+  });
 }
 
 /** Resolución de la tabla de la costa. El contorno viene simplificado a 170

@@ -69,7 +69,7 @@ async function requireCity(cityId: string | null): Promise<Session> {
  * oculto, bastaría cambiarlo para escribir donde no toca.
  */
 async function cityOfRow(
-  table: "cases" | "needs" | "photos" | "offers" | "case_updates",
+  table: "cases" | "needs" | "photos" | "offers" | "case_updates" | "budget_items",
   id: string,
 ): Promise<string | null> {
   const supabase = await createSupabaseServerClient();
@@ -80,7 +80,7 @@ async function cityOfRow(
 
 /** Como requireCity, pero resolviendo el municipio desde la fila. */
 async function requireRowCity(
-  table: "cases" | "needs" | "photos" | "offers" | "case_updates",
+  table: "cases" | "needs" | "photos" | "offers" | "case_updates" | "budget_items",
   id: string,
 ): Promise<Session> {
   return requireCity(await cityOfRow(table, id));
@@ -486,6 +486,58 @@ export async function deleteNeed(formData: FormData) {
 
   const { error } = await supabase.from("needs").delete().eq("id", id);
   if (error) fail("No se pudo borrar la necesidad", error);
+}
+
+function copAmount(formData: FormData, key: string): number {
+  const digits = text(formData, key).replace(/\D/g, "");
+  return Number(digits);
+}
+
+export async function createBudgetItem(formData: FormData) {
+  const cityId = optionalId(formData, "city_id");
+  const caseId = optionalId(formData, "case_id");
+  if (!cityId || !caseId) throw new Error("Falta la causa.");
+
+  const { supabase } = await requireCity(cityId);
+  await caseInCity(caseId, cityId);
+
+  const amount = copAmount(formData, "amount_cop");
+  if (!Number.isFinite(amount) || amount < 1) {
+    throw new Error("El precio tiene que ser un número en pesos, mayor que cero.");
+  }
+
+  const { error } = await supabase.from("budget_items").insert({
+    city_id: cityId,
+    case_id: caseId,
+    title: text(formData, "title"),
+    amount_cop: amount,
+  });
+
+  if (error) fail("No se pudo añadir el ítem", error);
+}
+
+export async function toggleBudgetItem(formData: FormData) {
+  const id = optionalId(formData, "id");
+  if (!id) throw new Error("Falta el ítem.");
+
+  const { supabase } = await requireRowCity("budget_items", id);
+  const purchased = bool(formData, "purchased");
+
+  const { error } = await supabase
+    .from("budget_items")
+    .update({ purchased })
+    .eq("id", id);
+
+  if (error) fail("No se pudo actualizar el ítem", error);
+}
+
+export async function deleteBudgetItem(formData: FormData) {
+  const id = optionalId(formData, "id");
+  if (!id) throw new Error("Falta el ítem.");
+
+  const { supabase } = await requireRowCity("budget_items", id);
+  const { error } = await supabase.from("budget_items").delete().eq("id", id);
+  if (error) fail("No se pudo borrar el ítem", error);
 }
 
 // ---------------------------------------------------------------------------

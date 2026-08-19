@@ -76,7 +76,7 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
     <div className="lg:grid lg:h-[calc(100svh-var(--strip-h,0px))] lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,36rem)] lg:overflow-hidden">
       <section
         aria-label="Cómo se va a leer el mapa"
-        className="relative overflow-hidden bg-selva px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"
+        className="map-board relative overflow-hidden bg-selva px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"
       >
         <div className="cintas pointer-events-none absolute inset-0" aria-hidden />
 
@@ -103,12 +103,7 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
 
       <section className="flex flex-col px-5 py-8 sm:px-8 lg:h-full lg:overflow-y-auto lg:px-10 lg:py-12">
         <header className="enters">
-          <div className="flex items-center gap-3">
-            <Logo className="h-9 w-auto text-accent" title={SITE_NAME} />
-            <span className="font-display text-[22px] leading-none text-ink">
-              Chocó<span className="text-accent">-up</span>
-            </span>
-          </div>
+          <Logo className="text-[26px] text-ink" />
 
           <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-brote px-3.5 py-1.5 text-[12px] font-medium text-ink">
             <span aria-hidden className="size-1.5 rounded-full bg-selva" />

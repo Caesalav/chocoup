@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CasePortrait } from "@/components/case/CasePortrait";
+import { DonationMeter } from "@/components/cards/DonationMeter";
 import { CategoryChip } from "@/components/ui/Chip";
 import { card, lifts } from "@/components/ui/styles";
 import { caseLead, thumbUrl } from "@/lib/format";
@@ -75,7 +76,7 @@ export function CaseBigCard({
   // resumen de esta causa, va ese. El recorte automático corta donde cae —a mitad de
   // frase, a veces a mitad de palabra— y aquí hay ocho tarjetas seguidas cortadas
   // igual, así que la ficha del municipio es donde más se nota. Los 150 se quedan:
-  // es el hueco de tres renglones a 13 px, y `caseLead` recorta también el resumen
+  // es el hueco de tres renglones a 12 px, y `caseLead` recorta también el resumen
   // escrito a mano por si un día la columna se estrecha.
   const story = caseLead(caseRecord, 150);
   const gallery = caseRecord.photos.filter((photo) => photo.id !== caseRecord.portrait_photo_id);
@@ -92,7 +93,7 @@ export function CaseBigCard({
         />
 
         <div className="min-w-0 flex-1">
-          <h3 className="font-display text-[17px] leading-tight text-ink">
+          <h3 className="line-clamp-2 font-display text-[17px] leading-tight text-ink">
             <Link
               href={`/ciudades/${citySlug}/casos/${caseRecord.id}`}
               className="rounded-sm after:absolute after:inset-0 after:rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -105,22 +106,12 @@ export function CaseBigCard({
             <p className="mt-1 text-[12px] leading-snug text-faint">{caseRecord.household}</p>
           )}
 
-          {/* Lo que falta va en cálido y lo cubierto en verde, igual que las
-              pastillas y que el mapa. */}
-          {caseRecord.openNeeds > 0 ? (
-            <p className="mt-1.5 flex items-center gap-2 text-[13px] text-need-mid-strong">
-              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-need-mid" />
-              {caseRecord.openNeeds}
-              {caseRecord.openNeeds === 1 ? " necesidad abierta" : " necesidades abiertas"}
-            </p>
-          ) : (
-            <p className="mt-1.5 text-[13px] text-accent-strong">Sin necesidades abiertas</p>
-          )}
+          <DonationMeter budget={caseRecord.budget} />
         </div>
       </div>
 
       {story && (
-        <p className="mt-3 line-clamp-3 text-[13px] leading-relaxed text-body">{story}</p>
+        <p className="mt-3 line-clamp-3 text-[12px] leading-relaxed text-body">{story}</p>
       )}
 
       {caseRecord.categories.length > 0 && (
@@ -161,12 +152,12 @@ export function CaseBigCard({
                 fotográfico ocupa casi el alto entero—: pedirlas de entrada sería
                 gastar la señal del Chocó en lo que nadie está mirando. */}
             {gallery.map((photo) => (
-              <li key={photo.id} className="w-[8.75rem] shrink-0 snap-start">
+              <li key={photo.id} className="w-[5.5rem] shrink-0 snap-start">
                 <FramedPhoto
                   src={thumbUrl(photo)}
                   alt={photo.caption || `Situación de ${caseRecord.display_name}`}
                   frame={savedFrame(photo)}
-                  className="aspect-[3/2] w-full rounded-lg border border-line"
+                  className="aspect-square w-full rounded-lg border border-line"
                 />
               </li>
             ))}
