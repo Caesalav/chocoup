@@ -44,7 +44,21 @@ export function isEmailConfigured(): boolean {
  * agradecimiento de una fundación desde un remitente prestado.
  */
 function sender(): string {
-  return process.env.EMAIL_FROM?.trim() || "ChocóUp <donaciones@chocoup.org>";
+  return process.env.EMAIL_FROM?.trim() || "ChocóUp <comunidad@chocoup.org>";
+}
+
+/**
+ * A dónde va la respuesta cuando alguien contesta.
+ *
+ * No es el remitente y por eso son dos variables. `comunidad@chocoup.org` es un
+ * buzón de envío —el que firma los correos y el que da la cara— y quien
+ * responde a un agradecimiento suele estar preguntando algo concreto que tiene
+ * que llegarle a una persona. Sin esto, esas respuestas caen en un buzón que
+ * nadie mira y se pierden calladas, que es la peor forma de perder un mensaje
+ * de alguien que acaba de dar dinero.
+ */
+function replyTo(): string {
+  return process.env.EMAIL_REPLY_TO?.trim() || "charlie@browwwn.com";
 }
 
 /**
@@ -66,6 +80,12 @@ export type OutgoingEmail = {
   /** La versión de texto, que es la que se lee si el cliente no pinta HTML. */
   text: string;
   html: string;
+  /**
+   * Si las respuestas van a una persona en vez de al buzón de envío. Se pone en
+   * el correo a quien dona; el aviso al equipo no lo necesita, porque ya llega
+   * a la dirección a la que se respondería.
+   */
+  answerable?: boolean;
 };
 
 /**
@@ -97,6 +117,7 @@ export async function sendEmail(message: OutgoingEmail): Promise<boolean> {
         subject: message.subject,
         text: message.text,
         html: message.html,
+        ...(message.answerable ? { reply_to: replyTo() } : {}),
       }),
     });
 

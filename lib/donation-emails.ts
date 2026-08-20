@@ -18,19 +18,42 @@ import type { DonationDestination } from "./types";
  * ni nada que solo le sirva al equipo. Al equipo se le cuenta lo que hace falta
  * para reconocer el movimiento en el extracto y para poder responder.
  *
- * El HTML va con estilos en línea y una tabla de un solo lado. No es descuido:
- * los clientes de correo no cargan hojas de estilo y muchos recortan lo que no
- * entienden, así que la paleta se escribe a mano aquí, en hexadecimal, y no se
- * importa de app/globals.css. Si la marca cambia de verde, este archivo no se
- * entera solo.
+ * ---------------------------------------------------------------------------
+ * POR QUÉ ESTE HTML NO SE PARECE AL DEL PORTAL
+ *
+ * Un correo no es una página, y casi nada de lo que sostiene el diseño del
+ * portal existe aquí. Las reglas que se siguen, todas obligadas:
+ *
+ *   * ESTILOS EN LÍNEA, uno por elemento. Gmail borra el `<style>` de la
+ *     cabecera en algunos clientes, así que la paleta se escribe a mano en
+ *     hexadecimal y no se importa de app/globals.css. Si la marca cambia de
+ *     verde, este archivo no se entera solo: es el precio de que el correo se
+ *     vea igual en Outlook que en el móvil.
+ *   * MAQUETADO CON TABLAS. `flex` y `grid` no existen en Outlook, que sigue
+ *     pintando con el motor de Word. Una tabla anidada es fea de escribir y es
+ *     lo único que se ve igual en todas partes.
+ *   * EL BOTÓN ES UNA CELDA CON FONDO, no un `<a>` con `padding`. Un enlace con
+ *     relleno se queda sin fondo en Outlook y el botón principal desaparece.
+ *   * LA TIPOGRAFÍA ES LA DEL SISTEMA. La `font-display` del portal es una
+ *     fuente web, y una fuente web en un correo no carga: se sustituye por
+ *     Times y el titular queda peor que si se hubiera pedido la del sistema.
+ *   * SIN IMÁGENES. Muchos clientes las bloquean por omisión, y un correo cuyo
+ *     encabezado es una imagen bloqueada empieza con un hueco gris. El nombre
+ *     va escrito con texto sobre el verde, que se ve siempre.
+ * ---------------------------------------------------------------------------
  */
 
 const PAPER = "#f4f7f2";
 const INK = "#0e1a15";
 const SELVA = "#0f352d";
 const BROTE = "#a5ed69";
+const LUZ = "#f0fee5";
 const LAND = "#dfe5da";
 const MUTED = "#5b6b62";
+const FAINT = "#8a9990";
+
+const FONT =
+  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 export type DonationFacts = {
   amountCop: number;
@@ -65,44 +88,120 @@ function destinationLabel(facts: DonationFacts): string {
   return facts.caseName ?? "una causa del portal";
 }
 
+/** El destino como se pinta: enlazado si la causa tiene ficha publicada. */
+function destinationHtml(facts: DonationFacts): string {
+  if (facts.caseUrl && facts.caseName) {
+    return `<a href="${escapeHtml(facts.caseUrl)}" style="color:${SELVA};text-decoration:underline;">${escapeHtml(facts.caseName)}</a>`;
+  }
+  return escapeHtml(destinationLabel(facts));
+}
+
 /**
- * El envoltorio: la cinta verde arriba, el contenido dentro, el pie con lo que
- * el portal repite en todas partes. Se escribe una vez porque los dos correos
- * tienen que parecer del mismo sitio.
+ * La línea que los clientes enseñan en la bandeja, detrás del asunto.
+ *
+ * Si no se pone, ahí se cuela lo primero del cuerpo, que es el nombre de la
+ * marca y no dice nada. Va oculta con las tres declaraciones que hacen falta
+ * juntas: sin altura, sin opacidad y fuera de pantalla, porque cada cliente
+ * ignora una distinta.
  */
-function layout({ heading, body }: { heading: string; body: string }): string {
+function preheader(text: string): string {
+  return `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(text)}</div>`;
+}
+
+/** El botón: una celda con fondo, que es lo único que Outlook pinta entero. */
+function cta(href: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
+    <tr>
+      <td style="background:${SELVA};border-radius:999px;">
+        <a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 28px;font-family:${FONT};font-size:15px;font-weight:600;line-height:1;color:${BROTE};text-decoration:none;">${escapeHtml(label)}</a>
+      </td>
+    </tr>
+  </table>`;
+}
+
+/** La fila «etiqueta / valor» de la que están hechos los dos correos. */
+function row(label: string, value: string, last = false): string {
+  const border = last ? "" : `border-bottom:1px solid ${LAND};`;
+  return `<tr>
+    <td style="padding:11px 0;${border}font-family:${FONT};font-size:14px;color:${MUTED};white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td>
+    <td style="padding:11px 0 11px 20px;${border}font-family:${FONT};font-size:14px;color:${INK};text-align:right;vertical-align:top;">${value}</td>
+  </tr>`;
+}
+
+/**
+ * El envoltorio: cabecera de selva con el nombre, tarjeta blanca con el
+ * contenido, pie con lo que el portal repite en todas partes. Se escribe una
+ * vez porque los dos correos tienen que parecer del mismo sitio.
+ */
+function layout({
+  preview,
+  eyebrow,
+  heading,
+  body,
+}: {
+  preview: string;
+  eyebrow: string;
+  heading: string;
+  body: string;
+}): string {
   return `<!doctype html>
 <html lang="es">
-<body style="margin:0;padding:24px 12px;background:${PAPER};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:${INK};">
-  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;width:100%;border-collapse:collapse;">
-    <tr>
-      <td style="background:${SELVA};border-radius:16px 16px 0 0;padding:22px 28px;">
-        <span style="color:${BROTE};font-size:19px;font-weight:700;letter-spacing:-0.01em;">${SITE_NAME}</span>
-      </td>
-    </tr>
-    <tr>
-      <td style="background:#ffffff;border:1px solid ${LAND};border-top:0;border-radius:0 0 16px 16px;padding:28px;">
-        <h1 style="margin:0 0 16px;font-size:22px;line-height:1.25;color:${INK};">${heading}</h1>
-        ${body}
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:18px 28px;color:${MUTED};font-size:12px;line-height:1.6;">
-        ${SITE_NAME} publica los casos con el consentimiento de cada persona.
-        Las donaciones se cobran por Mercado Pago: nada del dinero pasa por el portal.
-      </td>
-    </tr>
-  </table>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>${escapeHtml(heading)}</title>
+</head>
+<body style="margin:0;padding:0;background:${PAPER};">
+${preheader(preview)}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${PAPER};">
+  <tr>
+    <td align="center" style="padding:28px 12px 36px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;border-collapse:collapse;">
+
+        <tr>
+          <td style="background:${SELVA};border-radius:20px 20px 0 0;padding:26px 32px;">
+            <span style="font-family:${FONT};font-size:20px;font-weight:700;letter-spacing:-0.01em;color:${BROTE};">${SITE_NAME}</span>
+            <span style="font-family:${FONT};font-size:13px;color:#9fb3a8;padding-left:10px;">${escapeHtml(eyebrow)}</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-left:1px solid ${LAND};border-right:1px solid ${LAND};border-bottom:1px solid ${LAND};border-radius:0 0 20px 20px;padding:32px;">
+            <h1 style="margin:0 0 20px;font-family:${FONT};font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.01em;color:${INK};">${escapeHtml(heading)}</h1>
+            ${body}
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:20px 32px 0;font-family:${FONT};font-size:12px;line-height:1.7;color:${FAINT};">
+            ${SITE_NAME} publica los casos con el consentimiento de cada persona.
+            Las donaciones se cobran por Mercado Pago: nada del dinero pasa por el portal.
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
 </body>
 </html>`;
 }
 
-/** La fila «etiqueta / valor» de la que están hechos los dos correos. */
-function row(label: string, value: string): string {
-  return `<tr>
-    <td style="padding:7px 0;color:${MUTED};font-size:14px;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td>
-    <td style="padding:7px 0 7px 16px;color:${INK};font-size:14px;vertical-align:top;">${value}</td>
-  </tr>`;
+/**
+ * El bloque del importe: lo primero que se busca al abrir cualquiera de los
+ * dos correos, así que se pinta grande y sobre el lavado verde en vez de
+ * quedarse como una fila más de la tabla.
+ */
+function amountBlock(amount: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin:0 0 24px;">
+    <tr>
+      <td style="background:${LUZ};border-radius:14px;padding:20px 24px;">
+        <p style="margin:0 0 4px;font-family:${FONT};font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${escapeHtml(label)}</p>
+        <p style="margin:0;font-family:${FONT};font-size:34px;line-height:1.1;font-weight:700;letter-spacing:-0.02em;color:${SELVA};">${escapeHtml(amount)}</p>
+      </td>
+    </tr>
+  </table>`;
 }
 
 /**
@@ -123,16 +222,12 @@ export function donationThanksEmail(facts: DonationFacts): OutgoingEmail | null 
 
   const amount = formatCOP(facts.amountCop);
   const where = destinationLabel(facts);
-  const greeting = facts.donorName.trim() ? `Hola, ${facts.donorName.trim()}` : "Hola";
+  const named = facts.donorName.trim();
+  const greeting = named ? `Hola, ${named}` : "Hola";
 
   const nameNote = facts.publishName
     ? "Como nos autorizaste, tu nombre aparece junto a tu donación en el registro público."
     : "Tu donación aparece en el registro público con su valor y su fecha, pero sin tu nombre: no nos autorizaste a publicarlo y no lo guardamos.";
-
-  const destinationHtml =
-    facts.caseUrl && facts.caseName
-      ? `<a href="${escapeHtml(facts.caseUrl)}" style="color:${SELVA};">${escapeHtml(facts.caseName)}</a>`
-      : escapeHtml(where);
 
   const text = [
     `${greeting},`,
@@ -147,30 +242,46 @@ export function donationThanksEmail(facts: DonationFacts): OutgoingEmail | null 
     "",
     `Puedes ver el registro de donaciones en ${facts.siteUrl}/#donaciones`,
     "",
+    "Si tienes cualquier duda, responde a este correo y te contestamos.",
+    "",
     `— El equipo de ${SITE_NAME}`,
   ].join("\n");
 
   const html = layout({
+    preview: `Recibimos tu donación de ${amount} para ${where}.`,
+    eyebrow: "Donación recibida",
     heading: "Gracias por tu donación",
     body: `
-      <p style="margin:0 0 18px;font-size:15px;line-height:1.65;color:${INK};">
-        ${escapeHtml(greeting)}: gracias de verdad. Tu aporte llega completo a ${destinationHtml}.
+      <p style="margin:0 0 22px;font-family:${FONT};font-size:16px;line-height:1.65;color:${INK};">
+        ${escapeHtml(greeting)}: gracias de verdad. Tu aporte llega completo a ${destinationHtml(facts)}.
       </p>
-      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;border-top:1px solid ${LAND};border-bottom:1px solid ${LAND};margin:0 0 18px;">
-        ${row("Valor", `<strong style="font-size:17px;">${escapeHtml(amount)}</strong>`)}
-        ${row("Destino", destinationHtml)}
-        ${row("Fecha", escapeHtml(formatDateTime(facts.donatedAt)))}
+
+      ${amountBlock(amount, "Tu donación")}
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;border-top:1px solid ${LAND};margin:0 0 24px;">
+        ${row("Destino", destinationHtml(facts))}
+        ${row("Fecha", escapeHtml(formatDateTime(facts.donatedAt)), true)}
       </table>
-      <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:${MUTED};">${escapeHtml(nameNote)}</p>
-      <a href="${escapeHtml(facts.siteUrl)}/#donaciones" style="display:inline-block;background:${SELVA};color:${BROTE};text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:999px;">Ver el registro de donaciones</a>
+
+      <p style="margin:0 0 26px;font-family:${FONT};font-size:14px;line-height:1.7;color:${MUTED};">
+        ${escapeHtml(nameNote)}
+      </p>
+
+      ${cta(`${facts.siteUrl}/#donaciones`, "Ver el registro de donaciones")}
+
+      <p style="margin:26px 0 0;font-family:${FONT};font-size:14px;line-height:1.7;color:${MUTED};">
+        Si tienes cualquier duda, responde a este correo y te contestamos.
+      </p>
     `,
   });
 
   return {
     to,
-    subject: `Gracias por tu donación de ${amount} — ${SITE_NAME}`,
+    subject: `Gracias por tu donación de ${amount}`,
     text,
     html,
+    // Quien responda a esto está preguntando algo concreto: va a una persona.
+    answerable: true,
   };
 }
 
@@ -188,8 +299,9 @@ export function donationThanksEmail(facts: DonationFacts): OutgoingEmail | null 
 export function donationAlertEmail(to: string, facts: DonationFacts): OutgoingEmail {
   const amount = formatCOP(facts.amountCop);
   const where = destinationLabel(facts);
-  const who = facts.donorName.trim() || "Anónima (no autorizó publicar el nombre)";
+  const who = facts.donorName.trim() || "Anónima";
   const contact = facts.payerEmail.trim() || "sin correo en el pago";
+  const link = facts.caseUrl ?? `${facts.siteUrl}/donaciones`;
 
   const text = [
     `Entró una donación de ${amount}.`,
@@ -205,24 +317,31 @@ export function donationAlertEmail(to: string, facts: DonationFacts): OutgoingEm
     facts.caseUrl ? `Ficha de la causa: ${facts.caseUrl}` : `Fue al fondo general: ${facts.siteUrl}/donaciones`,
   ].join("\n");
 
+  const contactHtml = facts.payerEmail.trim()
+    ? `<a href="mailto:${escapeHtml(facts.payerEmail.trim())}" style="color:${SELVA};text-decoration:underline;">${escapeHtml(facts.payerEmail.trim())}</a>`
+    : escapeHtml(contact);
+
   const html = layout({
-    heading: `Entró una donación de ${escapeHtml(amount)}`,
+    preview: `${who} · ${amount} · ${where}`,
+    eyebrow: "Aviso interno",
+    heading: "Entró una donación",
     body: `
-      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;border-top:1px solid ${LAND};border-bottom:1px solid ${LAND};margin:0 0 18px;">
+      ${amountBlock(amount, "Importe")}
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;border-top:1px solid ${LAND};margin:0 0 24px;">
         ${row("Quién", escapeHtml(who))}
-        ${row("Contacto", escapeHtml(contact))}
-        ${row("Valor", `<strong style="font-size:17px;">${escapeHtml(amount)}</strong>`)}
-        ${row(
-          "Destino",
-          facts.caseUrl && facts.caseName
-            ? `<a href="${escapeHtml(facts.caseUrl)}" style="color:${SELVA};">${escapeHtml(facts.caseName)}</a>`
-            : escapeHtml(where),
-        )}
+        ${row("Contacto", contactHtml)}
+        ${row("Destino", destinationHtml(facts))}
         ${row("Fecha", escapeHtml(formatDateTime(facts.donatedAt)))}
-        ${row("Referencia", `<code style="font-size:13px;">${escapeHtml(facts.paymentRef)}</code>`)}
         ${row("Publica el nombre", facts.publishName ? "sí" : "no")}
+        ${row(
+          "Referencia",
+          `<span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:${MUTED};">${escapeHtml(facts.paymentRef)}</span>`,
+          true,
+        )}
       </table>
-      <a href="${escapeHtml(facts.caseUrl ?? `${facts.siteUrl}/donaciones`)}" style="display:inline-block;background:${SELVA};color:${BROTE};text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:999px;">Abrir en el portal</a>
+
+      ${cta(link, "Abrir en el portal")}
     `,
   });
 
