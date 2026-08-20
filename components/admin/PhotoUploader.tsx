@@ -57,7 +57,7 @@ export function PhotoUploader({
     setBusy(true);
 
     for (const { file, key } of queue) {
-      const { full, thumb, extension, originalSize } = await prepareImage(file);
+      const { full, thumb, extension, originalSize, fullSize, thumbSize } = await prepareImage(file);
       update(key, {
         state: "subiendo",
         note: `${formatBytes(originalSize)} → ${formatBytes(full.size)}`,
@@ -86,7 +86,14 @@ export function PhotoUploader({
       }
 
       try {
-        await registerPhoto({ cityId, caseId, storagePath: paths.full, thumbPath });
+        await registerPhoto({
+          cityId,
+          caseId,
+          storagePath: paths.full,
+          thumbPath,
+          byteSize: fullSize,
+          thumbByteSize: thumbPath ? thumbSize : 0,
+        });
         update(key, {
           state: "listo",
           note: thumbPath

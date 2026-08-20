@@ -9,6 +9,7 @@ import { FormSection } from "./FormSection";
 import { uploadCasePhoto } from "./upload-case-photo";
 import { alertBox, button } from "@/components/ui/styles";
 import { isDemoMode } from "@/lib/supabase/env";
+import type { PhotoFrame } from "@/lib/photo-frame";
 
 /**
  * Abrir una causa con lo que se sabe el primer día, incluidas las fotos.
@@ -48,6 +49,7 @@ export function NewCaseForm({
       key: crypto.randomUUID(),
       file,
       url: URL.createObjectURL(file),
+      frame: null as PhotoFrame | null,
     }));
     setPhotos((current) => [...current, ...drafts]);
   }
@@ -69,7 +71,12 @@ export function NewCaseForm({
             const draft = photos[index];
             setStatus(`Subiendo fotos ${index + 1} de ${photos.length}…`);
             try {
-              const photoId = await uploadCasePhoto(draft.file, created.cityId, created.id);
+              const photoId = await uploadCasePhoto(
+                draft.file,
+                created.cityId,
+                created.id,
+                draft.frame,
+              );
               if (draft.key === portraitKey) portraitId = photoId;
             } catch {
               // La causa ya existe: lo que no suba se puede completar en la ficha.
@@ -107,7 +114,7 @@ export function NewCaseForm({
 
         <FormSection
           title="Fotos"
-          hint="Toca la cara de la persona para marcarla como retrato: sale en la tarjeta, recortada en redondo. El resto son de la situación. Si ninguna sirve de retrato, no toques ninguna: la tarjeta pone las iniciales."
+          hint="Toca la cara de la persona para marcarla como retrato. Encuadrar deja a la vista lo que importa. Si ninguna sirve de retrato, no toques ninguna: la tarjeta pone las iniciales."
         >
           {demo ? (
             <p className="rounded-lg border border-dashed border-line-strong bg-panel-high px-3.5 py-3 text-sm text-muted">
@@ -121,6 +128,11 @@ export function NewCaseForm({
               onAdd={addFiles}
               onRemove={(key) => setPhotos((current) => current.filter((photo) => photo.key !== key))}
               onPortrait={setPortraitKey}
+              onFrame={(key, frame) =>
+                setPhotos((current) =>
+                  current.map((photo) => (photo.key === key ? { ...photo, frame } : photo)),
+                )
+              }
               disabled={pending}
             />
           )}

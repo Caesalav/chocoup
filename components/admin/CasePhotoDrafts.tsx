@@ -1,21 +1,26 @@
 "use client";
 
 import { useRef, useState, type DragEvent } from "react";
+import { PhotoCropEditor, defaultFrame } from "./PhotoCropEditor";
 import { FramedPhoto } from "@/components/ui/Photo";
+import { button } from "@/components/ui/styles";
+import { type PhotoFrame } from "@/lib/photo-frame";
 
 export type DraftPhoto = {
   key: string;
   file: File;
   url: string;
+  frame: PhotoFrame | null;
 };
 
 /**
  * Las fotos del primer día, antes de que el caso exista.
  *
- * No se suben aquí: se eligen, se ven y se marca cuál es el retrato. La subida
- * va después de crear la causa, porque Storage las cuelga de su identificador.
- * El retrato es una elección y no «la primera»: en campo la primera foto suele
- * ser la casa, y esa no es la cara que tiene que salir en la tarjeta.
+ * No se suben aquí: se eligen, se ven, se encuadran y se marca cuál es el
+ * retrato. La subida va después de crear la causa, porque Storage las cuelga de
+ * su identificador. El retrato es una elección y no «la primera»: en campo la
+ * primera foto suele ser la casa, y esa no es la cara que tiene que salir en la
+ * tarjeta.
  */
 export function CasePhotoDrafts({
   photos,
@@ -23,6 +28,7 @@ export function CasePhotoDrafts({
   onAdd,
   onRemove,
   onPortrait,
+  onFrame,
   disabled = false,
 }: {
   photos: DraftPhoto[];
@@ -30,10 +36,12 @@ export function CasePhotoDrafts({
   onAdd: (files: File[]) => void;
   onRemove: (key: string) => void;
   onPortrait: (key: string | null) => void;
+  onFrame: (key: string, frame: PhotoFrame | null) => void;
   disabled?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const [cropping, setCropping] = useState<string | null>(null);
 
   function take(list: FileList | File[] | null) {
     if (!list || disabled) return;
@@ -58,6 +66,9 @@ export function CasePhotoDrafts({
       take(event.dataTransfer.files);
     },
   };
+
+  const cropPhoto = photos.find((photo) => photo.key === cropping) ?? null;
+  const cropKind = cropPhoto?.key === portraitKey ? "portrait" : "situation";
 
   return (
     <div>
@@ -110,6 +121,7 @@ export function CasePhotoDrafts({
                     src={photo.url}
                     alt=""
                     kind={chosen ? "portrait" : "situation"}
+                    frame={photo.frame}
                     eager
                     className={`aspect-square w-full ${
                       chosen
@@ -129,9 +141,19 @@ export function CasePhotoDrafts({
                 <button
                   type="button"
                   disabled={disabled}
+                  onClick={() => setCropping(photo.key)}
+                  className="mt-1 w-full text-center text-[11px] text-accent hover:underline disabled:opacity-50"
+                >
+                  Encuadrar
+                </button>
+
+                <button
+                  type="button"
+                  disabled={disabled}
                   onClick={() => {
                     URL.revokeObjectURL(photo.url);
                     if (chosen) onPortrait(null);
+                    if (cropping === photo.key) setCropping(null);
                     onRemove(photo.key);
                   }}
                   className="absolute -right-1 -top-1 flex size-11 items-center justify-center rounded-full text-ink"
@@ -163,6 +185,64 @@ export function CasePhotoDrafts({
           </li>
         </ul>
       )}
+
+      {cropPhoto && (
+        <DraftCropDialog
+          photo={cropPhoto}
+          kind={cropKind}
+          onSave={(frame) => {
+            onFrame(cropPhoto.key, frame);
+            setCropping(null);
+          }}
+          onClose={() => setCropping(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DraftCropDialog({
+  photo,
+  kind,
+  onSave,
+  onClose,
+}: {
+  photo: DraftPhoto;
+  kind: "situation" | "portrait";
+  onSave: (frame: PhotoFrame | null) => void;
+  onClose: () => void;
+}) {
+  const [frame, setFrame] = useState<PhotoFrame>(() => photo.frame ?? defaultFrame(kind));
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Encuadrar fotografía"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center"
+    >
+      <div className="max-h-[92svh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-panel-high p-4 shadow-float">
+        <p className="font-display text-[18px] leading-tight text-ink">Encuadrar</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-muted">
+          {kind === "portrait"
+            ? "Así sale el retrato, recortado en redondo. Deja la cara en el círculo."
+            : "Así sale en el carrusel y en el diario. Deja a la vista lo que importa."}
+        </p>
+        <div className="mt-4">
+          <PhotoCropEditor src={photo.url} kind={kind} value={frame} onChange={setFrame} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" className={button.primary} onClick={() => onSave(frame)}>
+            Guardar encuadre
+          </button>
+          <button type="button" className={button.ghost} onClick={() => onSave(null)}>
+            Recorte automático
+          </button>
+          <button type="button" className={button.ghost} onClick={onClose}>
+            Cancelar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -26,7 +26,17 @@ export default async function AdminCitiesPage() {
         backLabel="Panel del equipo"
         title="Ciudades"
         Icon={TownIcon}
-        description="Busca el municipio por su nombre: si es del Chocó, el mapa ya sabe dónde queda. Luego la descripción y las fotos."
+        description={
+          <>
+            Busca el municipio por su nombre: si es del Chocó, el mapa ya sabe dónde queda. El
+            portal solo enseña los que tienen casos. La portada del pueblo es una foto de
+            archivo hasta que subas la tuya. El cupo de Storage se ve en{" "}
+            <Link href="/admin/fotos" className="text-accent hover:underline">
+              espacio de fotos
+            </Link>
+            .
+          </>
+        }
         actions={
           canCreate ? (
             <Link href="/admin/ciudades/nueva" className={button.primary}>

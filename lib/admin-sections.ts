@@ -85,6 +85,8 @@ export function activeAdminSection(pathname: string): AdminSectionKey | null {
 }
 
 export const ADMIN_UTILITIES = [
+  { href: "/admin/fotos", label: "Fotos", coordinationOnly: false },
   { href: "/admin/sugerencias", label: "Sugerencias", coordinationOnly: false },
+  { href: "/admin/casos/donantes", label: "Donantes", coordinationOnly: true },
   { href: "/admin/equipo", label: "Equipo", coordinationOnly: true },
 ] as const;

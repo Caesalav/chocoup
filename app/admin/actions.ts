@@ -771,24 +771,35 @@ export async function registerPhoto(input: {
   storagePath: string;
   thumbPath?: string;
   frame?: PhotoFrame | null;
+  byteSize?: number;
+  thumbByteSize?: number;
 }): Promise<string> {
   const { supabase } = await requireCity(input.cityId);
   const caseId = await caseInCity(input.caseId, input.cityId);
   const frame = input.frame ? clampFrame(input.frame) : null;
+  const byteSize = Math.max(0, Math.round(input.byteSize ?? 0));
+  const thumbByteSize = Math.max(0, Math.round(input.thumbByteSize ?? 0));
 
-  const { data, error } = await supabase
+  const row = {
+    city_id: input.cityId,
+    case_id: caseId,
+    storage_path: input.storagePath,
+    thumb_path: input.thumbPath ?? "",
+    ...(frame
+      ? { focus_x: frame.focusX, focus_y: frame.focusY, zoom: frame.zoom }
+      : {}),
+  };
+
+  let { data, error } = await supabase
     .from("photos")
-    .insert({
-      city_id: input.cityId,
-      case_id: caseId,
-      storage_path: input.storagePath,
-      thumb_path: input.thumbPath ?? "",
-      ...(frame
-        ? { focus_x: frame.focusX, focus_y: frame.focusY, zoom: frame.zoom }
-        : {}),
-    })
+    .insert({ ...row, byte_size: byteSize, thumb_byte_size: thumbByteSize })
     .select("id")
     .single();
+
+  // 0022 todavía no está: la foto no puede perderse por una columna nueva.
+  if (error && /byte_size/.test(error.message)) {
+    ({ data, error } = await supabase.from("photos").insert(row).select("id").single());
+  }
 
   if (error || !data) fail("No se pudo registrar la foto", error);
   return data.id as string;
@@ -897,8 +908,12 @@ export async function deletePhoto(formData: FormData) {
   // esta foto. Lo que impide borrar la de otro municipio es la política del
   // bucket, que compara la carpeta del archivo con los municipios asignados.
   //
+  // Las de archivo (`demo/…`) no están en Storage: viven en public/demo. Pedir
+  // borrarlas al bucket solo ensucia el registro.
+  //
   // Si algún archivo queda huérfano no rompe nada, así que no se aborta por esto.
-  if (paths.length > 0) await supabase.storage.from(PHOTO_BUCKET).remove(paths);
+  const stored = paths.filter((path) => !path.startsWith("demo/"));
+  if (stored.length > 0) await supabase.storage.from(PHOTO_BUCKET).remove(stored);
 }
 
 // ---------------------------------------------------------------------------

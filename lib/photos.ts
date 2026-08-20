@@ -26,6 +26,8 @@ export type PreparedPhoto = {
   thumb: Blob | null;
   extension: string;
   originalSize: number;
+  fullSize: number;
+  thumbSize: number;
 };
 
 function isJpeg(file: File): boolean {
@@ -74,15 +76,26 @@ export async function prepareImage(file: File): Promise<PreparedPhoto> {
         thumb,
         extension: extensionOf(file.name),
         originalSize: file.size,
+        fullSize: file.size,
+        thumbSize: thumb?.size ?? 0,
       };
     }
-    return { full, thumb, extension: "jpg", originalSize: file.size };
+    return {
+      full,
+      thumb,
+      extension: "jpg",
+      originalSize: file.size,
+      fullSize: full.size,
+      thumbSize: thumb?.size ?? 0,
+    };
   } catch {
     return {
       full: file,
       thumb: null,
       extension: extensionOf(file.name),
       originalSize: file.size,
+      fullSize: file.size,
+      thumbSize: 0,
     };
   }
 }
@@ -106,8 +119,4 @@ export function storagePathsFor(
   };
 }
 
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+export { formatBytes } from "./format";

@@ -1,5 +1,5 @@
 import { MUNICIPALITIES } from "@/lib/choco-texture";
-import { unprojectFromMap } from "@/lib/choco-map";
+import { polygonOf, unprojectFromMap } from "@/lib/choco-map";
 
 /**
  * Los treinta municipios del Chocó, con un punto que cae sobre el mapa del
@@ -39,16 +39,11 @@ const DISPLAY: Record<string, string> = {
 };
 
 function pathCenter(d: string): { lat: number; lng: number } {
-  const nums = [...d.matchAll(/-?\d+\.?\d*/g)].map((match) => Number(match[0]));
-  let x = 0;
-  let y = 0;
-  let n = 0;
-  for (let i = 0; i + 1 < nums.length; i += 2) {
-    x += nums[i];
-    y += nums[i + 1];
-    n += 1;
-  }
-  return unprojectFromMap(x / n, y / n);
+  const pts = polygonOf(d);
+  const n = pts.length || 1;
+  const x = pts.reduce((sum, p) => sum + p.x, 0) / n;
+  const y = pts.reduce((sum, p) => sum + p.y, 0) / n;
+  return unprojectFromMap(x, y);
 }
 
 function displayName(raw: string): string {

@@ -19,7 +19,9 @@ const VIEWS: { id: MapView; label: string; href: string }[] = [
  * Vive en la URL y no en estado de cliente por las dos razones de siempre en este
  * portal: son dos enlaces, así que sin JavaScript funcionan igual, y «el Chocó
  * dentro de Colombia» se puede pegar en WhatsApp, que es cómo llega aquí la
- * gente. Es la misma pastilla maciza que marca lo abierto en el resto del portal.
+ * gente. Sobre `mar` la pastilla abierta es tinta con `luz`: el verde de marca
+ * no entra en el atlas para no pelear con el mosaico ni volver a teñir de selva
+ * un campo que es océano.
  */
 export function MapViewTabs({ active }: { active: MapView }) {
   return (
@@ -36,7 +38,7 @@ export function MapViewTabs({ active }: { active: MapView }) {
             href={view.href}
             aria-current={selected ? "page" : undefined}
             className={`flex min-h-9 items-center justify-center rounded-full px-4 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-              selected ? "bg-ink text-paper" : "text-muted hover:text-ink"
+              selected ? "bg-ink text-luz" : "text-muted hover:text-ink"
             }`}
           >
             {view.label}

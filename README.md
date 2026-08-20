@@ -136,7 +136,7 @@ En el panel de Supabase, **SQL Editor**, pega y ejecuta **en este orden**:
     dato y la barrera que impide escribir un importe desde un navegador.
 18. `supabase/migrations/0018_tablero.sql` — el foco del momento («ahora, aquí») y el recuento
     de aportes en camino hacia un pueblo.
-19. `supabase/seed.sql` — los 10 municipios del Chocó con sus coordenadas, sin publicar.
+19. `supabase/seed.sql` — Quibdó, el municipio con casos. Los demás se añaden desde el panel cuando se documentan.
 
 **Son dieciocho migraciones.** Tres no son opcionales aunque lo parezcan:
 

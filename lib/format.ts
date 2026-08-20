@@ -230,6 +230,15 @@ export function plural(count: number, singular: string, plural_: string): string
   return `${count} ${count === 1 ? singular : plural_}`;
 }
 
+/** Tamaño de archivo, como se lee: 180 KB, 1,2 MB. */
+export function formatBytes(bytes: number): string {
+  const size = Math.max(0, Number(bytes) || 0);
+  if (size < 1024) return `${Math.round(size)} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  const mb = size / (1024 * 1024);
+  return `${mb.toLocaleString("es-CO", { maximumFractionDigits: mb >= 10 ? 0 : 1 })} MB`;
+}
+
 /**
  * Un importe en pesos colombianos, como se lee: $ 1.200.000.
  *

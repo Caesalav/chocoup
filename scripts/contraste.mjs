@@ -413,6 +413,30 @@ if (!soloEstados) {
   }
   console.log(fila("contour sobre land (filete entre municipios)", contraste(color("contour"), color("land")), 1.5));
 
+  console.log("\n=== MAPA: mar, tierra y la escala ===");
+  console.log("El atlas no puede pintar el Pacífico de selva ni el resto de Colombia de");
+  console.log("arena: el oro de «falta poco» vivía a H 74 y la tierra a H 82 lo apagaba.");
+  console.log("Texto sobre mar pide AA. Los pares de relleno se miran en ΔE: no son tinta.\n");
+  for (const tinta of ["ink", "body", "muted"]) {
+    console.log(fila(`${tinta} sobre mar`, contraste(color(tinta), color("mar"))));
+  }
+  console.log(fila("luz sobre ink (Live del atlas)", contraste(color("luz"), color("ink")), 7));
+  console.log(fila("mar-ink sobre mar (rótulo del Pacífico)", contraste(color("mar-ink"), color("mar")), 4.5));
+  const relleno = (a, b, etiqueta) => {
+    const [A, B] = [color(a), color(b)];
+    console.log(
+      `  ${etiqueta.padEnd(46)} ΔE ${distancia(A, B).toFixed(1).padStart(5)}  ` +
+        `${fmt(contraste(A, B)).padStart(5)}:1`,
+    );
+  };
+  relleno("need-low", "tierra", "need-low / tierra (el oro no puede perderse)");
+  relleno("need-mid", "tierra", "need-mid / tierra");
+  relleno("need-high", "tierra", "need-high / tierra");
+  relleno("need-blank", "tierra", "need-blank / tierra (tablero sobre el país)");
+  relleno("tierra", "mar", "tierra / mar (país contra océano)");
+  relleno("need-low", "mar", "need-low / mar");
+  relleno("need-high", "mar", "need-high / mar");
+
   console.log("\n=== MAPA: SEPARACIÓN ENTRE TRAMOS ===");
   console.log("La prueba más dura de la paleta, y no es una pastilla con su palabra: son");
   console.log("áreas pequeñas, sin etiqueta al lado, sobre papel, y el mapa no las ordena —");

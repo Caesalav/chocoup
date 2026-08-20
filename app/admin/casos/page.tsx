@@ -54,6 +54,10 @@ export default async function AdminCasesPage() {
                 <Link href={MONEY_REVIEW_PATH} className="text-accent hover:underline">
                   a dónde va el dinero
                 </Link>
+                . Quien donó, en{" "}
+                <Link href="/admin/casos/donantes" className="text-accent hover:underline">
+                  donantes
+                </Link>
                 .
               </>
             )}

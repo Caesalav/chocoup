@@ -122,6 +122,19 @@
   --color-land: #dfe5da;
   --color-contour: #93a198;
 
+  /* Geografía del mapa, y no marca. El Pacífico no puede pintarse de selva:
+     ese verde es vegetación y acción, y a la izquierda de este dibujo hay
+     agua. `mar` es el azul de un atlas escolar: bastante croma para leerse
+     como océano, bastante claro para que la tinta y la escala cálida se
+     sostengan. `tierra` es el resto de Colombia, y NO puede ser arena: el
+     oro de «falta poco» vive a H 74, y una tierra a H 82 lo apagaba. Va en
+     el verde-gris de las superficies hundidas, un peldaño más oscuro que
+     `need-blank`, para que el país sea el fondo y el Chocó el tablero.
+     `mar-ink` nombra el océano. */
+  --color-mar: oklch(0.84 0.07 228);
+  --color-mar-ink: oklch(0.32 0.075 230);
+  --color-tierra: oklch(0.91 0.016 160);
+
   /* Escala por necesidades abiertas: el único color del mapa, en planos. Los
      cinco valores tienen que ordenarse de un vistazo y sin leer la leyenda: el
      gris de "sin documentar" se hunde en el papel; el verde de "sin casos
@@ -295,10 +308,16 @@
      parece luz. Son cuatro y se usan enteras, sin mezclar: reposo, levantada al
      pasar por encima, hundida al pulsar, y flotante para lo que va anclado a la
      pantalla —la barra inferior y la de acciones— que no descansa sobre nada. */
-  --shadow-card: 0 1px 2px oklch(0.28 0.03 160 / 5%), 0 2px 6px -2px oklch(0.28 0.03 160 / 7%);
-  --shadow-lift: 0 3px 6px oklch(0.28 0.03 160 / 8%), 0 14px 28px -8px oklch(0.28 0.03 160 / 26%);
+  --shadow-card:
+    0 1px 2px oklch(0.28 0.03 160 / 5%),
+    0 2px 6px -2px oklch(0.28 0.03 160 / 7%);
+  --shadow-lift:
+    0 3px 6px oklch(0.28 0.03 160 / 8%),
+    0 14px 28px -8px oklch(0.28 0.03 160 / 26%);
   --shadow-press: 0 1px 1px oklch(0.28 0.03 160 / 12%);
-  --shadow-float: 0 4px 10px oklch(0.28 0.03 160 / 10%), 0 16px 36px -10px oklch(0.28 0.03 160 / 28%);
+  --shadow-float:
+    0 4px 10px oklch(0.28 0.03 160 / 10%),
+    0 16px 36px -10px oklch(0.28 0.03 160 / 28%);
 
   /* Radios. La referencia redondea de más: sus tarjetas llevan 23-24 px medidos
      en cajas de 415x222 y 220x223, o sea entre el 10 % y el 11 % del lado corto,
@@ -316,7 +335,8 @@
   --radius-3xl: 1.75rem;
   --radius-4xl: 2.25rem;
 
-  --font-display: var(--font-display), "Bricolage Grotesque", system-ui, sans-serif;
+  --font-display:
+    var(--font-display), "Bricolage Grotesque", system-ui, sans-serif;
   --font-sans: var(--font-sans), "Outfit", system-ui, sans-serif;
 }
 
@@ -675,19 +695,21 @@ body {
  * mientras cada municipio fue una pieza con su relleno y su filete, resaltar
  * uno solo servía para que los treinta siguientes le pintaran encima.
  *
- * De ahí salen los dos únicos sitios donde se dibuja un estado:
+ * De ahí salen los únicos sitios donde se dibuja un estado:
  *
  *   .map-shape   la capa de frente. Invisible en reposo y lo único que recibe
  *                el cursor. Bajo el puntero se enciende ENCIMA de todo el
  *                mosaico, y como aquí nunca hay dos encendidos a la vez, nadie
  *                puede taparlo.
+ *   .map-tag     el nombre de una pieza sin documentar, en esa misma capa y por
+ *                tanto encima del mosaico. Aparece con ella.
  *   .map-chosen  el municipio del recado, en su propia capa bajo la de frente.
  *
- * Y de ahí sale también que los dos estados no se parezcan. El cursor es LUZ:
- * la pieza se levanta del papel, con su filete y su sombra, y se va cuando
- * apartas la mano. El elegido es TINTA: una línea que lo rodea y se queda.
- * Antes los dos eran "lo mismo pero más", y el cursor pesaba más que la
- * selección, que es al revés de lo que dicen.
+ * Y de ahí sale también que los dos estados no se parezcan. El cursor es un CERCO
+ * desnudo: una línea de `selva` que aparece alrededor de la pieza y se va cuando
+ * apartas la mano. El elegido es TINTA CALZADA: una línea de `ink` sobre un pad de
+ * papel, que late al llegar y se queda. Antes los dos eran «lo mismo pero más», y
+ * el cursor pesaba más que la selección, que es al revés de lo que dicen.
  *
  * La leyenda y el mosaico se hablan por CSS (`.map-board:has(...)`): pasar
  * por «Prioritario» apaga lo que no lo es. Sin JavaScript, y por eso sirve
@@ -703,21 +725,101 @@ body {
   transition: opacity 0.2s ease;
 }
 
-/* El canal de separación, para los treinta de una vez y por encima de todos los
-   colores. Va centrado en cada linde, así que entre dos vecinos se ve el doble
-   de su mitad y siempre lo mismo, venga quien venga escrito antes.
+/* El escenario del mapa es un atlas: campo de `mar`, Colombia en `tierra`,
+   el Chocó en la escala de necesidad. El océano de la izquierda ES el fondo
+   de la vista, así que el verde de marca no se lee como vegetación donde hay
+   agua. */
+
+/* ---------------------------------------------------------------------------
+ * EL CONTRASTE DE DENTRO DE LA VENTANA
+ *
+ * El marco de `selva` con cintas le da presencia al mapa en la página, pero el
+ * problema que se ve dentro es otro y necesita su propia respuesta.
+ *
+ * Medido: `need-blank` (#e4e9e0) contra el papel de la ventana está a 1,14:1 y
+ * contra `land` a 1,04:1. Un municipio sin documentar y el agua de alrededor son
+ * EL MISMO GRIS, y con 27 de 30 sin documentar el interior del dibujo era casi
+ * todo blanco sobre blanco. Tocar la escala está prohibido y además no es ahí:
+ * esas cinco fichas están derivadas y medidas en MARCA.md.
+ *
+ * Y NO SE ARREGLA CON UN RELLENO. El escalón más grande que existe entre
+ * `need-blank` y una superficie clara del sistema es 1,23:1 —contra el blanco de
+ * `panel-high`; contra `paper` 1,14, contra `canvas` 1,05, contra `land` 1,04—.
+ * Ninguno llega a 1,5. La separación no puede ser de tono, así que es de LÍNEA, y
+ * son dos, una para cada cosa que se tenía que leer y no se leía:
+ *
+ *   el departamento contra el agua   era una almohadilla de `land` de 7,6 px a
+ *                                    1,04:1 del gris de las piezas, o sea nada.
+ *                                    Ahora es el filete de `selva` de la silueta:
+ *                                    12,40:1 contra el papel de la ventana
+ *   las treinta piezas entre sí      era un canal de papel de 4 px a 1,06:1 del
+ *                                    gris, o sea nada, y encima se comía el 32 %
+ *                                    del color del mapa. Ahora es el pelo de
+ *                                    `contour` de 1,25 px: 2,19:1 contra el gris,
+ *                                    y cuesta el 11 %
+ *
+ * Y el efecto medible es que hay MÁS COLOR: las treinta piezas juntas pasan de
+ * 17.606 px² de color visible a 23.904 a 390×844, un 35,8 % más. Parte del
+ * «blanco sobre blanco» era literalmente eso: un tercio del dato tapado por dos
+ * bandas claras que no dibujaban nada.
+ *
+ * Lo que va encima no hay que remedirlo, porque la ventana sigue siendo de papel:
+ * el halo de los rótulos, el filete del punto de la ciudad, el rótulo del mar en
+ * `faint` (4,97:1) y la guía en negro al 20 % se quedan como estaban.
+ * ------------------------------------------------------------------------- */
+
+/* El filete de la silueta va ENTERO POR FUERA: el trazo se pinta antes del
+   relleno, así que la mitad de dentro la tapa el propio respaldo del
+   departamento. Es lo que deja intacta la costa de una astilla como Bahía Solano.
+   El grosor y la cuenta están en el marcado, junto al `<use>`. */
+.map-edge {
+  paint-order: stroke fill;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* La lechada: los treinta contornos gruesos DEBAJO de los rellenos y recortados
+   con la silueta. Dentro de cada municipio la tapa su propio color, así que no le
+   cuesta superficie a nadie; lo único que se ve de ella es lo que asoma por los
+   huecos del catálogo. Va en `need-blank` y no en papel: el papel se leía como
+   una costura suelta; el gris de «sin documentar» es el mismo relleno del resto
+   del tablero. El grosor va en el marcado, junto a su cuenta (`GROUT` en
+   ChocoMap). */
+.map-grout {
+  fill: none;
+  stroke: var(--color-need-blank);
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* El linde entre municipios, para los treinta de una vez y por encima de todos
+   los colores. Va centrado en cada frontera, así que entre dos vecinos se ve el
+   doble de su mitad y siempre lo mismo, venga quien venga escrito antes.
+
+   UN PELO, Y NO CUATRO PÍXELES. La mitad del trazo cae dentro de la forma, y con
+   cuatro píxeles eso eran dos por dentro de cada municipio: el 33 % del color del
+   mapa, y el 91 % del de Unión Panamericana. La cuenta entera y las medidas del
+   navegador están en ChocoMap, encima de las capas. A 1,25 —el mismo pelo que la
+   guía de un rótulo— cuesta el 11 %.
+
+   Y es de `contour`, que es para lo que existe esa ficha. El papel que llevaba
+   antes está a 1,06:1 del gris de «sin documentar», así que entre dos vecinos sin
+   documentar —27 de los 30— no dibujaba nada: pagaba un tercio del color por una
+   línea que no se veía. `contour` contra ese mismo gris da 2,19:1.
+
    Los grosores están en PÍXELES, no en unidades del dibujo: ver `NON_SCALING`
    en components/map/ChocoMap.tsx. */
-.map-channel {
+.map-linde {
   fill: none;
-  stroke: var(--color-paper);
-  stroke-width: 4;
+  stroke: var(--color-contour);
+  stroke-width: 1.25;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 
 .map-body,
-.map-channel,
+.map-grout,
+.map-linde,
 .map-chosen {
   pointer-events: none;
 }
@@ -733,49 +835,83 @@ body {
 
 .map-shape {
   opacity: 0;
-  /* `fill` responde al interior y NUNCA al trazo: así el filete de papel que se
-     dibuja al pasar no agranda la zona sensible tres unidades hacia el vecino,
-     que es lo que hace que un municipio se quede pegado al cursor. */
+  /* `fill` responde al interior y NUNCA al trazo: así el filete que se dibuja al
+     pasar no agranda la zona sensible hacia el vecino, que es lo que hace que un
+     municipio se quede pegado al cursor. */
   pointer-events: fill;
   paint-order: stroke fill;
-  stroke: var(--color-paper);
+  stroke: var(--color-selva);
   stroke-width: 0;
-  transform-box: fill-box;
-  transform-origin: center;
   transition:
     opacity 0.18s ease,
-    stroke-width 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    stroke-width 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Levantar la pieza es su color entero, un filete de papel que ensancha el canal
-   a su alrededor y una sombra que cae sobre los vecinos. No se oscurece ni se
-   satura: un filtro sobre estos cinco colores no hace lo mismo en los cinco
-   —el gris de "sin documentar" se va a blanco y el rojo apenas se mueve— y el
-   mapa necesita que el gesto se lea igual en cualquier municipio. */
-@media (hover: hover) {
-  .map-link:hover .map-shape {
-    opacity: 1;
-    stroke-width: 6;
-    transform: scale(1.02);
-    filter: drop-shadow(0 3px 8px oklch(0.28 0.03 160 / 0.34));
-  }
-  .map-link:active .map-shape {
-    transform: scale(0.995);
-  }
+/* LA MICROANIMACIÓN: SE DIBUJA UN CERCO, NO SE AGRANDA LA PIEZA.
+ *
+ * El resalte era `scale(1.02)` más un filete de papel de seis píxeles y una
+ * sombra que caía sobre los vecinos, y las tres cosas cobraban en superficie
+ * ajena: medido en el navegador a 390×844, pasar el cursor por el Medio San Juan
+ * le quitaba 72 px² de color visible a Istmina. Crecer es lo contrario de
+ * separar.
+ *
+ * Ahora la pieza no se mueve ni crece: se repinta a plena luz en la capa de
+ * frente —que va encima de todo el mosaico, así que nadie puede taparla— y le
+ * aparece un cerco de tinta alrededor. Es UNA regla para los treinta.
+ *
+ * EL CERCO VA ENTERO POR FUERA DE LA FORMA porque `paint-order` pinta el trazo
+ * antes del relleno, así que la mitad de dentro la tapa su propio color.
+ * Comprobado midiendo, y era la duda de partida: quitarle el trazo a una pieza
+ * resaltada cambia su superficie visible menos del 1 % —Cértegui −57,7 % contra
+ * −58,5 %; el Medio Atrato −34,2 % contra −35,1 %—, o sea que el trazo no se come
+ * nada. Lo que se la comía era su propio nombre, y eso se arregla en
+ * `shapeLabelSpot`. Cinco píxeles, de los que se ven los dos y medio de fuera:
+ * caben en la lechada sin llegar al color del vecino.
+ *
+ * ES DE `selva` Y NO DEL GRIS DEL LINDE, Y ESO ES LO QUE MIDIÓ LA DECISIÓN. El
+ * cerco cae sobre los vecinos, y 27 de los 30 son el gris de «sin documentar»:
+ * `contour` contra ese gris está a 2,19:1 —el mismo pelo de la división interna,
+ * solo más gordo— y `selva` a 10,87:1. Contra el papel de la ventana, que es lo
+ * que rodea a los municipios de la costa, 2,49:1 contra 12,40:1. Cinco veces más
+ * señal por el mismo precio.
+ *
+ * Y NO SE APAGA EL RESTO DEL TABLERO, aunque era el gesto que más nos gustaba.
+ * Probado y medido: dentro de una ventana clara, una pieza atenuada al 60 % contra
+ * su propia versión encendida da 1,06:1 en el gris de «sin documentar», o sea
+ * nada, y son 27 de las 30 piezas. El apagado solo funciona sobre un campo
+ * oscuro, y el campo oscuro es el marco, no la ventana. Sobre papel la señal
+ * tiene que ser una línea.
+ *
+ * No se confunde con el municipio del recado, que es la otra marca oscura del
+ * dibujo: aquel lleva su línea de `ink` CALZADA en un pad de papel de diez
+ * píxeles y late; este es una línea sola y desnuda que se va al apartar la mano.
+ * Uno es tinta que se queda, el otro es el dedo señalando.
+ *
+ * FUERA de `@media (hover: hover)` a propósito, y con `:focus` al lado: en un
+ * teléfono no hay cursor, y dentro del bloque el nombre de una pieza sin
+ * documentar solo se vería en escritorio, que es justo donde el <title> del
+ * navegador ya lo cuenta al parar el ratón. Con `:focus` la pieza se queda
+ * encendida al tocarla hasta que se toca otra, y eso —y no el hover— es lo que
+ * hace que un nombre se pueda leer con el pulgar encima. Enfocable al toque y no
+ * al tabulador: la pieza lleva un `tabindex` de -1 y el motivo está en ChocoMap.
+ *
+ * Con `prefers-reduced-motion` no hay nada que apagar: la transición se va a
+ * 0,01 ms por la regla del final y el cerco se ve igual, que es de lo que se
+ * trata. */
+.map-piece:is(:hover, :focus) .map-shape {
+  opacity: 1;
+  stroke-width: 5;
+}
 
-  /* Un municipio sin documentar no lleva a ninguna parte, así que no se levanta:
-     se dibuja su contorno y nada más. Dice "esta forma es Lloró" —que es lo que
-     el <title> está contando a la vez— sin prometer un enlace que no existe, y
-     sin tocarle el relleno, porque el relleno es el dato. El trazo es el gris del
-     contorno y la mitad de grueso que la tinta del elegido: son dos cosas y se
-     tienen que leer como dos. */
-  .map-piece:not(.map-link):hover .map-shape {
-    opacity: 1;
-    fill: none;
-    stroke: var(--color-contour);
-    stroke-width: 1.5;
-  }
+/* El nombre de una pieza sin documentar, que en reposo no está en ninguna parte
+   del dibujo: esas formas no tienen punto ni rótulo, así que hasta que se
+   señalan son un color sin nombre. */
+.map-tag {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.map-piece:is(:hover, :focus) .map-tag {
+  opacity: 1;
 }
 
 /* El foco del teclado va FUERA del bloque de hover, y es de las dos cosas que
@@ -783,16 +919,18 @@ body {
    quien recorre el mapa con el tabulador no veía absolutamente nada —ni en un
    teléfono, donde no hay hover que valga, ni con prefers-reduced-motion, que
    además le quitaba el único rastro que quedaba—. El aro es de la marca y va
-   sobre la caja: no se confunde con el filete de papel del cursor ni con la
-   línea de tinta del elegido. */
-.map-link:focus-visible {
+   sobre la caja: no se confunde con el filete gris del cursor ni con la línea de
+   tinta del elegido.
+
+   El recorrido del teclado son los enlaces del mapa y nada más: una pieza sin
+   documentar se enfoca al tocarla, pero no es un control y no se tabula (el
+   motivo está en ChocoMap). La regla se queda escrita sobre `.map-piece` de todas
+   formas, porque el aro es de cualquier pieza que llegue a tener el foco, y con
+   `:focus-visible` un clic no lo saca. */
+.map-piece:focus-visible {
   outline: 3px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: 2px;
-}
-.map-link:focus-visible .map-shape {
-  opacity: 1;
-  stroke-width: 6;
 }
 
 /* --- El municipio elegido -------------------------------------------------- */
@@ -881,6 +1019,27 @@ body {
   opacity: 0.2;
 }
 
+/* Y el municipio del recado se apaga con los de su tramo. Va en su propia regla
+   porque no puede irse a media luz como los demás: su capa REPINTA su color
+   encima del relleno que ya está atenuado —es la cuarta pasada que deja la tinta
+   por fuera de la forma— y dos veces 0,22 son 0,39 de tinta, así que a media luz
+   saldría más fuerte que sus iguales y el filtro diría de él lo contrario que del
+   vecino de al lado. Apagada la capa entera, lo que queda a la vista es su
+   relleno atenuado, igual que el de los demás; la línea de tinta vuelve al soltar
+   la leyenda, que es lo que dura la pregunta. */
+.map-board:has(.legend-step[data-tier="blank"]:is(:hover, :focus-visible))
+  .map-chosen:not([data-tier="blank"]),
+.map-board:has(.legend-step[data-tier="none"]:is(:hover, :focus-visible))
+  .map-chosen:not([data-tier="none"]),
+.map-board:has(.legend-step[data-tier="low"]:is(:hover, :focus-visible))
+  .map-chosen:not([data-tier="low"]),
+.map-board:has(.legend-step[data-tier="mid"]:is(:hover, :focus-visible))
+  .map-chosen:not([data-tier="mid"]),
+.map-board:has(.legend-step[data-tier="high"]:is(:hover, :focus-visible))
+  .map-chosen:not([data-tier="high"]) {
+  opacity: 0;
+}
+
 /* La guía que une un punto con su nombre cuando el nombre se ha tenido que
    apartar. Un pelo de tinta aguada, y en píxeles como el resto de las líneas del
    mapa: es una aclaración, no un trazo del dibujo. */
@@ -891,8 +1050,61 @@ body {
   vector-effect: non-scaling-stroke;
   transition: opacity 0.2s ease;
 }
-.map-pin {
+.map-pin,
+.map-chosen {
   transition: opacity 0.2s ease;
+}
+
+/* --- El avance del rótulo, solo donde se lee ------------------------------- */
+
+/* El `<svg>` del mosaico —no el tablero de la página, que es `.map-board`—
+   declara su propia caja como contenedor. No es para maquetar nada: es para poder
+   preguntar a qué escala se está dibujando, que es lo único que decide si un
+   número de dieciséis unidades es un número o una mancha.
+
+   `container-type: size` no mira el contenido, así que el mapa de la ficha de un
+   municipio —que saca el alto de la proporción del encuadre— no lo lleva; el
+   porqué está en la prop `className` de ChocoMap. */
+.map-box {
+  container: mapa / size;
+}
+
+/* El encuadre mide 720,3 × 1.000 unidades y se ajusta a esa caja, o sea que una
+   unidad vale `min(ancho / 720,3; alto / 1.000)` px. Medido en /mapa sobre el
+   `<svg>`, y en las cuatro manda el alto: 0,2188 px/unidad en una ventana de
+   360×640, 0,4228 en un teléfono de 390×844, 0,448 en un escritorio de 1440×900
+   y 0,8307 en una tableta de 820×1180. Las dieciséis unidades del porcentaje son
+   ahí 3,5 / 6,8 / 7,2 / 13,3 px: solo la última es un número y no un borrón.
+
+   De ahí el umbral. Hacen falta 0,625 px por unidad para que dieciséis sean los
+   diez píxeles que se leen, o sea 625 px de alto y 451 de ancho (720,3 × 0,625 =
+   450,2, y se redondea hacia arriba porque es un suelo); se piden los dos porque
+   la escala es el menor de los dos cocientes, y los dos hacen falta de verdad:
+   medido en el navegador, en un escritorio de 1440×900 la caja del mapa sale de
+   480 × 448 px, así que el ancho pasaría el filtro y el número se dibujaría a
+   7,17 px. Y se pregunta por la caja del dibujo y no por el tamaño de la pantalla
+   porque entre las dos hay una cabecera que crece: el mismo teléfono con el
+   recado en dos líneas deja menos mapa, y el número no se lee mejor por dónde
+   esté escrita esa línea.
+
+   El ancho manda en las ventanas estrechas y altas, que es donde se comprueba
+   que el umbral no está de adorno: medido sobre el `<svg>`, una ventana de
+   460×1100 da una caja de 420 px y el número sale a 9,33 px, una de 480×1100 da
+   440 px y 9,77 px —las dos por debajo del suelo, y las dos escondidas—, y una de
+   500×1150 da 460 px y 10,22 px, que ya es un número.
+
+   Lo que queda donde no aparece es el color de la pieza y su punto, que es lo que
+   se lee a un metro. El número no se pierde: viaja en el HTML —esto es CSS, no
+   JavaScript escondiendo nada—, está en el nombre accesible del enlace y está
+   entero en la tarjeta del municipio. */
+.map-percent {
+  display: none;
+}
+
+@container mapa (min-width: 451px) and (min-height: 625px) {
+  .map-percent {
+    display: inline;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -910,7 +1122,7 @@ body {
  *   0 – 26 %   quieto. Sin ese respiro no hay tiempo de reconocer el país.
  *  26 – 80 %   el acercamiento, de `--intro-scale` a no transformar nada.
  *  36 – 72 %   Colombia se va, mientras el departamento sigue viniendo.
- *  80 – 100 %  relevo: el papel y el verde se disuelven sobre el mapa de debajo.
+ *  80 – 100 %  relevo: el campo de selva se disuelve sobre el mapa de debajo.
  *
  * Que el acercamiento acabe en el 80 % y no en el 100 % es a propósito: los
  * últimos 400 ms el departamento ya está parado en su sitio definitivo, así que
@@ -983,7 +1195,7 @@ body {
   position: absolute;
   inset: -4px;
   border-radius: 9999px;
-  background: var(--color-accent);
+  background: var(--color-brote);
   animation: live-ring 1.8s ease-out infinite;
   pointer-events: none;
 }
@@ -1022,14 +1234,14 @@ body {
   .draws-check {
     stroke-dasharray: none;
   }
-  /* Se quita el movimiento y NADA MÁS. El filete de papel, la sombra y el aro
-     del foco no son movimiento: son cómo se sabe qué municipio está bajo el
-     cursor y cuál tiene el foco. Antes este bloque los borraba todos con un
-     `filter: none`, y el mapa se quedaba sin un solo estado visible para quien
-     pide menos animación. */
-  .map-shape {
-    transform: none !important;
-  }
+  /* Se quita el movimiento y NADA MÁS. El filete del resalte, el apagado del
+     tablero y el aro del foco no son movimiento: son cómo se sabe qué municipio
+     está bajo el cursor y cuál tiene el foco. Antes este bloque los borraba todos
+     con un `filter: none`, y el mapa se quedaba sin un solo estado visible para
+     quien pide menos animación. Aquí ya no queda nada que apagar del resalte
+     —el `scale` que había se cambió por el apagado del tablero, que es un estado
+     y no un movimiento— y lo que hace la regla de abajo es dejar la transición en
+     0,01 ms: el gesto llega instantáneo y se ve igual. */
   *,
   *::before,
   *::after {

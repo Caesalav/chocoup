@@ -21,7 +21,7 @@ export default async function CitiesPage() {
       <div className={`${shell} pt-4 lg:pt-10`}>
         <ScreenHeader
           title="Municipios"
-          subtitle="Donde el equipo ha estado. En el mapa, gris es sin visitar; verde es sin casos reportados."
+          subtitle="Donde hay familias documentadas. En el mapa, gris es sin visitar; verde es sin casos reportados."
           backHref="/"
           backLabel="Volver al inicio"
           count={cities.length}
@@ -29,7 +29,7 @@ export default async function CitiesPage() {
 
         {cities.length === 0 ? (
           <p className={`${card} mt-6 p-5 text-[14px] leading-relaxed text-muted`}>
-            Todavía no hay ningún municipio publicado.
+            Todavía no hay ningún municipio con casos documentados.
           </p>
         ) : (
           <ul className={`enters enters-1 mt-6 ${cardGrid}`}>

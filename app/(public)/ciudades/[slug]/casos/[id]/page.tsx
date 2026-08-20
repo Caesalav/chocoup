@@ -107,11 +107,18 @@ export default async function CasePage({ params }: Props) {
           </div>
         )}
 
-        <div className={`${shell} absolute inset-x-0 top-0 flex items-center justify-between pt-4`}>
+        {/* La fila no recibe el dedo y los dos mandos sí. Su caja cruza la foto de
+            lado a lado y mide 60 px de alto: entera se comía todo lo que pasara
+            por esa franja —el arrastre del carrete y, desde que las barras del
+            indicador se pueden pulsar, las barras mismas, que caen justo ahí—. Es
+            lo que ya hacía el titular de abajo, que nació con la clase puesta. */}
+        <div
+          className={`${shell} pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between pt-4`}
+        >
           <Link
             href={`/ciudades/${city.slug}`}
             aria-label={`Volver a ${city.name}`}
-            className={gallery.length > 0 ? iconOnPhoto : iconOnPaper}
+            className={`pointer-events-auto ${gallery.length > 0 ? iconOnPhoto : iconOnPaper}`}
           >
             <BackIcon className="size-5" />
           </Link>
@@ -119,7 +126,7 @@ export default async function CasePage({ params }: Props) {
           <ShareLink
             url={shareUrl}
             title={shareTitle}
-            className={gallery.length > 0 ? iconOnPhoto : iconOnPaper}
+            className={`pointer-events-auto ${gallery.length > 0 ? iconOnPhoto : iconOnPaper}`}
           >
             <ShareIcon className="size-5" />
             <span className="sr-only">Compartir este caso</span>

@@ -12,18 +12,24 @@ import type { SupportOfferKind } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  searchParams: Promise<{ tab?: string; q?: string; lugar?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string; lugar?: string; orden?: string; categoria?: string }>;
 };
 
 function isKind(value: string | undefined): value is SupportOfferKind {
   return value === "voluntario" || value === "profesion" || value === "recurso";
 }
 
+function isSort(value: string | undefined): value is "fecha" | "nombre" | "lugar" | "oferta" {
+  return value === "fecha" || value === "nombre" || value === "lugar" || value === "oferta";
+}
+
 export default async function ResourcesPage({ searchParams }: Props) {
-  const { tab, q: rawQ, lugar: rawPlace } = await searchParams;
+  const { tab, q: rawQ, lugar: rawPlace, orden: rawSort, categoria: rawCategory } = await searchParams;
   const kind: SupportOfferKind = isKind(tab) ? tab : "voluntario";
   const q = (rawQ ?? "").trim().toLowerCase().slice(0, 80);
   const place = (rawPlace ?? "").trim().toLowerCase().slice(0, 80);
+  const sort = isSort(rawSort) ? rawSort : "fecha";
+  const category = (rawCategory ?? "").trim();
 
   const [volunteers, professions, resources] = await Promise.all([
     getSupportOffers("voluntario"),
@@ -37,26 +43,44 @@ export default async function ResourcesPage({ searchParams }: Props) {
     profesion: professions.length,
     recurso: resources.length,
   };
-  const rows = byKind[kind].filter((row) => {
-    if (place && !row.city_name.toLowerCase().includes(place)) return false;
-    if (!q) return true;
-    const haystack = [
-      row.person_name,
-      row.contact,
-      row.email,
-      row.city_name,
-      row.message,
-      row.skills,
-      row.profession,
-      row.resource,
-      row.availability,
-    ]
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(q);
-  });
+  const rows = byKind[kind]
+    .filter((row) => {
+      if (place && !row.city_name.toLowerCase().includes(place)) return false;
+      if (kind === "recurso" && category && row.category !== category) return false;
+      if (!q) return true;
+      const haystack = [
+        row.person_name,
+        row.contact,
+        row.email,
+        row.city_name,
+        row.message,
+        row.skills,
+        row.profession,
+        row.resource,
+        row.availability,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    })
+    .sort((a, b) => {
+      if (sort === "nombre") return a.person_name.localeCompare(b.person_name, "es");
+      if (sort === "lugar") return a.city_name.localeCompare(b.city_name, "es");
+      if (sort === "oferta") {
+        const left = kind === "profesion" ? a.profession : kind === "recurso" ? a.resource : a.skills;
+        const right = kind === "profesion" ? b.profession : kind === "recurso" ? b.resource : b.skills;
+        return left.localeCompare(right, "es");
+      }
+      return b.created_at.localeCompare(a.created_at);
+    });
 
-  const queryFor = (next: { tab?: string; q?: string; lugar?: string }) => {
+  const queryFor = (next: {
+    tab?: string;
+    q?: string;
+    lugar?: string;
+    orden?: string;
+    categoria?: string;
+  }) => {
     const params = new URLSearchParams();
     const nextTab = next.tab ?? kind;
     if (nextTab !== "voluntario") params.set("tab", nextTab);
@@ -64,6 +88,10 @@ export default async function ResourcesPage({ searchParams }: Props) {
     if (nextQ) params.set("q", nextQ);
     const nextPlace = next.lugar ?? place;
     if (nextPlace) params.set("lugar", nextPlace);
+    const nextSort = next.orden ?? sort;
+    if (nextSort !== "fecha") params.set("orden", nextSort);
+    const nextCategory = next.categoria ?? category;
+    if (nextCategory) params.set("categoria", nextCategory);
     const qs = params.toString();
     return qs ? `/admin/recursos?${qs}` : "/admin/recursos";
   };
@@ -130,6 +158,32 @@ export default async function ResourcesPage({ searchParams }: Props) {
             className={field.input}
           />
         </label>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className={field.label}>Orden</span>
+            <select name="orden" defaultValue={sort} className={field.select}>
+              <option value="fecha">Más recientes</option>
+              <option value="nombre">Nombre</option>
+              <option value="lugar">Lugar</option>
+              <option value="oferta">Lo ofrecido</option>
+            </select>
+          </label>
+          {kind === "recurso" ? (
+            <label className="block">
+              <span className={field.label}>Categoría</span>
+              <select name="categoria" defaultValue={category} className={field.select}>
+                <option value="">Todas</option>
+                {NEED_CATEGORIES.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <input type="hidden" name="categoria" value="" />
+          )}
+        </div>
         <button type="submit" className="mt-4 text-[14px] font-medium text-accent hover:underline">
           Filtrar
         </button>
@@ -137,7 +191,7 @@ export default async function ResourcesPage({ searchParams }: Props) {
 
       <p className="mt-6 text-sm text-muted">
         {plural(rows.length, "oferta", "ofertas")}
-        {q || place ? " con este filtro" : ` en ${SUPPORT_KINDS.find((entry) => entry.value === kind)?.label.toLowerCase()}`}
+        {q || place || category ? " con este filtro" : ` en ${SUPPORT_KINDS.find((entry) => entry.value === kind)?.label.toLowerCase()}`}
       </p>
 
       {rows.length === 0 ? (
