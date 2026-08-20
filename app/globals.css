@@ -122,17 +122,19 @@
   --color-land: #dfe5da;
   --color-contour: #93a198;
 
-  /* Geografía del mapa, y no marca. El Pacífico no puede pintarse de selva:
-     ese verde es vegetación y acción, y a la izquierda de este dibujo hay
-     agua. `mar` es el azul de un atlas escolar: bastante croma para leerse
-     como océano, bastante claro para que la tinta y la escala cálida se
-     sostengan. `tierra` es el resto de Colombia, y NO puede ser arena: el
-     oro de «falta poco» vive a H 74, y una tierra a H 82 lo apagaba. Va en
-     el verde-gris de las superficies hundidas, un peldaño más oscuro que
-     `need-blank`, para que el país sea el fondo y el Chocó el tablero.
-     `mar-ink` nombra el océano. */
-  --color-mar: oklch(0.84 0.07 228);
-  --color-mar-ink: oklch(0.32 0.075 230);
+  /* Geografía del mapa, y no marca. `tierra` es el resto de Colombia, y NO
+     puede ser arena: el oro de «falta poco» vive a H 74, y una tierra a H 82
+     lo apagaba. Va en el verde-gris de las superficies hundidas, un peldaño
+     más oscuro que `need-blank`, para que el país sea el fondo y el Chocó el
+     tablero.
+
+     El agua no tiene color propio, y es a propósito: el Pacífico se queda en
+     el papel de la página. Hubo un `mar` azul de atlas escolar pintado a
+     sangre sobre el encuadre, y el problema no era el tono sino el área. En
+     este dibujo el país solo asoma al este, así que el agua es la mayor parte
+     del campo: el azul se llevaba más superficie que el departamento y
+     competía con la escala de necesidad, que es el único dato del mapa. Quien
+     nombra el océano es su rótulo, en `faint`. */
   --color-tierra: oklch(0.91 0.016 160);
 
   /* Escala por necesidades abiertas: el único color del mapa, en planos. Los
@@ -725,10 +727,9 @@ body {
   transition: opacity 0.2s ease;
 }
 
-/* El escenario del mapa es un atlas: campo de `mar`, Colombia en `tierra`,
-   el Chocó en la escala de necesidad. El océano de la izquierda ES el fondo
-   de la vista, así que el verde de marca no se lee como vegetación donde hay
-   agua. */
+/* El escenario del mapa es un atlas: el papel de la página como campo,
+   Colombia en `tierra` y el Chocó en la escala de necesidad. El agua es el
+   propio papel, que es lo que deja todo el color disponible para el dato. */
 
 /* ---------------------------------------------------------------------------
  * EL CONTRASTE DE DENTRO DE LA VENTANA

@@ -413,15 +413,15 @@ if (!soloEstados) {
   }
   console.log(fila("contour sobre land (filete entre municipios)", contraste(color("contour"), color("land")), 1.5));
 
-  console.log("\n=== MAPA: mar, tierra y la escala ===");
-  console.log("El atlas no puede pintar el Pacífico de selva ni el resto de Colombia de");
-  console.log("arena: el oro de «falta poco» vivía a H 74 y la tierra a H 82 lo apagaba.");
-  console.log("Texto sobre mar pide AA. Los pares de relleno se miran en ΔE: no son tinta.\n");
+  console.log("\n=== MAPA: tierra y la escala ===");
+  console.log("El resto de Colombia no puede ser arena: el oro de «falta poco» vivía a");
+  console.log("H 74 y la tierra a H 82 lo apagaba. El agua no se mide porque no se pinta:");
+  console.log("es el papel. Los pares de relleno se miran en ΔE: no son tinta.\n");
   for (const tinta of ["ink", "body", "muted"]) {
-    console.log(fila(`${tinta} sobre mar`, contraste(color(tinta), color("mar"))));
+    console.log(fila(`${tinta} sobre tierra`, contraste(color(tinta), color("tierra"))));
   }
   console.log(fila("luz sobre ink (Live del atlas)", contraste(color("luz"), color("ink")), 7));
-  console.log(fila("mar-ink sobre mar (rótulo del Pacífico)", contraste(color("mar-ink"), color("mar")), 4.5));
+  console.log(fila("faint sobre paper (rótulo del Pacífico)", contraste(color("faint"), color("paper")), 4.5));
   const relleno = (a, b, etiqueta) => {
     const [A, B] = [color(a), color(b)];
     console.log(
@@ -433,9 +433,7 @@ if (!soloEstados) {
   relleno("need-mid", "tierra", "need-mid / tierra");
   relleno("need-high", "tierra", "need-high / tierra");
   relleno("need-blank", "tierra", "need-blank / tierra (tablero sobre el país)");
-  relleno("tierra", "mar", "tierra / mar (país contra océano)");
-  relleno("need-low", "mar", "need-low / mar");
-  relleno("need-high", "mar", "need-high / mar");
+  relleno("tierra", "paper", "tierra / paper (país contra el agua)");
 
   console.log("\n=== MAPA: SEPARACIÓN ENTRE TRAMOS ===");
   console.log("La prueba más dura de la paleta, y no es una pastilla con su palabra: son");

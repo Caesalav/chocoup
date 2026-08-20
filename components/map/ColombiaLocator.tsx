@@ -110,11 +110,10 @@ type Props = {
 export function ColombiaLocator({ className, named = false, zooms = false, mosaic }: Props) {
   const drawing = (
     <>
-      {/* El mar llena el encuadre. El país va encima, en el gris de las
-          superficies hundidas, y el Chocó encima del país: tres capas, tres
-          significados. El oro de la escala no puede vivir también en la tierra
-          del país. */}
-      <rect className="fill-mar" x="-300" y="-900" width="2700" height="3800" />
+      {/* El agua es el papel del encuadre. El país va encima, en el gris de
+          las superficies hundidas, y el Chocó encima del país: dos capas de
+          color y una de papel, tres significados. El oro de la escala no puede
+          vivir también en la tierra del país. */}
       <path
         d={COLOMBIA_PATH}
         className={`fill-tierra stroke-contour${zooms ? " intro-country" : ""}`}
@@ -125,7 +124,7 @@ export function ColombiaLocator({ className, named = false, zooms = false, mosai
         <text
           x={-96}
           y={640}
-          className="fill-mar-ink"
+          className="fill-faint"
           fontSize={92}
           fontWeight={500}
           letterSpacing={10}

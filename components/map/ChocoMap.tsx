@@ -15,7 +15,6 @@ import {
   placeOceanLabel,
   placePins,
   shapeLabelSpot,
-  VIEW_BOX,
   viewBoxAttr,
   type MapPin,
 } from "@/lib/choco-map";
@@ -260,17 +259,13 @@ export function ChocoMap({
         />
       ) : (
         <>
-          {/* Tres lecturas, de atrás hacia adelante: el Pacífico (el fondo de
-              la vista), el resto de Colombia en arena, el Chocó en la escala.
-              En este encuadre el país solo asoma al este; al oeste el mar es
-              el campo entero. */}
-          <rect
-            className="fill-mar"
-            x={VIEW_BOX.minX}
-            y={VIEW_BOX.minY}
-            width={VIEW_BOX.width}
-            height={VIEW_BOX.height}
-          />
+          {/* Dos lecturas, de atrás hacia adelante: el resto de Colombia en
+              verde-gris y el Chocó en la escala. El agua no se pinta. Un campo
+              de azul a sangre sobre el viewBox entero se lleva el dibujo por
+              delante: ocupa más área que el departamento y compite con la
+              escala de color, que es el único dato del mapa. Como en una carta
+              impresa, el Pacífico se queda en el papel de la página y quien lo
+              nombra es su rótulo. */}
           <path d={COLOMBIA_PATH} className="fill-tierra" />
           <defs>
             {/* `vector-effect` NO se hereda, así que va en la forma declarada y no
@@ -549,7 +544,7 @@ export function ChocoMap({
         <text
           x={ocean.x}
           y={ocean.y}
-          className="map-ocean fill-mar-ink"
+          className="fill-faint"
           fontSize={OCEAN_LABEL.fontSize}
           letterSpacing={OCEAN_LABEL.letterSpacing}
           transform={`rotate(-90 ${ocean.x} ${ocean.y})`}
@@ -563,7 +558,7 @@ export function ChocoMap({
         <text
           x={inland.x}
           y={inland.y}
-          className="map-ocean fill-muted"
+          className="fill-muted"
           fontSize={LAND_LABEL.fontSize}
           letterSpacing={LAND_LABEL.letterSpacing}
           transform={`rotate(90 ${inland.x} ${inland.y})`}

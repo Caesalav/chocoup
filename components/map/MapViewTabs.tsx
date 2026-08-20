@@ -19,9 +19,8 @@ const VIEWS: { id: MapView; label: string; href: string }[] = [
  * Vive en la URL y no en estado de cliente por las dos razones de siempre en este
  * portal: son dos enlaces, así que sin JavaScript funcionan igual, y «el Chocó
  * dentro de Colombia» se puede pegar en WhatsApp, que es cómo llega aquí la
- * gente. Sobre `mar` la pastilla abierta es tinta con `luz`: el verde de marca
- * no entra en el atlas para no pelear con el mosaico ni volver a teñir de selva
- * un campo que es océano.
+ * gente. La pastilla abierta es tinta con `luz`: el verde de marca no entra en
+ * el atlas para no pelear con el mosaico, que es donde vive el único dato.
  */
 export function MapViewTabs({ active }: { active: MapView }) {
   return (

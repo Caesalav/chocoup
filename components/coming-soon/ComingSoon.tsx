@@ -106,14 +106,15 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
     <div className="lg:grid lg:h-[calc(100svh-var(--strip-h,0px))] lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,36rem)] lg:overflow-hidden">
       <section
         aria-label="Cómo se va a leer el mapa"
-        className="map-board map-stage relative overflow-hidden bg-mar px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"
+        className="map-board relative overflow-hidden bg-paper px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"
       >
         <p className="enters relative text-[13px] tracking-wide text-muted">
           {SITE_NAME}
         </p>
 
-        {/* El mismo atlas que /mapa: el campo es el Pacífico, sin ventana de
-            papel que convierta el océano y el país en el mismo beige. */}
+        {/* El mismo atlas que /mapa, y por lo tanto sobre el mismo papel: el
+            país se lee porque va en verde-gris sobre el campo, no porque el
+            campo sea de otro color. */}
         <div className="enters enters-1 relative mt-4 h-[min(48svh,26rem)] overflow-hidden lg:mt-5 lg:h-0 lg:flex-1">
           <ChocoMap
             pins={LESSON_PINS}

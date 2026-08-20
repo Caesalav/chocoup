@@ -115,13 +115,14 @@ export default async function MapPage({ searchParams }: Props) {
     <div
       className={`map-board ${shell} screen-h flex flex-col pt-3 lg:grid lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] lg:gap-x-12 lg:pb-6 lg:pt-6`}
     >
-      {/* Atlas: el campo entero es el Pacífico. Colombia asoma a la derecha
-          en el gris de las superficies hundidas; el Chocó es el único sitio
-          con color de dato. Sin cintas y sin selva: ese verde competía con
-          el rojo, el naranja y el oro, y pintaba de bosque el agua. La tinta
-          es `ink` sobre `mar`. El mapa no va en una ventana de papel: esa
-          caja hacía del océano y del país el mismo beige. */}
-      <div className="map-stage enters relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-mar px-4 py-4 lg:h-full lg:px-5 lg:py-5">
+      {/* Atlas sobre papel. Colombia asoma a la derecha en el gris de las
+          superficies hundidas; el Chocó es el único sitio con color de dato.
+          Sin cintas y sin selva: ese verde competía con el rojo, el naranja y
+          el oro. Y sin campo de azul, que era el error contrario: el agua se
+          lleva la mayor parte de este encuadre —el país solo entra por el
+          este—, así que pintarla dejaba el dato en minoría dentro de su propio
+          mapa. El agua es el papel; quien la nombra es su rótulo. */}
+      <div className="enters relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-paper px-4 py-4 lg:h-full lg:px-5 lg:py-5">
         <LiveBadge className="top-4 right-4 left-auto lg:top-5 lg:right-5" />
         <header className="shrink-0">
           <h1 className="font-display text-[22px] leading-tight text-ink lg:text-[30px]">
