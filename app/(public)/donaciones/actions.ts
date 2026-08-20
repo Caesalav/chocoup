@@ -32,13 +32,21 @@ function copAmount(formData: FormData, key: string): number {
   return Number(digits);
 }
 
-/** Solo rutas internas, para volver de Mercado Pago sin abrir otro sitio. */
-function returnPath(value: string): string {
-  if (!value.startsWith("/") || value.startsWith("//") || value.includes("://")) {
-    return "/donaciones";
-  }
-  return value;
-}
+/**
+ * A dónde devuelve Mercado Pago cuando termina, salga como salga.
+ *
+ * Es una pantalla fija y no la página de la que se venía, que es lo que se
+ * hacía antes. Volver a la ficha de la familia dejaba a quien acababa de pagar
+ * delante del mismo botón «Donar» que acababa de pulsar, sin una sola palabra
+ * que dijera si el cobro había salido: la única señal era la barra de recaudado,
+ * que tarda en moverse porque depende del webhook.
+ *
+ * La causa no se pierde por fijarla: la pantalla la saca de `external_reference`
+ * del propio pago, que es dato comprobado, y no de un parámetro de la
+ * dirección. Los tres caminos —aprobado, pendiente y rechazado— caen aquí y la
+ * pantalla dice cuál fue.
+ */
+const THANKS_PATH = "/donaciones/gracias";
 
 /**
  * Abre Mercado Pago con el valor escrito. El cobro ocurre allá; aquí solo se
@@ -79,7 +87,7 @@ export async function startMercadoPagoCheckout(
   const donorName = publishName ? text(formData, "donor_name").slice(0, MAX_NAME) : "";
 
   const heading = text(formData, "heading") || "Donación a Chocó Up";
-  const back = await absoluteUrl(returnPath(text(formData, "return_to")));
+  const back = await absoluteUrl(THANKS_PATH);
   const notificationUrl = await publicUrl(PAYMENT_WEBHOOK_PATH);
 
   if (!isMercadoPagoConfigured()) {

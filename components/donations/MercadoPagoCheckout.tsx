@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { useActionState, useState } from "react";
 import { startMercadoPagoCheckout, type DonorFormState } from "@/app/(public)/donaciones/actions";
 import { alertBox, button, field } from "@/components/ui/styles";
@@ -35,7 +34,6 @@ export function MercadoPagoCheckout({
   note?: string;
   showHeading?: boolean;
 }) {
-  const pathname = usePathname();
   const [amount, setAmount] = useState(String(PRESETS[1]));
   const [state, action, pending] = useActionState<DonorFormState, FormData>(
     startMercadoPagoCheckout,
@@ -61,7 +59,6 @@ export function MercadoPagoCheckout({
           className="absolute left-[-9999px] size-0"
         />
         <input type="hidden" name="heading" value={heading ?? "Donación a Chocó Up"} />
-        <input type="hidden" name="return_to" value={pathname} />
         {caseId && <input type="hidden" name="case_id" value={caseId} />}
 
         <div>

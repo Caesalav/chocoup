@@ -196,6 +196,19 @@ export type MercadoPagoPayment = {
   date_approved: string | null;
   live_mode: boolean;
   metadata: Record<string, unknown> | null;
+  /**
+   * Quien pagó, según la pasarela. De aquí sale una sola cosa: el correo al que
+   * se manda el agradecimiento.
+   *
+   * No sale el nombre, y no es un olvido. `payer.first_name` es el titular del
+   * medio de pago —que a veces es la mamá, o la empresa— y el portal ya
+   * pregunta el nombre en su propio formulario justamente para no confundir las
+   * dos cosas; está explicado en components/donations/MercadoPagoCheckout.tsx.
+   *
+   * Puede llegar vacío: con algunos medios en efectivo no hay correo. Quien lo
+   * use tiene que aguantar que no esté.
+   */
+  payer: { email?: string | null } | null;
 };
 
 /**

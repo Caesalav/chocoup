@@ -1,3 +1,4 @@
+import { notifyConfirmedDonation } from "@/lib/donation-notify";
 import {
   donationStatus,
   fetchPayment,
@@ -7,6 +8,7 @@ import {
   mercadoPagoWebhookSecret,
   readDonationReference,
 } from "@/lib/mercadopago";
+import { absoluteUrl } from "@/lib/site";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -168,33 +170,72 @@ export async function POST(request: Request) {
     settled_at: status === "confirmada" ? (payment.date_approved ?? new Date().toISOString()) : null,
   };
 
-  const { error } = await supabase.from("donations").insert(donation);
+  const { data: inserted, error } = await supabase
+    .from("donations")
+    .insert(donation)
+    .select("id")
+    .single();
+
+  let donationId = inserted?.id as string | undefined;
+  let outcome = "registrada";
 
   // 23505 es el índice único de 0017 diciendo que este pago ya está escrito, o
   // sea, que este aviso es el segundo. Entonces no es una fila nueva: es la
   // misma cambiando de estado —de pendiente a confirmada, de confirmada a
   // reembolsada— y lo que hay que hacer es actualizarla.
   if (error?.code === "23505") {
-    const { error: updateError } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from("donations")
       .update({ status: donation.status, settled_at: donation.settled_at })
       .eq("provider", donation.provider)
-      .eq("payment_ref", donation.payment_ref);
+      .eq("payment_ref", donation.payment_ref)
+      .select("id")
+      .single();
 
     if (updateError) {
       console.error("mercadopago webhook: no se pudo actualizar el pago", dataId, updateError.message);
       return Response.json({ error: "no-se-pudo-actualizar" }, { status: 500 });
     }
 
-    return Response.json({ ok: "actualizada" });
-  }
-
-  if (error) {
+    donationId = updated?.id as string | undefined;
+    outcome = "actualizada";
+  } else if (error) {
     console.error("mercadopago webhook: no se pudo registrar el pago", dataId, error.message);
     return Response.json({ error: "no-se-pudo-registrar" }, { status: 500 });
   }
 
-  return Response.json({ ok: "registrada" });
+  /**
+   * Los dos correos, y solo cuando el dinero está confirmado.
+   *
+   * Va después de responder por el pago y no antes: cuando esto corre, la fila
+   * ya está escrita y el registro del portal ya es correcto. Por eso el envío
+   * no puede cambiar lo que se le contesta a Mercado Pago —un buzón lleno no es
+   * motivo para que reintente un pago bien anotado— y por eso
+   * `notifyConfirmedDonation` no lanza: lleva su propia cuenta de lo enviado
+   * (0024) y sus propios reintentos.
+   *
+   * Una donación pendiente no manda nada. Con una transferencia o un pago en
+   * efectivo pueden pasar días hasta que se aprueba, y dar las gracias por un
+   * dinero que todavía puede no llegar es prometer algo que no ha pasado.
+   * Cuando se apruebe entrará otro aviso por aquí y ese sí las dará.
+   */
+  if (donationId && donation.status === "confirmada") {
+    await notifyConfirmedDonation({
+      admin: supabase,
+      donationId,
+      destination: donation.destination,
+      caseId: donation.case_id,
+      amountCop: donation.amount_cop,
+      donorName: donation.donor_name,
+      publishName: donation.publish_name,
+      paymentRef: donation.payment_ref,
+      payerEmail: payment.payer?.email?.trim() ?? "",
+      donatedAt: donation.settled_at ?? new Date().toISOString(),
+      siteUrl: (await absoluteUrl("/")).replace(/\/+$/, ""),
+    });
+  }
+
+  return Response.json({ ok: outcome });
 }
 
 /**
