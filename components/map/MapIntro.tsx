@@ -60,11 +60,20 @@ export function MapIntro() {
   if (!play) return null;
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
-      {/* El papel tapa el mapa hasta que el departamento ya ha aterrizado. Antes
-          se iba abriendo durante todo el acercamiento, y eso enseñaba el mosaico
-          debajo de un Chocó que todavía venía de camino: dos veces la misma
-          forma a dos tamaños, que es justo la superposición que no encajaba. */}
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
+    >
+      {/* Una plancha del MISMO color que la ventana tapa el mapa hasta que el
+          departamento ya ha aterrizado. Antes se iba abriendo durante todo el
+          acercamiento, y eso enseñaba el mosaico debajo de un Chocó que todavía
+          venía de camino: dos veces la misma forma a dos tamaños, que es justo la
+          superposición que no encajaba.
+
+          Y tiene que ser el color de la ventana, no otro: la plancha se apaga con
+          una transición, así que cualquier diferencia se ve como un fundido de
+          color encima del dibujo. La ventana es de papel (ver /mapa), así que
+          esto es de papel. */}
       <div className="intro-handoff absolute inset-0 bg-paper" />
 
       {/* Con el encuadre del mapa del Chocó (`zooms`): el mismo viewBox y el

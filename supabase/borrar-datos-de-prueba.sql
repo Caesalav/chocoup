@@ -22,18 +22,12 @@
 -- anteriores buscan por esa misma marca.
 --
 -- Los municipios NO se borran: son los del Chocó de verdad y hacen falta. Solo se
--- les quita la marca, el resumen inventado y la publicación, que es como los deja
--- supabase/seed.sql.
+-- les quita la marca, el resumen inventado y la publicación. Un pueblo sin casos
+-- no tiene que volver: el portal solo enseña donde hay familias documentadas.
 --
--- Los municipios no los crea este archivo sino supabase/seed.sql, y cuántos haya
--- cargados en un momento dado no lo afirma este comentario: se mira antes de
--- ejecutar, o al terminar se lee como un fallo del borrado un municipio que nunca
--- estuvo.
---
---   select count(*) from public.cities;
---
--- Si falta alguno de los de la semilla, vuelve a pasar supabase/seed.sql, que los
--- reinserta con sus coordenadas y sin publicar.
+-- Si Quibdó desapareciera, vuelve a pasar supabase/seed.sql, que lo reinserta
+-- con sus coordenadas y sin publicar. Los demás municipios se crean desde el
+-- panel cuando se documentan.
 --
 -- Lo que este archivo NO toca, y conviene saberlo antes de ejecutarlo con prisa:
 -- los casos reales de Quibdó —publicados, con consentimiento, retrato, fotos en
@@ -43,7 +37,18 @@
 
 begin;
 
--- Ofertas. Van primero porque apuntan a casos y necesidades que están a punto de
+-- Donaciones de los casos de prueba. Van primero porque `donations.case_id`
+-- es `on delete restrict` (0017): si se dejaran, borrar el caso fallaría y el
+-- archivo entero se revertiría, con Istmina (prueba) y Bahía Solano (prueba)
+-- todavía publicados. Las donaciones de las causas reales no se tocan.
+delete from public.donations
+where case_id in (
+  select id from public.cases
+  where story like 'CASO DE PRUEBA%'
+     or id::text like '00000000-0000-4000-8000-%'
+);
+
+-- Ofertas. Van después de las donaciones y antes de los casos porque apuntan a casos y necesidades que están a punto de
 -- desaparecer, y su clave ajena es `on delete set null`: si se dejaran para el
 -- final, quedarían ofertas de prueba huérfanas y ya sin nada que las señalara.
 delete from public.offers
@@ -58,10 +63,13 @@ where story like 'CASO DE PRUEBA%';
 delete from public.needs
 where city_id in (select id from public.cities where name like '%(prueba)%');
 
--- Fotos de zona, por la misma razón. Se borra la fila; el archivo no hay que
+-- Fotos de zona de la carga de prueba. Se borra la fila; el archivo no hay que
 -- tocarlo, porque estas fotos nunca estuvieron en Storage: viven en public/demo.
+-- Las portadas `demo/ciudad-*` no son de esa carga: son el paisaje de archivo
+-- del municipio documentado, hasta que el equipo suba la foto del pueblo.
 delete from public.photos
-where storage_path like 'demo/%';
+where storage_path like 'demo/%'
+  and storage_path not like 'demo/ciudad-%';
 
 -- Los municipios se quedan y solo pierden la marca. Aquí se vaciaba además su
 -- canal de donación de muestra, que era lo único de este archivo que, olvidado,
@@ -88,7 +96,7 @@ commit;
 -- Lo que tiene que dar cero es la primera columna. Las otras son el caso real,
 -- que este archivo no toca.
 select (select count(*) from public.cases where story like 'CASO DE PRUEBA%')
-     + (select count(*) from public.photos where storage_path like 'demo/%')
+     + (select count(*) from public.photos where storage_path like 'demo/%' and storage_path not like 'demo/ciudad-%')
      + (select count(*) from public.offers where offerer_name like '%(prueba)%')
      + (select count(*) from public.cities where name like '%(prueba)%')
          as restos_de_prueba, -- tiene que ser 0
@@ -127,4 +135,5 @@ select 'casos' as tabla, count(*) from public.cases where id::text like '0000000
 union all select 'fotos', count(*) from public.photos where id::text like '00000000-0000-4000-8000-%'
 union all select 'necesidades', count(*) from public.needs where id::text like '00000000-0000-4000-8000-%'
 union all select 'avances', count(*) from public.case_updates where id::text like '00000000-0000-4000-8000-%'
-union all select 'ofertas', count(*) from public.offers where id::text like '00000000-0000-4000-8000-%';
+union all select 'ofertas', count(*) from public.offers where id::text like '00000000-0000-4000-8000-%'
+union all select 'donaciones', count(*) from public.donations where id::text like '00000000-0000-4000-8000-%';

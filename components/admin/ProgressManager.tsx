@@ -180,6 +180,8 @@ export function ProgressManager({
                           focus_x: update.photoFrame?.focusX ?? null,
                           focus_y: update.photoFrame?.focusY ?? null,
                           zoom: update.photoFrame?.zoom ?? null,
+                          byte_size: 0,
+                          thumb_byte_size: 0,
                           created_at: update.created_at,
                         }}
                         kind="situation"

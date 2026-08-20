@@ -19,7 +19,7 @@ export async function uploadCasePhoto(
   frame: PhotoFrame | null = null,
 ): Promise<string> {
   const supabase = createSupabaseBrowserClient();
-  const { full, thumb, extension } = await prepareImage(file);
+  const { full, thumb, extension, fullSize, thumbSize } = await prepareImage(file);
   const paths = storagePathsFor(cityId, caseId, extension);
 
   const { error } = await supabase.storage.from(PHOTO_BUCKET).upload(paths.full, full, {
@@ -43,5 +43,7 @@ export async function uploadCasePhoto(
     storagePath: paths.full,
     thumbPath,
     frame,
+    byteSize: fullSize,
+    thumbByteSize: thumbPath ? thumbSize : 0,
   });
 }

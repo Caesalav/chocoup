@@ -214,7 +214,8 @@ const MIGRATIONS = [
   "migrations/0019_muro_de_ofertas.sql",
   "migrations/0020_presupuesto.sql",
   "migrations/0021_registro_de_donaciones.sql",
-  "migrations/0022_donacion_al_fondo.sql",
+  "migrations/0022_peso_de_fotos.sql",
+  "migrations/0023_donacion_al_fondo.sql",
 ];
 const migration = (file) => readFileSync(join(HERE, file), "utf8");
 
@@ -304,8 +305,17 @@ try {
   check("El seed.sql se ejecuta sin errores", false, String(error.message));
 }
 
-const seeded = await one("select count(*)::int as n from public.cities");
-check("El seed carga los 10 municipios", seeded.n === 10, `n=${seeded.n}`);
+const seeded = await one("select slug, count(*) over ()::int as n from public.cities");
+check("El seed carga Quibdó", seeded.n === 1 && seeded.slug === "quibdo", `n=${seeded.n} slug=${seeded.slug}`);
+
+// Istmina no va en el seed: el portal solo guarda pueblos con casos. Las
+// pruebas de permisos sí necesitan un segundo municipio, ajeno a quien
+// documenta Quibdó, y que además esté sin publicar para el contador.
+await sql(`
+insert into public.cities (name, slug, lat, lng, summary, published) values
+  ('Istmina', 'istmina', 5.1594, -76.6853, '', false)
+on conflict (slug) do nothing;
+`);
 
 const bucket = await one("select public from storage.buckets where id = 'fotos'");
 check("El bucket fotos existe y es público", bucket?.public === true);
@@ -490,7 +500,7 @@ check("Sin publicar, el público no ve municipios", hidden.n === 0, `n=${hidden.
 
 await asUser("charlie@test.com");
 const teamSees = await one("select count(*)::int as n from public.cities");
-check("El equipo ve los municipios sin publicar", teamSees.n === 10, `n=${teamSees.n}`);
+check("El equipo ve los municipios sin publicar", teamSees.n === 2, `n=${teamSees.n}`);
 
 // --- El equipo documenta Quibdó -------------------------------------------
 await asUser("charlie@test.com");
@@ -4072,6 +4082,43 @@ await expectError(
   `insert into public.support_offers (kind, person_name, contact)
      values ('dinero', 'Nadie', '3000000000')`,
   "support_offers_kind_valid",
+);
+
+await asPostgres();
+const sizeColumns = await db.query(`
+  select column_name, data_type, column_default, is_nullable
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'photos'
+    and column_name in ('byte_size', 'thumb_byte_size')
+  order by column_name`);
+check(
+  "Las dos columnas del peso de cada foto existen y son enteros no nulos",
+  sizeColumns.rows.length === 2 &&
+    sizeColumns.rows.every((row) => row.data_type === "bigint" && row.is_nullable === "NO"),
+  sizeColumns.rows.map((row) => `${row.column_name}=${row.data_type}`).join(", "),
+);
+
+await asUser("charlie@test.com");
+await sql("update public.photos set byte_size = 180000, thumb_byte_size = 22000 where storage_path = 'quibdo/1.jpg'");
+const weighed = await one("select byte_size, thumb_byte_size from public.photos where storage_path = 'quibdo/1.jpg'");
+check(
+  "El equipo registra el peso de una foto ya subida",
+  Number(weighed.byte_size) === 180000 && Number(weighed.thumb_byte_size) === 22000,
+  JSON.stringify(weighed),
+);
+
+await asPostgres();
+await expectError(
+  "El peso de una foto no puede ser negativo",
+  "update public.photos set byte_size = -1 where storage_path = 'quibdo/1.jpg'",
+  "photos_byte_size_nonneg",
+);
+
+await asAnon();
+await expectError(
+  "El público no cambia el peso de una foto",
+  "update public.photos set byte_size = 1 where storage_path = 'quibdo/1.jpg'",
+  "permission denied",
 );
 
 // --- Informe -----------------------------------------------------------

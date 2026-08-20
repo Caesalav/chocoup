@@ -217,6 +217,10 @@ export type Photo = {
   focus_x: number | null;
   focus_y: number | null;
   zoom: number | null;
+  /** Bytes del JPEG grande. Cero si todavía no se midió. */
+  byte_size: number;
+  /** Bytes de la miniatura. Cero si no hay o no se midió. */
+  thumb_byte_size: number;
   created_at: string;
 };
 
@@ -398,7 +402,7 @@ export type OfferRecord = {
  * A dónde va una donación: a una familia o al fondo general que reparte el
  * equipo. No es un detalle de pantalla, es una columna con dos restricciones
  * detrás: 'causa' exige una causa y 'fondo' exige que no haya ninguna. Ver
- * supabase/migrations/0022_donacion_al_fondo.sql.
+ * supabase/migrations/0023_donacion_al_fondo.sql.
  */
 export type DonationDestination = "causa" | "fondo";
 
@@ -422,6 +426,29 @@ export type DonationLogEntry = {
   city_id: string | null;
   city_name: string | null;
   city_slug: string | null;
+};
+
+/**
+ * Una donación como la lee coordinación: todos los estados, el nombre aunque
+ * no se publique, y la referencia del pago. El público no ve esta forma.
+ */
+export type DonationStatus = "pendiente" | "confirmada" | "fallida" | "reembolsada";
+
+export type AdminDonation = {
+  id: string;
+  amount_cop: number;
+  status: DonationStatus;
+  donor_name: string;
+  publish_name: boolean;
+  provider: string;
+  payment_ref: string;
+  created_at: string;
+  settled_at: string | null;
+  case_id: string;
+  case_name: string;
+  city_id: string;
+  city_name: string;
+  city_slug: string;
 };
 
 /** Oferta con el contexto al que apunta, para la bandeja del equipo. */
@@ -452,9 +479,15 @@ export type CityCardData = City & {
   /** Ítems del presupuesto todavía sin comprar. */
   openNeeds: number;
   /**
-   * Casos con algo sin cubrir, que no es lo mismo que `caseCount`. El mapa
-   * enseña este al lado del color: uno dice a cuánta gente le falta algo y el
-   * color dice cuánto falta. Ver `countOpenCases` en lib/needs.ts.
+   * Casos con algo sin cubrir, que no es lo mismo que `caseCount`. La tarjeta
+   * del pueblo lo enseña junto a su porcentaje —el inicio y el costado de
+   * /mapa— porque contestan preguntas distintas: el porcentaje dice cuánto
+   * falta y esto dice a cuánta gente. Ver `countOpenBudgetCases` en
+   * lib/budget.ts.
+   *
+   * En cero no se escribe: la tarjeta se queda con su porcentaje, y un «0 casos
+   * abiertos» al lado sonaría a que en ese pueblo no hay nadie documentado. Ver
+   * `CityRailCard`.
    */
   openCases: number;
   /** Casos con el presupuesto comprado entero. */

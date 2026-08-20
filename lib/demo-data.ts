@@ -29,6 +29,7 @@ import {
 import { countOpenNeeds, isOpenNeed } from "./needs";
 import type {
   AdminCityRow,
+  AdminDonation,
   AidRecord,
   Case,
   CaseCard,
@@ -965,16 +966,9 @@ export const demoSupportOffers: SupportOffer[] = supportSeeds.map((seed, index) 
 type PhotoSeed = { citySlug: string; caseName?: string; image: string; caption: string };
 
 const photoSeeds: PhotoSeed[] = [
-  { citySlug: "quibdo", image: "choco-rio", caption: "El Atrato a su paso por el municipio." },
-  { citySlug: "quibdo", image: "choco-pueblo", caption: "Viviendas de la ribera en La Yesquita." },
-  { citySlug: "quibdo", image: "choco-edificio", caption: "El coliseo del barrio Kennedy, hoy albergue." },
-  { citySlug: "quibdo", image: "choco-canoas", caption: "Canoas varadas en el malecón." },
-  { citySlug: "istmina", image: "choco-edificio", caption: "Escuela del barrio San Agustín." },
-  { citySlug: "istmina", image: "choco-camino", caption: "La vía de entrada al casco urbano." },
-  { citySlug: "istmina", image: "choco-rio", caption: "El San Juan aguas arriba del pueblo." },
-  { citySlug: "bahia-solano", image: "choco-costa", caption: "La playa de El Valle." },
-  { citySlug: "bahia-solano", image: "choco-palafitos", caption: "Palafitos sobre el estero." },
-  { citySlug: "bahia-solano", image: "choco-canoas", caption: "Las lanchas de los pescadores." },
+  { citySlug: "quibdo", image: "ciudad-quibdo", caption: "Atardecer sobre el Atrato, en Quibdó." },
+  { citySlug: "istmina", image: "ciudad-istmina", caption: "La iglesia del Divino Niño, en Istmina." },
+  { citySlug: "bahia-solano", image: "ciudad-bahia-solano", caption: "El Valle, en Bahía Solano." },
 
   { citySlug: "quibdo", caseName: DANIELA, image: "choco-pueblo", caption: "La cuadra donde estaba la casa de Daniela." },
   { citySlug: "quibdo", caseName: DANIELA, image: "choco-edificio", caption: "El coliseo del barrio, cerca de donde duermen ahora." },
@@ -1069,6 +1063,8 @@ export const demoPhotos: Photo[] = photoSeeds.map((seed, index) => ({
   focus_x: null,
   focus_y: null,
   zoom: null,
+  byte_size: 0,
+  thumb_byte_size: 0,
   created_at: day(9),
 }));
 
@@ -1601,7 +1597,8 @@ export function demoCityCards(): CityCardData[] {
             offer.delivered_on === null,
         ).length,
       };
-    });
+    })
+    .filter((city) => city.caseCount > 0);
 }
 
 export function demoCityPage(slug: string, includeDrafts: boolean): CityPage | null {
@@ -1609,6 +1606,7 @@ export function demoCityPage(slug: string, includeDrafts: boolean): CityPage | n
   if (!city || (!city.published && !includeDrafts)) return null;
 
   const visible = visibleCases(city.id, includeDrafts);
+  if (!includeDrafts && visible.length === 0) return null;
   // El mismo conjunto que cuenta la tarjeta de /municipios, partido en dos por
   // el ámbito: la ficha las enseña separadas —el panel edita las de la zona en
   // su propio formulario— y su cabecera vuelve a sumarlas. Partiendo de aquí no
@@ -1747,7 +1745,7 @@ export function demoOfferTarget(params: {
 const publishedCities = () => demoCities.filter((city) => city.published);
 
 export function demoPortalTotals(): PortalTotals {
-  const cities = publishedCities();
+  const cities = publishedCities().filter((city) => visibleCases(city.id, false).length > 0);
   const cases = cities.flatMap((city) => visibleCases(city.id, false));
   const items = demoBudgetItems.filter((item) => cases.some((row) => row.id === item.case_id));
   const donated = cases.reduce((sum, row) => sum + (demoDonatedByCase[row.id] ?? 0), 0);
@@ -2011,6 +2009,51 @@ export function demoDonationLog(filters: {
     });
 
   return rows.slice(0, filters.limit ?? rows.length);
+}
+
+export function demoAdminDonations(): AdminDonation[] {
+  const rows: AdminDonation[] = [];
+  for (const row of demoDonationRows) {
+    const caseRecord = demoCases.find((entry) => entry.id === row.case_id);
+    const city = demoCities.find((entry) => entry.id === row.city_id);
+    if (!caseRecord || !city) continue;
+    rows.push({
+      id: row.id,
+      amount_cop: row.amount_cop,
+      status: "confirmada",
+      donor_name: row.donor_name,
+      publish_name: row.publish_name,
+      provider: "muestra",
+      payment_ref: "",
+      created_at: row.donated_at,
+      settled_at: row.donated_at,
+      case_id: caseRecord.id,
+      case_name: caseRecord.display_name,
+      city_id: city.id,
+      city_name: city.name,
+      city_slug: city.slug,
+    });
+  }
+  return rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function demoPhotoUsage() {
+  return demoPhotos.map((photo) => {
+    const city = demoCities.find((entry) => entry.id === photo.city_id)!;
+    const caseRecord = photo.case_id
+      ? demoCases.find((entry) => entry.id === photo.case_id) ?? null
+      : null;
+    return {
+      id: photo.id,
+      city_id: city.id,
+      city_name: city.name,
+      city_slug: city.slug,
+      case_id: photo.case_id,
+      case_name: caseRecord?.display_name ?? null,
+      byte_size: 0,
+      thumb_byte_size: 0,
+    };
+  });
 }
 
 export function demoAidRecords(): AidRecord[] {

@@ -98,7 +98,7 @@ export default async function AdminCityPage({ params }: Props) {
         <FormSection
           framed={false}
           title="Fotos"
-          hint="Las de la situación del pueblo. El retrato de una familia va en su caso."
+          hint="Las del pueblo. Hay una de archivo mientras llega la tuya: bórrala y sube la foto cuando la tomes. El retrato de una familia va en su caso."
         >
           <PhotoManager cityId={city.id} photos={photos} />
         </FormSection>

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase/server";
 import { isDemoMode } from "./supabase/env";
 import {
@@ -229,7 +230,25 @@ export function openCategories(needs: Pick<Need, "category" | "status">[]): Need
   return [...new Set(needs.filter(isOpenNeed).map((need) => need.category))];
 }
 
-export async function getCityCards(): Promise<CityCardData[]> {
+/**
+ * Los municipios con casos, con todo lo que enseña su tarjeta.
+ *
+ * El mapa sigue dibujando los treinta del DANE; esta lista es solo donde el
+ * equipo ya documentó una familia. Un pueblo publicado sin casos no sale: no
+ * hay nada que enseñar hasta que haya al menos un caso.
+ *
+ * Va envuelto en `cache` de React, que memoriza la llamada durante UNA petición y
+ * nada más. Es la garantía de más abajo dicha con el lenguaje en vez de con
+ * cuidado: el inicio y /mapa piden esta lista y además `getPortalTotals()`, que se
+ * apoya en ella, así que la misma consulta salía dos veces por visita —tres
+ * lecturas contra Supabase cada una— y las dos podían caer a los dos lados de una
+ * escritura. Ahora los dos sitios leen las mismas filas porque son literalmente el
+ * mismo array.
+ *
+ * No es caché entre visitas: eso lo deciden las pantallas con
+ * `dynamic = "force-dynamic"`, y sigue siendo una consulta por visita.
+ */
+export const getCityCards = cache(async function cityCards(): Promise<CityCardData[]> {
   if (isDemoMode()) return demoCityCards();
   const supabase = await createSupabaseServerClient();
 
@@ -254,22 +273,25 @@ export async function getCityCards(): Promise<CityCardData[]> {
     donatedByCity.set(row.city_id, (donatedByCity.get(row.city_id) ?? 0) + Number(row.donated_cop));
   }
 
-  return (data as NestedCityRow[]).map((city) => {
-    const items = city.cases.flatMap((row) => row.budget_items ?? []);
-    return {
-      ...city,
-      coverPath: coverOf(city.photos.filter((photo) => photo.case_id === null)),
-      coverFrame: coverFrameOf(city.photos.filter((photo) => photo.case_id === null)),
-      caseCount: city.cases.length,
-      needs: city.needs.map((need) => ({
-        category: need.category,
-        status: need.status,
-        case_id: need.case_id,
-      })),
-      ...cityBoard(items, donatedByCity.get(city.id) ?? 0, onTheWay.get(city.id) ?? 0),
-    };
-  });
-}
+  return (data as NestedCityRow[])
+    .filter((city) => city.cases.length > 0)
+    .map((city) => {
+      const items = city.cases.flatMap((row) => row.budget_items ?? []);
+      const covers = city.photos.filter((photo) => photo.case_id === null);
+      return {
+        ...city,
+        coverPath: coverOf(covers),
+        coverFrame: coverFrameOf(covers),
+        caseCount: city.cases.length,
+        needs: city.needs.map((need) => ({
+          category: need.category,
+          status: need.status,
+          case_id: need.case_id,
+        })),
+        ...cityBoard(items, donatedByCity.get(city.id) ?? 0, onTheWay.get(city.id) ?? 0),
+      };
+    });
+});
 
 export async function getCityPage(slug: string, options: Options = {}): Promise<CityPage | null> {
   if (isDemoMode()) return demoCityPage(slug, options.includeDrafts ?? false);
@@ -328,6 +350,30 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
     budget_items: BudgetItem[];
   };
 
+  const cityCases = ((cases.data ?? []) as NestedCaseRow[]).map((row) => {
+    const progress = ((updateLinks.data ?? []) as { case_id: string; photo_id: string | null }[])
+      .filter((link) => link.case_id === row.id)
+      .map((link) => ({ photo_id: link.photo_id }));
+    const nestedPhotos = bySortOrder(row.photos ?? []);
+    const casePhotos = situationPhotos(nestedPhotos, row.portrait_photo_id, progress);
+    const budget = budgetProgress(row.budget_items ?? [], donatedByCase.get(row.id) ?? 0);
+    return {
+      ...row,
+      photos: casePhotos,
+      coverPath: coverOf(casePhotos),
+      coverFrame: coverFrameOf(casePhotos),
+      portraitPath: portraitOf(row.portrait_photo_id, nestedPhotos),
+      portraitFrame: portraitFrameOf(row.portrait_photo_id, nestedPhotos),
+      openNeeds: budget.pendingItems,
+      budget,
+      categories: [],
+    };
+  });
+
+  // El portal no enseña un pueblo vacío. El panel sí: ahí se crea el municipio
+  // antes de documentar la primera familia.
+  if (!options.includeDrafts && cityCases.length === 0) return null;
+
   return {
     city,
     photos: allPhotos.filter((photo) => photo.case_id === null),
@@ -336,25 +382,7 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
     // El orden de las fotos anidadas no lo garantiza la consulta —el `order` de
     // arriba es de los casos—, y aquí sí importa: es el del carrusel de esa
     // persona y el que el equipo dejó puesto en el panel.
-    cases: ((cases.data ?? []) as NestedCaseRow[]).map((row) => {
-      const progress = ((updateLinks.data ?? []) as { case_id: string; photo_id: string | null }[])
-        .filter((link) => link.case_id === row.id)
-        .map((link) => ({ photo_id: link.photo_id }));
-      const nestedPhotos = bySortOrder(row.photos ?? []);
-      const casePhotos = situationPhotos(nestedPhotos, row.portrait_photo_id, progress);
-      const budget = budgetProgress(row.budget_items ?? [], donatedByCase.get(row.id) ?? 0);
-      return {
-        ...row,
-        photos: casePhotos,
-        coverPath: coverOf(casePhotos),
-        coverFrame: coverFrameOf(casePhotos),
-        portraitPath: portraitOf(row.portrait_photo_id, nestedPhotos),
-        portraitFrame: portraitFrameOf(row.portrait_photo_id, nestedPhotos),
-        openNeeds: budget.pendingItems,
-        budget,
-        categories: [],
-      };
-    }),
+    cases: cityCases,
   };
 }
 
@@ -435,7 +463,7 @@ export async function getCasePage(
 // abiertas, categorías, municipio— para que ninguna pantalla tenga que volver a
 // preguntar ni contar por su cuenta. Los números del inicio y el buscador se
 // apoyan además en `getCityCards`, que abarca el portal entero en una consulta:
-// hay treinta municipios como techo, así que es barato, y evita que dos
+// solo los municipios con casos, así que es barato, y evita que dos
 // pantallas cuenten distinto por haber filtrado cada una a su manera.
 // ---------------------------------------------------------------------------
 

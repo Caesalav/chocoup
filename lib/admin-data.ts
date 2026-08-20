@@ -17,6 +17,8 @@ import {
   demoNewsletterSignups,
   demoOffersFor,
   demoPhotos,
+  demoPhotoUsage,
+  demoAdminDonations,
   demoSupportOffers,
   demoTeamDirectory,
 } from "./demo-data";
@@ -27,6 +29,7 @@ import { countOpenNeeds, isOpenNeed, OPEN_STATUSES } from "./needs";
 import { savedFrame, type PhotoFrame } from "./photo-frame";
 import type {
   AdminCityRow,
+  AdminDonation,
   Case,
   CaseKind,
   City,
@@ -43,6 +46,7 @@ import type {
   Photo,
   TeamMemberEntry,
 } from "./types";
+import { groupPhotoUsage, type PhotoUsageRow, type StorageUsage } from "./storage-usage";
 
 export type { AdminCaseResource, AdminCaseRow };
 
@@ -428,4 +432,104 @@ export async function getFeedback(): Promise<FeedbackNote[]> {
     .select("id, kind, body, contact, page_path, created_at")
     .order("created_at", { ascending: false });
   return (data ?? []) as FeedbackNote[];
+}
+
+/**
+ * Cuánto pesa cada foto, agrupado por municipio y causa.
+ *
+ * Lo lee todo el equipo: el cupo es de todo el portal, no de un pueblo, y quien
+ * documenta tiene que ver si cabe otra foto antes de subirla. Las políticas de
+ * `photos` ya recortan lo que cada sesión puede leer.
+ */
+export async function getPhotoStorageUsage(): Promise<StorageUsage> {
+  if (isDemoMode()) return groupPhotoUsage(demoPhotoUsage());
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("photos")
+    .select(
+      "id, city_id, case_id, byte_size, thumb_byte_size, cities(name, slug), cases(display_name)",
+    );
+
+  if (error || !data) return groupPhotoUsage([]);
+
+  type Row = {
+    id: string;
+    city_id: string;
+    case_id: string | null;
+    byte_size: number | null;
+    thumb_byte_size: number | null;
+    cities: { name: string; slug: string } | null;
+    cases: { display_name: string } | null;
+  };
+
+  const rows: PhotoUsageRow[] = (data as unknown as Row[])
+    .filter((row) => row.cities)
+    .map((row) => ({
+      id: row.id,
+      city_id: row.city_id,
+      city_name: row.cities!.name,
+      city_slug: row.cities!.slug,
+      case_id: row.case_id,
+      case_name: row.cases?.display_name ?? null,
+      byte_size: Number(row.byte_size) || 0,
+      thumb_byte_size: Number(row.thumb_byte_size) || 0,
+    }));
+
+  return groupPhotoUsage(rows);
+}
+
+/**
+ * Quien donó, a qué causa y en qué estado. Solo coordinación: es la misma
+ * lista que `donations_coordination_read` (0017).
+ */
+export async function getAdminDonations(): Promise<AdminDonation[]> {
+  if (isDemoMode()) return demoAdminDonations();
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("donations")
+    .select(
+      "id, amount_cop, status, donor_name, publish_name, provider, payment_ref, created_at, settled_at, case_id, cases(display_name, city_id, cities(name, slug))",
+    )
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+
+  type Row = {
+    id: string;
+    amount_cop: number;
+    status: AdminDonation["status"];
+    donor_name: string;
+    publish_name: boolean;
+    provider: string;
+    payment_ref: string;
+    created_at: string;
+    settled_at: string | null;
+    case_id: string;
+    cases: {
+      display_name: string;
+      city_id: string;
+      cities: { name: string; slug: string } | null;
+    } | null;
+  };
+
+  return (data as unknown as Row[])
+    .filter((row) => row.cases?.cities)
+    .map((row) => ({
+      id: row.id,
+      amount_cop: Number(row.amount_cop),
+      status: row.status,
+      donor_name: row.donor_name,
+      publish_name: row.publish_name,
+      provider: row.provider,
+      payment_ref: row.payment_ref,
+      created_at: row.created_at,
+      settled_at: row.settled_at,
+      case_id: row.case_id,
+      case_name: row.cases!.display_name,
+      city_id: row.cases!.city_id,
+      city_name: row.cases!.cities!.name,
+      city_slug: row.cases!.cities!.slug,
+    }));
 }

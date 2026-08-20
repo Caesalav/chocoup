@@ -129,6 +129,16 @@ export function DonationIcon(props: IconProps) {
   );
 }
 
+/** Fotos: el recuadro y el sol, el mismo dibujo de una cámara de móvil. */
+export function PhotoIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4.2 7.4h3.2l1.2-2h6.8l1.2 2h3.2A1.4 1.4 0 0 1 21.2 8.8v9.4a1.4 1.4 0 0 1-1.4 1.4H4.2A1.4 1.4 0 0 1 2.8 18.2V8.8A1.4 1.4 0 0 1 4.2 7.4z" />
+      <circle cx="12" cy="13.4" r="3.2" />
+    </Glyph>
+  );
+}
+
 export function ShareIcon(props: IconProps) {
   return (
     <Glyph {...props}>

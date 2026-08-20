@@ -67,7 +67,7 @@ export function donationReference(caseId: string | null): string {
  * Devuelve null cuando la referencia no es ninguna de las dos formas que este
  * portal escribe. Null NO es «el fondo»: es «no sé de quién es este dinero», y
  * quien llama tiene que negarse a registrarlo. Confundir las dos cosas es
- * exactamente lo que 0022_donacion_al_fondo.sql existe para impedir.
+ * exactamente lo que 0023_donacion_al_fondo.sql existe para impedir.
  */
 export function readDonationReference(
   reference: string | null | undefined,

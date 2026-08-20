@@ -2,10 +2,12 @@ import { WaitlistForm } from "@/components/coming-soon/WaitlistForm";
 import { PreviewUnlock } from "@/components/coming-soon/PreviewUnlock";
 import { Logo } from "@/components/Logo";
 import { ChocoMap } from "@/components/map/ChocoMap";
+import { MapStatus } from "@/components/map/MapStatus";
 import { NeedsLegend } from "@/components/map/NeedsLegend";
 import { CasesIcon, MapIcon, OfferIcon } from "@/components/ui/icons";
 import type { MapPin } from "@/lib/choco-map";
 import { SITE_NAME } from "@/lib/constants";
+import { paintMunicipalities } from "@/lib/needs-scale";
 
 /**
  * Un mapa de muestra: enseña la escala, no el estado real.
@@ -50,6 +52,34 @@ const LESSON_PINS: MapPin[] = [
   },
 ];
 
+/**
+ * El marcador de la muestra: las dos cifras que salen de esos cuatro pueblos y
+ * de ningún otro sitio.
+ *
+ * Se cuentan repartiéndolos entre las treinta formas con la misma llamada que
+ * hace el mosaico, así que el número de prioritarios y el rojo del dibujo no
+ * pueden decir cosas distintas —es lo único que importa de un contador puesto al
+ * lado de un color— y el denominador de los documentados es el de las formas que
+ * se están dibujando y no un treinta escrito a mano.
+ *
+ * Del marcador del tablero falta la tercera cifra, lo resuelto, y falta a
+ * propósito: es el dinero del portal contra su meta, y aquí las dos maneras de
+ * ponerla son malas. La de verdad publica el tablero que esta misma pantalla
+ * dice que todavía no es público; una inventada serían donaciones fingidas, y
+ * eso no lo arregla ninguna nota al pie. Un color y un porcentaje de cobertura
+ * se leen como una lección; un importe recaudado se lee como una cuenta.
+ *
+ * Por eso al marcador no se le pasan `goal` ni `donated` en vez de pasarle
+ * ceros: la ausencia es lo único que significa «aquí el dinero no se enseña», y
+ * un cero significaría que el portal no tiene meta, que es un dato suyo y no
+ * está en esta pantalla para darlo.
+ */
+const LESSON_BOARD = paintMunicipalities(LESSON_PINS);
+const LESSON_PRIORITY = LESSON_BOARD.filter(
+  (shape) => shape.tier === "high",
+).length;
+const LESSON_DOCUMENTED = LESSON_BOARD.filter((shape) => shape.city).length;
+
 const LESSONS = [
   {
     n: "1",
@@ -76,15 +106,15 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
     <div className="lg:grid lg:h-[calc(100svh-var(--strip-h,0px))] lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,36rem)] lg:overflow-hidden">
       <section
         aria-label="Cómo se va a leer el mapa"
-        className="map-board relative overflow-hidden bg-selva px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"
+        className="map-board map-stage relative overflow-hidden bg-mar px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"
       >
-        <div className="cintas pointer-events-none absolute inset-0" aria-hidden />
-
-        <p className="enters relative text-[13px] tracking-wide text-luz/80">
+        <p className="enters relative text-[13px] tracking-wide text-muted">
           {SITE_NAME}
         </p>
 
-        <div className="enters enters-1 relative mt-4 h-[min(48svh,26rem)] overflow-hidden rounded-[1.75rem] bg-paper lg:mt-5 lg:h-0 lg:flex-1">
+        {/* El mismo atlas que /mapa: el campo es el Pacífico, sin ventana de
+            papel que convierta el océano y el país en el mismo beige. */}
+        <div className="enters enters-1 relative mt-4 h-[min(48svh,26rem)] overflow-hidden lg:mt-5 lg:h-0 lg:flex-1">
           <ChocoMap
             pins={LESSON_PINS}
             activeSlug="quibdo"
@@ -92,11 +122,20 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
           />
         </div>
 
-        <div className="enters enters-2 relative mt-4 rounded-2xl bg-paper/95 px-4 py-3">
+        <div className="enters enters-2 relative mt-4 border-t border-ink/10 pt-2.5">
           <NeedsLegend />
+          <div className="mt-2">
+            <MapStatus
+              priority={LESSON_PRIORITY}
+              documented={LESSON_DOCUMENTED}
+              total={LESSON_BOARD.length}
+              updatedAt={null}
+              label="Marcador del mapa de muestra"
+            />
+          </div>
           <p className="mt-2 text-[12px] leading-relaxed text-muted">
-            Un ejemplo de lectura, no el tablero real. El de verdad todavía no es
-            público.
+            Un ejemplo de lectura con cifras de muestra, no el tablero real. El
+            de verdad todavía no es público.
           </p>
         </div>
       </section>
@@ -118,9 +157,9 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
             El tablero del Chocó todavía no es público
           </h1>
           <p className="mt-4 max-w-[36rem] text-[16px] leading-relaxed text-body">
-            Después del terremoto, un mapa compartido: dónde falta, qué se ha cubierto y
-            cómo ayudar. Lo estamos armando con el equipo en campo. Aún no se puede
-            entrar.
+            Después del terremoto, un mapa compartido: dónde falta, qué se ha
+            cubierto y cómo ayudar. Lo estamos armando con el equipo en campo.
+            Aún no se puede entrar.
           </p>
         </header>
 
@@ -132,8 +171,12 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
                 <span className="sr-only">Paso {n}. </span>
               </span>
               <div className="min-w-0 pt-0.5">
-                <p className="font-display text-[18px] leading-tight text-ink">{title}</p>
-                <p className="mt-1 text-[14px] leading-relaxed text-muted">{body}</p>
+                <p className="font-display text-[18px] leading-tight text-ink">
+                  {title}
+                </p>
+                <p className="mt-1 text-[14px] leading-relaxed text-muted">
+                  {body}
+                </p>
               </div>
             </li>
           ))}
