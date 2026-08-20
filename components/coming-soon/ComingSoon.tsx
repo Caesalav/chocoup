@@ -103,7 +103,7 @@ const LESSONS = [
 
 export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
   return (
-    <div className="lg:grid lg:h-[calc(100svh-var(--strip-h,0px))] lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,36rem)] lg:overflow-hidden">
+    <div className="lg:grid lg:h-svh lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,36rem)] lg:overflow-hidden">
       <section
         aria-label="Cómo se va a leer el mapa"
         className="map-board relative overflow-hidden bg-paper px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"

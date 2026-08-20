@@ -2,22 +2,6 @@ import "server-only";
 
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase/server";
-import { isDemoMode } from "./supabase/env";
-import {
-  demoAidRecords,
-  demoCampaignFocus,
-  demoDonationLog,
-  demoCasePage,
-  demoCaseCards,
-  demoCityCards,
-  demoContributionTally,
-  demoGeneralChannel,
-  demoCityPage,
-  demoNeedCards,
-  demoOfferRecords,
-  demoOfferTarget,
-  demoPortalTotals,
-} from "./demo-data";
 import { EMPTY_FOCUS, type CampaignFocusRow } from "./campaign";
 import { situationPhotos, withUpdatePhotos } from "./case-photos";
 import { lastUpdateOn } from "./case-updates";
@@ -67,8 +51,8 @@ import type {
  * Las consultas públicas no filtran por `published`: eso lo hacen las RLS.
  * Así una consulta olvidada no puede filtrar un caso sin consentimiento.
  *
- * `includeDrafts` solo tiene efecto con datos de muestra, donde no hay RLS que
- * distinga quién pregunta. El panel lo activa; el portal público, no.
+ * `includeDrafts` no toca las filas: solo deja que el panel abra la ficha de un
+ * municipio todavía sin casos, que el portal público esconde.
  */
 
 type Options = { includeDrafts?: boolean };
@@ -150,7 +134,6 @@ function bySortOrder<T extends Pick<Photo, "sort_order">>(photos: T[]): T[] {
  * deja de enseñarlo sin esperar a tener el siguiente.
  */
 export async function getGeneralChannel(): Promise<DonationChannel | null> {
-  if (isDemoMode()) return demoGeneralChannel();
   const supabase = await createSupabaseServerClient();
 
   const { data } = await supabase
@@ -171,7 +154,6 @@ export async function getGeneralChannel(): Promise<DonationChannel | null> {
  * devuelve vacío, y el mapa sigue hablando solo.
  */
 export async function getCampaignFocusRow(): Promise<CampaignFocusRow> {
-  if (isDemoMode()) return demoCampaignFocus();
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("campaign_focus")
@@ -211,7 +193,6 @@ function cityBoard(
  * que acaba de abrir.
  */
 export async function getContributionTally(): Promise<ContributionTally> {
-  if (isDemoMode()) return demoContributionTally();
   const supabase = await createSupabaseServerClient();
 
   const { data } = await supabase
@@ -249,7 +230,6 @@ export function openCategories(needs: Pick<Need, "category" | "status">[]): Need
  * `dynamic = "force-dynamic"`, y sigue siendo una consulta por visita.
  */
 export const getCityCards = cache(async function cityCards(): Promise<CityCardData[]> {
-  if (isDemoMode()) return demoCityCards();
   const supabase = await createSupabaseServerClient();
 
   const [{ data, error }, activity, raised] = await Promise.all([
@@ -294,7 +274,6 @@ export const getCityCards = cache(async function cityCards(): Promise<CityCardDa
 });
 
 export async function getCityPage(slug: string, options: Options = {}): Promise<CityPage | null> {
-  if (isDemoMode()) return demoCityPage(slug, options.includeDrafts ?? false);
   const supabase = await createSupabaseServerClient();
 
   const { data: city } = await supabase
@@ -386,12 +365,7 @@ export async function getCityPage(slug: string, options: Options = {}): Promise<
   };
 }
 
-export async function getCasePage(
-  slug: string,
-  caseId: string,
-  options: Options = {},
-): Promise<CasePage | null> {
-  if (isDemoMode()) return demoCasePage(slug, caseId, options.includeDrafts ?? false);
+export async function getCasePage(slug: string, caseId: string): Promise<CasePage | null> {
   const supabase = await createSupabaseServerClient();
 
   const { data: city } = await supabase
@@ -469,7 +443,6 @@ export async function getCasePage(
 
 /** Los números del inicio. Ninguno se estima: todos son filas contadas. */
 export async function getPortalTotals(): Promise<PortalTotals> {
-  if (isDemoMode()) return demoPortalTotals();
   const cities = await getCityCards();
   const budget = mergeBudget(cities.map((city) => city.budget));
 
@@ -489,7 +462,6 @@ export async function getPortalTotals(): Promise<PortalTotals> {
 
 /** Casos de todo el portal, del más reciente al más antiguo. */
 export async function getCaseCards(): Promise<CaseCard[]> {
-  if (isDemoMode()) return demoCaseCards();
   const supabase = await createSupabaseServerClient();
 
   const [{ data }, raised] = await Promise.all([
@@ -540,7 +512,6 @@ export async function getCaseCards(): Promise<CaseCard[]> {
  * la lista existe para que alguien encuentre algo que pueda aportar hoy.
  */
 export async function getNeedCards(): Promise<NeedCard[]> {
-  if (isDemoMode()) return sortNeeds(demoNeedCards());
   const supabase = await createSupabaseServerClient();
 
   const { data } = await supabase
@@ -602,7 +573,6 @@ export async function getDonationLog(filters: {
   sort?: DonationLogSort;
 } = {}): Promise<DonationLogEntry[]> {
   const limit = Math.min(Math.max(filters.limit ?? DONATION_LOG_LIMIT, 1), 50);
-  if (isDemoMode()) return demoDonationLog({ ...filters, limit });
   const supabase = await createSupabaseServerClient();
 
   let query = supabase
@@ -631,8 +601,6 @@ export async function countDonationLog(filters: {
   caseId?: string;
   cityId?: string;
 } = {}): Promise<number> {
-  if (isDemoMode()) return demoDonationLog(filters).length;
-
   const supabase = await createSupabaseServerClient();
   let query = supabase.from(DONATION_LOG_VIEW).select("id", { count: "exact", head: true });
   if (filters.caseId) query = query.eq("case_id", filters.caseId);
@@ -643,7 +611,6 @@ export async function countDonationLog(filters: {
 }
 
 export async function getAidRecords(): Promise<AidRecord[]> {
-  if (isDemoMode()) return demoAidRecords();
   const supabase = await createSupabaseServerClient();
 
   // Se ordena por mes, que es lo que hay. Dentro del mes manda el identificador:
@@ -674,7 +641,6 @@ export async function getAidRecords(): Promise<AidRecord[]> {
  * acorta sola sin que ninguna pantalla tenga que acordarse de filtrar por fecha.
  */
 export async function getOfferRecords(): Promise<OfferRecord[]> {
-  if (isDemoMode()) return demoOfferRecords();
   const supabase = await createSupabaseServerClient();
 
   // Lo más reciente primero, que es lo contrario de lo que pide una lista de
@@ -764,41 +730,6 @@ export async function getOfferTarget(params: {
   city?: string;
   completa?: string;
 }): Promise<OfferTargetWithSource | null> {
-  if (isDemoMode()) {
-    // Con datos de muestra no hay base de datos donde resolver el parámetro, así
-    // que se resuelve contra la misma lista que pinta el muro. Hereda el
-    // municipio por el slug, igual que abajo, y no la necesidad: la lista de
-    // muestra tampoco publica su identificador y aquí no hay dónde buscar el
-    // título. El equipo la vincula desde la bandeja.
-    const promised = params.completa
-      ? demoOfferRecords().find((row) => row.id === params.completa)
-      : undefined;
-
-    if (!promised) {
-      const base = demoOfferTarget(params);
-      return base && { ...base, completes: null };
-    }
-
-    const city = promised.city_slug ? demoOfferTarget({ city: promised.city_slug }) : null;
-    return {
-      cityId: city?.cityId ?? null,
-      cityName: city?.cityName ?? null,
-      citySlug: city?.citySlug ?? null,
-      caseId: null,
-      caseName: null,
-      needId: null,
-      needTitle: promised.need_title,
-      needCategory: null,
-      completes: {
-        id: promised.id,
-        category: promised.category,
-        resource: promised.resource,
-        offered_on: promised.offered_on,
-        state: promised.state,
-      },
-    };
-  }
-
   const supabase = await createSupabaseServerClient();
 
   // «Puedo completar esto»: alguien vio una promesa en /ofrecido —600 tejas sin

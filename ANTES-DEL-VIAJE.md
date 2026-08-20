@@ -158,13 +158,18 @@ Comprobado, no supuesto:
       [`npm run verify:sql`](#npm-run-verifysql-no-dice-nada-de-la-base-real).
 - [ ] **La carga de prueba sigue en producción**, y es la mitad de lo que hay:
       dos de los tres municipios publicados se llaman «Istmina (prueba)» y «Bahía
-      Solano (prueba)», tres de las ocho causas empiezan por «CASO DE PRUEBA»,
-      **las siete ofertas son de prueba** y trece de las 49 fotos son las de
-      `public/demo`. Se retira entera con `supabase/borrar-datos-de-prueba.sql`,
-      que borra por la marca y nunca por fecha, así que se puede ejecutar con los
-      casos reales al lado. **Hazlo antes de compartir el enlace**, no después.
-      Cuenta con que al terminar `/ayudas` y `/ofrecido` se queden vacíos: hoy no
-      tienen ni una fila real.
+      Solano (prueba)», tres de las ocho causas empiezan por «CASO DE PRUEBA» y
+      **las siete ofertas son de prueba**. Se retira entera con
+      `supabase/borrar-datos-de-prueba.sql`, que borra por la marca y nunca por
+      fecha, así que se puede ejecutar con los casos reales al lado. **Hazlo antes
+      de compartir el enlace**, no después. Cuenta con que al terminar `/ayudas` y
+      `/ofrecido` se queden vacíos: hoy no tienen ni una fila real.
+
+      Del lado del código esto ya no espera a nadie: `lib/demo-data.ts`, el
+      interruptor `isDemoMode()`, la franja de aviso y las fotos de `public/demo`
+      se borraron, y el portal solo lee Supabase. Por eso el borrado de la base
+      ahora también se lleva las portadas `demo/ciudad-*` que antes se salvaban:
+      sus JPG ya no existen y una fila superviviente pinta un hueco roto.
 - [ ] **El circuito de una oferta nunca se ha recorrido con datos de verdad.** Las
       siete que hay las insertó la carga de prueba, no el formulario. Ofrecer,
       verificar, aceptar, anotar la entrega y verla salir sin nombre no se ha hecho

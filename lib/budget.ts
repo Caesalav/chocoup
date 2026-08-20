@@ -6,8 +6,7 @@ import type { CaseProgress } from "./case-progress";
  *
  * La meta es la suma de los precios. Lo usado es la suma de los ítems que el
  * equipo marcó como comprados. Lo donado no se teclea: llega de las donaciones
- * confirmadas (o, en los datos de muestra, de una cifra inventada para poder
- * ver la barra).
+ * confirmadas.
  *
  * La barra del caso enseña las tres cifras. El mapa y las tarjetas usan
  * `ratio`: si ya hay donaciones, es recaudado / meta; si todavía no —Mercado

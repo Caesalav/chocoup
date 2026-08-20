@@ -342,13 +342,7 @@
   --font-sans: var(--font-sans), "Outfit", system-ui, sans-serif;
 }
 
-/* Alto de la franja superior (el aviso de datos de muestra). Lo descuenta todo
-   lo que quiere ocupar la pantalla entera —hoy, el mapa de /mapa a través de
-   `.screen-h`—: sin esto, lo que va anclado abajo, la leyenda y el pie de
-   estado, caía fuera de la vista. Vale 0 cuando no hay aviso. */
 :root {
-  --strip-h: 0px;
-
   /* Alto reservado por la barra inferior de navegación, que va fija y tapa lo
      que quede debajo. Lo publica aquí y no en el componente porque quien lo
      tiene que descontar es cada pantalla, no la barra. Son la pastilla (60) más
@@ -411,24 +405,14 @@
   background-size: cover;
 }
 
-.has-strip {
-  --strip-h: 76px;
-}
-@media (min-width: 640px) {
-  .has-strip {
-    --strip-h: 36px;
-  }
-}
-
-/* Alto útil de una pantalla completa: lo que queda de la ventana después de la
-   franja de aviso y de lo que ocupe la navegación, que abajo en el móvil y
-   arriba en el escritorio. */
+/* Alto útil de una pantalla completa: lo que queda de la ventana después de lo
+   que ocupe la navegación, que va abajo en el móvil y arriba en el escritorio. */
 .screen-h {
-  height: calc(100svh - var(--strip-h, 0px) - var(--nav-h));
+  height: calc(100svh - var(--nav-h));
 }
 @media (min-width: 1024px) {
   .screen-h {
-    height: calc(100svh - var(--strip-h, 0px) - var(--head-h));
+    height: calc(100svh - var(--head-h));
   }
 }
 

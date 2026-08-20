@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { NEED_CATEGORIES } from "@/lib/constants";
 import { looksLikeEmail } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/supabase/env";
 import { supportKindMeta } from "@/lib/support";
 import type { SupportOfferKind } from "@/lib/types";
 
@@ -95,8 +94,6 @@ export async function submitSupportOffer(
     row.category = category;
     row.can_deliver = checked(formData, "can_deliver");
   }
-
-  if (isDemoMode()) redirect("/ofrecer/gracias");
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("support_offers").insert(row);

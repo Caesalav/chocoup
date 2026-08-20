@@ -23,7 +23,7 @@ type Props = { params: Promise<{ slug: string; id: string }> };
 export default async function AdminCasePage({ params }: Props) {
   const { slug, id } = await params;
   const [data, team] = await Promise.all([
-    getCasePage(slug, id, { includeDrafts: true }),
+    getCasePage(slug, id),
     currentTeam(),
   ]);
   if (!data) notFound();

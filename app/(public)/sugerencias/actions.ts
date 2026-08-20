@@ -3,8 +3,6 @@
 import { redirect } from "next/navigation";
 import { FEEDBACK_KINDS } from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/supabase/env";
-
 export type FeedbackFormState = { error: string } | null;
 
 function text(formData: FormData, key: string): string {
@@ -45,8 +43,6 @@ export async function submitFeedback(
   if (contact.length > 200) {
     return { error: "El contacto es demasiado largo." };
   }
-
-  if (isDemoMode()) redirect("/sugerencias/gracias");
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("feedback").insert({

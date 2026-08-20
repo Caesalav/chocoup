@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Outfit } from "next/font/google";
-import { DemoBanner } from "@/components/DemoBanner";
 import { SITE_NAME, SITE_TAGLINE } from "@/lib/constants";
-import { isDemoMode } from "@/lib/supabase/env";
 import "./globals.css";
 
 const sans = Outfit({
@@ -35,15 +33,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${sans.variable} ${display.variable} h-full antialiased`}
     >
       {/* El color del papel lo pinta <html> y aquí no se repite, para que no haya
-          dos sitios donde cambiarlo. has-strip da alto a la franja de aviso para que
-          las pantallas a alto completo lo descuenten.
+          dos sitios donde cambiarlo.
 
           La navegación no vive aquí: la monta cada zona. El portal público
           (app/(public)/layout.tsx) pone la barra inferior en el móvil y la
           cabecera a partir de `lg`, nunca las dos; el panel del equipo monta la
           suya. Este archivo solo envuelve a los dos. */}
-      <body className={`flex min-h-full flex-col text-body ${isDemoMode() ? "has-strip" : ""}`}>
-        <DemoBanner />
+      <body className="flex min-h-full flex-col text-body">
         <div className="relative flex flex-1 flex-col">{children}</div>
       </body>
     </html>

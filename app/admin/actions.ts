@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { CASE_KINDS, NEED_CATEGORIES, PHOTO_BUCKET, TEAM_ROLES } from "@/lib/constants";
 import { externalUrl, normalizePhone } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/supabase/env";
 import { canWriteCity, currentTeam } from "@/lib/team";
 import { uniqueSlug } from "@/lib/slug";
 import { clampFrame, type PhotoFrame } from "@/lib/photo-frame";
@@ -30,12 +29,6 @@ type Session = {
 };
 
 async function requireTeam(): Promise<Session> {
-  if (isDemoMode()) {
-    throw new Error(
-      "El portal está con datos de muestra y no hay base de datos donde guardar. Conecta Supabase siguiendo el README y podrás documentar de verdad.",
-    );
-  }
-
   const team = await currentTeam();
   if (!team) throw new Error("Tu cuenta no está en la lista del equipo.");
 
@@ -908,12 +901,8 @@ export async function deletePhoto(formData: FormData) {
   // esta foto. Lo que impide borrar la de otro municipio es la política del
   // bucket, que compara la carpeta del archivo con los municipios asignados.
   //
-  // Las de archivo (`demo/…`) no están en Storage: viven en public/demo. Pedir
-  // borrarlas al bucket solo ensucia el registro.
-  //
   // Si algún archivo queda huérfano no rompe nada, así que no se aborta por esto.
-  const stored = paths.filter((path) => !path.startsWith("demo/"));
-  if (stored.length > 0) await supabase.storage.from(PHOTO_BUCKET).remove(stored);
+  if (paths.length > 0) await supabase.storage.from(PHOTO_BUCKET).remove(paths);
 }
 
 // ---------------------------------------------------------------------------

@@ -3,10 +3,7 @@ import type { Metadata } from "next";
 import { AdminBottomNav } from "./AdminBottomNav";
 import { AdminNav } from "./AdminNav";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getFeedback, getOffers } from "@/lib/admin-data";
 import { createSupabaseServerClient, getSessionEmail, getTeamSession } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/supabase/env";
-import { demoTeamSession } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 
@@ -16,32 +13,6 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // Con datos de muestra no hay sesión que comprobar: el panel se puede recorrer
-  // para ver cómo es, y cualquier intento de guardar avisa de que no persiste.
-  if (isDemoMode()) {
-    const [pendingOffers, inbox] = await Promise.all([
-      getOffers("pendiente"),
-      getFeedback(),
-    ]);
-    const team = demoTeamSession();
-    return (
-      <>
-        {/* La misma navegación del portal: cabecera en escritorio, barra abajo
-            en el móvil. Debajo de la cabecera, en pantallas grandes, van las
-            tres secciones del equipo. */}
-        <SiteHeader className="hidden lg:block" />
-        <AdminNav
-          email={team.email}
-          role={team.role}
-          pendingOffers={pendingOffers.length}
-          feedbackCount={inbox.length}
-        />
-        <main className="flex-1 pb-[var(--nav-h)] lg:pb-0">{children}</main>
-        <AdminBottomNav pendingOffers={pendingOffers.length} />
-      </>
-    );
-  }
-
   const email = await getSessionEmail();
   if (!email) redirect("/entrar");
 

@@ -5,7 +5,6 @@ import { panel } from "@/components/ui/styles";
 import { getPhotoStorageUsage } from "@/lib/admin-data";
 import { formatBytes, plural } from "@/lib/format";
 import { SUPABASE_FREE_EGRESS_BYTES, usageRatio } from "@/lib/storage-usage";
-import { isDemoMode } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +21,6 @@ export default async function PhotoStoragePage() {
   const ratio = usageRatio(usage.totalBytes, usage.quotaBytes);
   const percent = Math.round(ratio * 100);
   const remaining = Math.max(0, usage.quotaBytes - usage.totalBytes);
-  const demo = isDemoMode();
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
@@ -33,13 +31,6 @@ export default async function PhotoStoragePage() {
         Icon={PhotoIcon}
         description="Cada foto se comprime en el teléfono (1600 px y una miniatura de 400 px) antes de subir. El cupo es el del plan gratuito de Supabase: 1 GB de archivos. Vercel no las guarda."
       />
-
-      {demo && (
-        <p className={`${panel} mt-6 p-4 text-sm leading-relaxed text-muted`}>
-          Estas fotos de muestra viven en el código, no en Storage. El recuento
-          sale en cero a propósito: no comen del cupo real.
-        </p>
-      )}
 
       <section className={`${panel} mt-6 p-5`}>
         <p className="text-[13px] text-muted">Plan gratuito de Supabase</p>

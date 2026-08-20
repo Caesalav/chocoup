@@ -4,8 +4,6 @@ import { redirect } from "next/navigation";
 import { NEED_CATEGORIES } from "@/lib/constants";
 import { looksLikeEmail } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/supabase/env";
-
 export type OfferFormState = { error: string } | null;
 
 function text(formData: FormData, key: string): string {
@@ -49,10 +47,6 @@ export async function submitOffer(
   if (!NEED_CATEGORIES.some((option) => option.value === category)) {
     return { error: "Elige un tipo de recurso válido." };
   }
-
-  // Con datos de muestra el recorrido se puede completar para verlo entero. El
-  // banner del portal ya avisa en pantalla de que nada queda guardado.
-  if (isDemoMode()) redirect("/ofrecer/gracias");
 
   const supabase = await createSupabaseServerClient();
 
@@ -129,8 +123,6 @@ export async function subscribeToUpdates(formData: FormData) {
   if (!looksLikeEmail(email)) {
     redirect(`${back}${separator}avisos=correo`);
   }
-
-  if (isDemoMode()) redirect(done);
 
   const supabase = await createSupabaseServerClient();
 

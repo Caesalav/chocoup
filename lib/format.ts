@@ -3,13 +3,6 @@ import { supabaseEnv } from "./supabase/env";
 
 /** El bucket es público, así que basta la URL directa del CDN. */
 export function photoUrl(storagePath: string): string {
-  // Las fotos de muestra no están en Storage, sino en public/demo. Llevan el
-  // sello "muestra" incrustado. Los paisajes no muestran daños; los retratos
-  // son caras de archivo, no de las familias de los textos.
-  if (storagePath.startsWith("demo/")) {
-    return `/${storagePath}.jpg`;
-  }
-
   const { url } = supabaseEnv();
   if (!url) return "";
   return `${url}/storage/v1/object/public/${PHOTO_BUCKET}/${storagePath}`;

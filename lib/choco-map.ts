@@ -606,8 +606,8 @@ function insideBands(d: string): { x: number; y: number; span: number }[] {
  * de la pieza, que a cambio de leerse es un precio justo, porque está encendida
  * debajo y el nombre sigue centrado en una de sus columnas.
  *
- * Dos renglones y no uno porque un renglón no llega. Con los tres municipios de
- * los datos de muestra documentados y el cuerpo actual, «Lloró» cae bajo el
+ * Dos renglones y no uno porque un renglón no llega. Con tres municipios
+ * documentados y el cuerpo actual, «Lloró» cae bajo el
  * rótulo de Quibdó y «Tadó» y «Unión Panamericana» bajo el de Istmina; a un
  * renglón se libran los dos primeros y a dos se libran los veintisiete. Lo que se
  * aparta el que peor lo tiene son 104,8 unidades, 44 px en un teléfono de 390 px,

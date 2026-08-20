@@ -14,20 +14,3 @@ export function isSupabaseConfigured(): boolean {
   const { url, key } = supabaseEnv();
   return url.length > 0 && key.length > 0;
 }
-
-/**
- * Sin base de datos, el portal se llena con datos de muestra para poder
- * valorar el diseño y el recorrido. `DEMO_DATA=1` fuerza lo mismo aunque
- * haya claves: el tablero cerrado se ve completo, y las cuentas cuadran.
- */
-export function isDemoMode(): boolean {
-  const force = (
-    process.env.NEXT_PUBLIC_DEMO_DATA ??
-    process.env.DEMO_DATA ??
-    ""
-  )
-    .trim()
-    .toLowerCase();
-  if (force === "1" || force === "true" || force === "yes") return true;
-  return !isSupabaseConfigured();
-}

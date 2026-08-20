@@ -1,43 +1,20 @@
 import "server-only";
 
 import { createSupabaseServerClient } from "./supabase/server";
-import { isDemoMode } from "./supabase/env";
 import { asCaseProgress, budgetProgress, type BudgetItem } from "./budget";
-import {
-  demoAdminCities,
-  demoBudgetItems,
-  demoBudgetOf,
-  demoCaseUpdates,
-  demoCases,
-  demoCities,
-  demoFeedback,
-  demoMoneyDestinations,
-  demoNeedOptions,
-  demoNeeds,
-  demoNewsletterSignups,
-  demoOffersFor,
-  demoPhotos,
-  demoPhotoUsage,
-  demoAdminDonations,
-  demoSupportOffers,
-  demoTeamDirectory,
-} from "./demo-data";
 import type { AdminCaseResource, AdminCaseRow } from "./admin-case";
 import { getGeneralChannel } from "./data";
 import { donationChannel, moneyDestinationsOf, type MoneyDestination } from "./donation-channel";
-import { countOpenNeeds, isOpenNeed, OPEN_STATUSES } from "./needs";
-import { savedFrame, type PhotoFrame } from "./photo-frame";
+import { countOpenNeeds, OPEN_STATUSES } from "./needs";
+import { savedFrame } from "./photo-frame";
 import type {
   AdminCityRow,
   AdminDonation,
   Case,
-  CaseKind,
   City,
   FeedbackNote,
   Need,
-  NeedCategory,
   NeedOption,
-  NeedStatus,
   NewsletterSignup,
   OfferStatus,
   SupportOffer,
@@ -61,7 +38,6 @@ export type { AdminCaseResource, AdminCaseRow };
  */
 
 export async function getAdminCities(): Promise<AdminCityRow[]> {
-  if (isDemoMode()) return demoAdminCities();
   const supabase = await createSupabaseServerClient();
 
   const { data } = await supabase
@@ -114,21 +90,6 @@ export async function getAdminCities(): Promise<AdminCityRow[]> {
  * ser la del último avance que quien mira puede leer.
  */
 export async function getAdminCases(): Promise<AdminCaseRow[]> {
-  if (isDemoMode()) {
-    return demoCases.map((row) => {
-      const city = demoCities.find((entry) => entry.id === row.city_id)!;
-      return toAdminCase(
-        row,
-        city,
-        demoNeeds.filter((need) => need.case_id === row.id),
-        demoBudgetItems.filter((item) => item.case_id === row.id),
-        demoCaseUpdates.filter((update) => update.case_id === row.id),
-        demoPhotos.filter((photo) => photo.case_id === row.id),
-        demoBudgetOf(row.id).donated,
-      );
-    });
-  }
-
   const supabase = await createSupabaseServerClient();
 
   const { data } = await supabase
@@ -246,7 +207,6 @@ function lastHappenedOn(updates: { happened_on: string }[]): string | null {
  * sale es justo lo que conviene revisar antes de que salga.
  */
 export async function getMoneyDestinations(): Promise<MoneyDestination[]> {
-  if (isDemoMode()) return demoMoneyDestinations();
   const supabase = await createSupabaseServerClient();
 
   // Se pide desde los casos y no desde los municipios, que es como se pedía
@@ -282,7 +242,6 @@ export async function getMoneyDestinations(): Promise<MoneyDestination[]> {
  * lista vacía para cualquier otra sesión.
  */
 export async function getNewsletterSignups(): Promise<NewsletterSignup[]> {
-  if (isDemoMode()) return demoNewsletterSignups();
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("newsletter_signups")
@@ -292,7 +251,6 @@ export async function getNewsletterSignups(): Promise<NewsletterSignup[]> {
 }
 
 export async function getOffers(status?: OfferStatus): Promise<OfferWithContext[]> {
-  if (isDemoMode()) return demoOffersFor(status);
   const supabase = await createSupabaseServerClient();
 
   let query = supabase
@@ -325,7 +283,6 @@ export async function getOffers(status?: OfferStatus): Promise<OfferWithContext[
  * quien no tenga este municipio asignado no llega a esta pantalla.
  */
 export async function getOffersForCase(caseId: string): Promise<OfferWithContext[]> {
-  if (isDemoMode()) return demoOffersFor().filter((offer) => offer.case_id === caseId);
   const supabase = await createSupabaseServerClient();
 
   const { data } = await supabase
@@ -341,7 +298,6 @@ export async function getOffersForCase(caseId: string): Promise<OfferWithContext
 
 /** Opciones para vincular una oferta con la necesidad que cubre. */
 export async function getNeedOptions(): Promise<NeedOption[]> {
-  if (isDemoMode()) return demoNeedOptions();
   const supabase = await createSupabaseServerClient();
 
   // El desplegable ofrece lo que se puede cubrir, así que el filtro se escribe
@@ -379,7 +335,6 @@ export async function getNeedOptions(): Promise<NeedOption[]> {
  * porque la pantalla ya solo existe para coordinación.
  */
 export async function getTeamDirectory(): Promise<TeamMemberEntry[]> {
-  if (isDemoMode()) return demoTeamDirectory();
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase.rpc("team_directory");
@@ -413,10 +368,6 @@ export async function getTeamDirectory(): Promise<TeamMemberEntry[]> {
  * que no apuntan a ningún municipio: no hay un pueblo asignado al que recortar.
  */
 export async function getSupportOffers(kind?: SupportOfferKind): Promise<SupportOffer[]> {
-  if (isDemoMode()) {
-    return demoSupportOffers.filter((row) => (kind ? row.kind === kind : true));
-  }
-
   const supabase = await createSupabaseServerClient();
   let query = supabase.from("support_offers").select("*").order("created_at", { ascending: false });
   if (kind) query = query.eq("kind", kind);
@@ -425,7 +376,6 @@ export async function getSupportOffers(kind?: SupportOfferKind): Promise<Support
 }
 
 export async function getFeedback(): Promise<FeedbackNote[]> {
-  if (isDemoMode()) return demoFeedback();
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("feedback")
@@ -442,8 +392,6 @@ export async function getFeedback(): Promise<FeedbackNote[]> {
  * `photos` ya recortan lo que cada sesión puede leer.
  */
 export async function getPhotoStorageUsage(): Promise<StorageUsage> {
-  if (isDemoMode()) return groupPhotoUsage(demoPhotoUsage());
-
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("photos")
@@ -484,8 +432,6 @@ export async function getPhotoStorageUsage(): Promise<StorageUsage> {
  * lista que `donations_coordination_read` (0017).
  */
 export async function getAdminDonations(): Promise<AdminDonation[]> {
-  if (isDemoMode()) return demoAdminDonations();
-
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("donations")

@@ -6,7 +6,6 @@ import { FramedPhoto } from "@/components/ui/Photo";
 import { field, panel } from "@/components/ui/styles";
 import { thumbUrl } from "@/lib/format";
 import { savedFrame } from "@/lib/photo-frame";
-import { isDemoMode } from "@/lib/supabase/env";
 import type { Photo } from "@/lib/types";
 
 export function PhotoManager({
@@ -23,13 +22,7 @@ export function PhotoManager({
 }) {
   return (
     <div>
-      {isDemoMode() ? (
-        <p className="rounded-lg border border-dashed border-line-strong bg-panel px-3.5 py-3 text-sm text-muted">
-          Subir fotos necesita Storage. Con datos de muestra no hay dónde guardarlas.
-        </p>
-      ) : (
-        <PhotoUploader cityId={cityId} caseId={caseId} />
-      )}
+      <PhotoUploader cityId={cityId} caseId={caseId} />
 
       {caseId && photos.length > 0 && (
         <PortraitPicker caseId={caseId} photos={photos} portraitPhotoId={portraitPhotoId} />

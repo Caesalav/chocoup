@@ -8,7 +8,6 @@ import { CasePhotoDrafts, type DraftPhoto } from "./CasePhotoDrafts";
 import { FormSection } from "./FormSection";
 import { uploadCasePhoto } from "./upload-case-photo";
 import { alertBox, button } from "@/components/ui/styles";
-import { isDemoMode } from "@/lib/supabase/env";
 import type { PhotoFrame } from "@/lib/photo-frame";
 
 /**
@@ -26,7 +25,6 @@ export function NewCaseForm({
   defaultCityId?: string;
 }) {
   const router = useRouter();
-  const demo = isDemoMode();
   const [photos, setPhotos] = useState<DraftPhoto[]>([]);
   const [portraitKey, setPortraitKey] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -64,7 +62,7 @@ export function NewCaseForm({
         setStatus("Creando el caso…");
         const created = await createCaseRecord(data);
 
-        if (!demo && photos.length > 0) {
+        if (photos.length > 0) {
           let portraitId: string | null = null;
 
           for (let index = 0; index < photos.length; index++) {
@@ -116,26 +114,19 @@ export function NewCaseForm({
           title="Fotos"
           hint="Toca la cara de la persona para marcarla como retrato. Encuadrar deja a la vista lo que importa. Si ninguna sirve de retrato, no toques ninguna: la tarjeta pone las iniciales."
         >
-          {demo ? (
-            <p className="rounded-lg border border-dashed border-line-strong bg-panel-high px-3.5 py-3 text-sm text-muted">
-              Subir fotos necesita Storage. Con datos de muestra el caso se puede abrir, pero no hay
-              dónde guardar las imágenes.
-            </p>
-          ) : (
-            <CasePhotoDrafts
-              photos={photos}
-              portraitKey={portraitKey}
-              onAdd={addFiles}
-              onRemove={(key) => setPhotos((current) => current.filter((photo) => photo.key !== key))}
-              onPortrait={setPortraitKey}
-              onFrame={(key, frame) =>
-                setPhotos((current) =>
-                  current.map((photo) => (photo.key === key ? { ...photo, frame } : photo)),
-                )
-              }
-              disabled={pending}
-            />
-          )}
+          <CasePhotoDrafts
+            photos={photos}
+            portraitKey={portraitKey}
+            onAdd={addFiles}
+            onRemove={(key) => setPhotos((current) => current.filter((photo) => photo.key !== key))}
+            onPortrait={setPortraitKey}
+            onFrame={(key, frame) =>
+              setPhotos((current) =>
+                current.map((photo) => (photo.key === key ? { ...photo, frame } : photo)),
+              )
+            }
+            disabled={pending}
+          />
         </FormSection>
       </div>
 

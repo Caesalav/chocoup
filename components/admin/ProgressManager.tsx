@@ -11,7 +11,6 @@ import { Photo } from "@/components/ui/Photo";
 import { button, field } from "@/components/ui/styles";
 import { formatDay } from "@/lib/format";
 import type { PhotoFrame } from "@/lib/photo-frame";
-import { isDemoMode } from "@/lib/supabase/env";
 import type { CaseUpdate } from "@/lib/types";
 
 export function ProgressManager({
@@ -28,7 +27,6 @@ export function ProgressManager({
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState<{ url: string; frame: PhotoFrame } | null>(null);
-  const demo = isDemoMode();
 
   function onCreate(form: HTMLFormElement) {
     setError("");
@@ -60,87 +58,80 @@ export function ProgressManager({
 
   return (
     <div>
-      {demo ? (
-        <p className="mb-4 rounded-lg border border-dashed border-line-strong bg-panel px-3.5 py-3 text-sm text-muted">
-          Añadir avances con foto necesita Storage. Con datos de muestra se ve el historial, pero
-          no hay dónde guardar uno nuevo.
-        </p>
-      ) : (
-        <form
-          className="rounded-xl border border-line bg-panel p-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onCreate(event.currentTarget);
-          }}
-        >
-          <input type="hidden" name="city_id" value={cityId} />
-          <input type="hidden" name="case_id" value={caseId} />
+      <form
+        className="rounded-xl border border-line bg-panel p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onCreate(event.currentTarget);
+        }}
+      >
+        <input type="hidden" name="city_id" value={cityId} />
+        <input type="hidden" name="case_id" value={caseId} />
 
-          <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-            <label className="block">
-              <span className={field.label}>Fecha</span>
-              <input name="happened_on" type="date" required defaultValue={today} className={field.input} />
-            </label>
-            <label className="block">
-              <span className={field.label}>Título</span>
-              <input
-                name="title"
-                required
-                className={field.input}
-                placeholder="Ej.: Arquitecto asignado"
-              />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className={field.label}>Qué se hizo</span>
-              <textarea
-                name="body"
-                required
-                rows={3}
-                className={field.textarea}
-                placeholder="Lo concreto: el plano, quién quedó a cargo, qué material llegó."
-              />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className={field.label}>Fotografía</span>
-              <input
-                name="photo"
-                type="file"
-                accept="image/*"
-                required
-                className={field.input}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (draft) URL.revokeObjectURL(draft.url);
-                  if (!file) {
-                    setDraft(null);
-                    return;
-                  }
-                  setDraft({ url: URL.createObjectURL(file), frame: defaultFrame("situation") });
-                }}
-              />
-            </label>
+        <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+          <label className="block">
+            <span className={field.label}>Fecha</span>
+            <input name="happened_on" type="date" required defaultValue={today} className={field.input} />
+          </label>
+          <label className="block">
+            <span className={field.label}>Título</span>
+            <input
+              name="title"
+              required
+              className={field.input}
+              placeholder="Ej.: Arquitecto asignado"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className={field.label}>Qué se hizo</span>
+            <textarea
+              name="body"
+              required
+              rows={3}
+              className={field.textarea}
+              placeholder="Lo concreto: el plano, quién quedó a cargo, qué material llegó."
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className={field.label}>Fotografía</span>
+            <input
+              name="photo"
+              type="file"
+              accept="image/*"
+              required
+              className={field.input}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (draft) URL.revokeObjectURL(draft.url);
+                if (!file) {
+                  setDraft(null);
+                  return;
+                }
+                setDraft({ url: URL.createObjectURL(file), frame: defaultFrame("situation") });
+              }}
+            />
+          </label>
+        </div>
+
+        {draft && (
+          <div className="mt-4">
+            <PhotoCropEditor
+              src={draft.url}
+              kind="situation"
+              value={draft.frame}
+              onChange={(frame) => setDraft((current) => (current ? { ...current, frame } : current))}
+            />
           </div>
+        )}
 
-          {draft && (
-            <div className="mt-4">
-              <PhotoCropEditor
-                src={draft.url}
-                kind="situation"
-                value={draft.frame}
-                onChange={(frame) => setDraft((current) => (current ? { ...current, frame } : current))}
-              />
-            </div>
-          )}
+        {error && <p className="mt-3 text-sm text-need-high">{error}</p>}
 
-          {error && <p className="mt-3 text-sm text-need-high">{error}</p>}
-
-          <div className="mt-3">
-            <button type="submit" className={`${button.primary} disabled:opacity-60`} disabled={pending}>
-              {pending ? "Añadiendo…" : "Añadir al seguimiento"}
-            </button>
-          </div>
-        </form>
-      )}
+        <div className="mt-3">
+          <button type="submit" className={`${button.primary} disabled:opacity-60`} disabled={pending}>
+            {pending ? "Añadiendo…" : "Añadir al seguimiento"}
+          </button>
+        </div>
+      </form>
 
       {updates.length > 0 && (
         <ol className="mt-4 divide-y divide-line rounded-xl border border-line bg-panel">
@@ -164,39 +155,35 @@ export function ProgressManager({
                 </div>
               </div>
 
-              {!demo && (
-                <>
-                  {update.photo_id && update.photoPath && (
-                    <div className="mt-3">
-                      <PhotoFrameButton
-                        photo={{
-                          id: update.photo_id,
-                          city_id: update.city_id,
-                          case_id: update.case_id,
-                          storage_path: update.photoPath,
-                          thumb_path: "",
-                          caption: "",
-                          sort_order: 0,
-                          focus_x: update.photoFrame?.focusX ?? null,
-                          focus_y: update.photoFrame?.focusY ?? null,
-                          zoom: update.photoFrame?.zoom ?? null,
-                          byte_size: 0,
-                          thumb_byte_size: 0,
-                          created_at: update.created_at,
-                        }}
-                        kind="situation"
-                      />
-                    </div>
-                  )}
-                  <UpdateEditor update={update} cityId={cityId} caseId={caseId} />
-                  <form action={deleteCaseUpdate} className="mt-2">
-                    <input type="hidden" name="id" value={update.id} />
-                    <DangerSubmitButton confirmText="¿Borrar este avance del seguimiento?">
-                      Borrar avance
-                    </DangerSubmitButton>
-                  </form>
-                </>
+              {update.photo_id && update.photoPath && (
+                <div className="mt-3">
+                  <PhotoFrameButton
+                    photo={{
+                      id: update.photo_id,
+                      city_id: update.city_id,
+                      case_id: update.case_id,
+                      storage_path: update.photoPath,
+                      thumb_path: "",
+                      caption: "",
+                      sort_order: 0,
+                      focus_x: update.photoFrame?.focusX ?? null,
+                      focus_y: update.photoFrame?.focusY ?? null,
+                      zoom: update.photoFrame?.zoom ?? null,
+                      byte_size: 0,
+                      thumb_byte_size: 0,
+                      created_at: update.created_at,
+                    }}
+                    kind="situation"
+                  />
+                </div>
               )}
+              <UpdateEditor update={update} cityId={cityId} caseId={caseId} />
+              <form action={deleteCaseUpdate} className="mt-2">
+                <input type="hidden" name="id" value={update.id} />
+                <DangerSubmitButton confirmText="¿Borrar este avance del seguimiento?">
+                  Borrar avance
+                </DangerSubmitButton>
+              </form>
             </li>
           ))}
         </ol>

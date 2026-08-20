@@ -24,62 +24,21 @@ El mapa es un esquema del Chocó en SVG, sin librería de mapas ni servicio de t
 
 ---
 
-## Datos de muestra
+## Solo datos reales
 
-Mientras no haya claves de Supabase en `.env.local`, el portal arranca lleno de contenido
-inventado: tres municipios publicados, dos en borrador, ocho causas —una de ellas un colegio,
-para poder ver lo que el tipo de causa cambia en el retrato—, necesidades abiertas en cada
-pueblo, un canal general de muestra y una bandeja de ofertas con casos pendientes, aceptados,
-negados y retirados. Sirve para valorar el diseño y recorrer el flujo completo, incluido el
-panel.
+El portal no inventa nada. Todo lo que se pinta sale de Supabase, y sin claves en
+`.env.local` las pantallas salen vacías en vez de rellenarse: es lo correcto en un portal
+que documenta un terremoto y se comparte por WhatsApp, donde una causa inventada sería
+indistinguible de una real.
 
-Las fechas de la muestra son de agosto de 2026 y **envejecen solas**: leída dentro de un año,
-la comprobación del canal general dirá que lleva un año sin mirarse. Es lo correcto para lo
-que es —una demostración de un momento— y es justo lo que `supabase/datos-de-prueba.sql` no
-puede permitirse, porque ese se pega sobre la base de verdad meses después.
+Aquí hubo un modo de muestra —`lib/demo-data.ts`, las fotos de archivo de `public/demo` y
+una carga de ejemplo en la base— y se retiró entero. Si en alguna base queda un resto de
+aquello, lo borra `supabase/borrar-datos-de-prueba.sql`, que busca por las marcas que
+llevaba puestas y deja intacto lo que no las tiene.
 
 ```bash
 npm install && npm run dev
 ```
-
-Una franja lo advierte arriba de todas las pantallas. Las escrituras no persisten: al
-guardar cualquier cosa el panel avisa de que falta conectar la base de datos.
-
-Todo esto vive en `lib/demo-data.ts` y desaparece por completo en cuanto existan las
-claves. No hay que desactivar nada.
-
-### Las fotos de muestra
-
-Son ocho paisajes del Chocó en `public/demo` —el río, un pueblo de ribera, palafitos, la
-costa, canoas, un camino, la selva y una construcción de bloque— y ocho retratos de
-archivo para las tarjetas de personas.
-
-**Ningún paisaje muestra daños. Los retratos son caras inventadas, no las familias de los
-textos.** Todas llevan el sello "muestra" incrustado en el propio píxel. El portal
-documenta un terremoto real y se comparte por WhatsApp: una imagen inventada de escombros
-en Quibdó sería indistinguible de una prueba. Los pies de foto describen lo que de verdad
-se ve.
-
-Si hay que rehacerlas o cambiar el sello, los PNG de origen van en una carpeta aparte y el
-script normaliza tamaños y estampa la marca:
-
-```bash
-python3 scripts/build-demo-photos.py <carpeta-con-los-png>
-```
-
-De cada una salen dos versiones, igual que con las fotos reales: 1600 px para la vista
-ampliada y 400 px para cuadrículas y tarjetas.
-
-El sello está colocado abajo, centrado y a un 9 % del borde, dentro de la zona que
-sobrevive a todos los recortes del portal: el 3:2 de las cuadrículas, el cuadrado de las
-filas y —el más agresivo— el círculo del retrato de una persona, donde el círculo toca el
-borde inferior justo por donde pasa el sello. **Lo que el círculo no salva es el tamaño**:
-el retrato se dibuja a 80 px, así que el sello queda ahí como una pastilla oscura de unos
-20 px y la palabra deja de leerse. No desaparece y no engaña —el aviso de la franja
-superior y las fotos del carrusel de la misma tarjeta lo dicen a las claras—, pero si algún
-día el retrato tiene que aguantar solo, lo que hay que hacer es estampar una segunda marca
-pensada para él (una inicial, o un aro en el canto) y no agrandar el retrato: al tamaño que
-haría legible esa palabra la tarjeta deja de ser una tarjeta.
 
 ---
 
@@ -1041,7 +1000,6 @@ lib/admin-sections.ts    el mapa del panel: una puerta, tres secciones y por qu�
 lib/donation-channel.ts  qué canal enseña una causa y de quién es
 lib/contributions.ts     qué cuenta el contador de aportes y con qué palabras
 lib/team.ts              rol y municipios de la sesión, y quién puede escribir dónde
-lib/demo-data.ts         contenido de muestra para cuando no hay base de datos
-supabase/                migraciones, semilla, carga de prueba y verify.mjs (pruebas de RLS)
+supabase/                migraciones, semilla, borrado de pruebas y verify.mjs (pruebas de RLS)
 proxy.ts                 refresco de la sesión en cada petición
 ```

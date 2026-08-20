@@ -1,17 +1,11 @@
 import { getTeamSession } from "./supabase/server";
-import { isDemoMode } from "./supabase/env";
-import { demoTeamSession } from "./demo-data";
 import type { TeamSession } from "./types";
 
 /**
- * Quién está usando el panel y qué puede tocar.
- *
- * Con datos de muestra hay una sesión inventada de coordinación para poder
- * recorrer el panel entero sin base de datos; en cuanto hay claves, la respuesta
- * la da Postgres a partir del correo del token.
+ * Quién está usando el panel y qué puede tocar. La respuesta la da Postgres a
+ * partir del correo del token.
  */
 export async function currentTeam(): Promise<TeamSession | null> {
-  if (isDemoMode()) return demoTeamSession();
   return getTeamSession();
 }
 
