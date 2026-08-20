@@ -580,7 +580,7 @@ export async function getDonationLog(filters: {
   let query = supabase
     .from(DONATION_LOG_VIEW)
     .select(
-      "id, amount_cop, donated_at, donor_name, publish_name, case_id, case_name, city_id, city_name, city_slug",
+      "id, amount_cop, donated_at, donor_name, publish_name, destination, case_id, case_name, city_id, city_name, city_slug",
     );
 
   if (filters.caseId) query = query.eq("case_id", filters.caseId);

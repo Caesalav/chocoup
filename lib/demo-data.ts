@@ -58,6 +58,7 @@ import type {
   SupportOfferKind,
   TeamMemberEntry,
   TeamSession,
+  DonationDestination,
   DonationLogEntry,
   FeedbackNote,
 } from "./types";
@@ -764,7 +765,8 @@ export const demoBudgetItems: BudgetItem[] = budgetSeeds.map((seed, index) => {
  * `donation_log`, no de la tabla.
  */
 type DonationSeed = {
-  caseName: string;
+  /** Null es una donación al fondo general, que no eligió familia. */
+  caseName: string | null;
   amount_cop: number;
   donor_name: string;
   publish_name: boolean;
@@ -790,14 +792,20 @@ const donationSeeds: DonationSeed[] = [
   { caseName: "Casa de la cultura de Istmina", amount_cop: 700_000, donor_name: "Alberto Mena", publish_name: true, at: at(18, 12, 25) },
   { caseName: "Casa de la cultura de Istmina", amount_cop: 400_000, donor_name: "Vecindario San Agustín", publish_name: true, at: at(15, 9, 5) },
   { caseName: DANIELA, amount_cop: 50_000, donor_name: "", publish_name: false, at: at(19, 20, 15) },
+  // Al fondo general: sin familia elegida, que es el otro camino que ofrece
+  // /donaciones. Una firmada y una anónima, porque las dos se pintan distinto y
+  // las dos tienen que poder mirarse antes de que entre dinero de verdad.
+  { caseName: null, amount_cop: 900_000, donor_name: "Aura Bermúdez", publish_name: true, at: at(19, 8, 45) },
+  { caseName: null, amount_cop: 120_000, donor_name: "", publish_name: false, at: at(16, 20, 30) },
 ];
 
 const demoDonationRows = donationSeeds.map((seed, index) => {
-  const caseRecord = caseByName(seed.caseName);
+  const caseRecord = seed.caseName ? caseByName(seed.caseName) : null;
   return {
     id: demoId(DONATION, index),
-    case_id: caseRecord.id,
-    city_id: caseRecord.city_id,
+    destination: (caseRecord ? "causa" : "fondo") as DonationDestination,
+    case_id: caseRecord?.id ?? null,
+    city_id: caseRecord?.city_id ?? null,
     amount_cop: seed.amount_cop,
     donor_name: seed.donor_name,
     publish_name: seed.publish_name,
@@ -805,8 +813,13 @@ const demoDonationRows = donationSeeds.map((seed, index) => {
   };
 });
 
+// Lo donado por causa, para la barra de cada ficha. Lo del fondo general no
+// entra en ninguna: no es de nadie todavía, y sumarlo a una familia sería
+// prometerle un dinero que el equipo aún no ha repartido. Es lo mismo que hace
+// la vista `case_budget` (0020), que suma por `case_id` y no ve estas filas.
 const demoDonatedByCase: Record<string, number> = {};
 for (const row of demoDonationRows) {
+  if (!row.case_id) continue;
   demoDonatedByCase[row.case_id] = (demoDonatedByCase[row.case_id] ?? 0) + row.amount_cop;
 }
 
@@ -1958,6 +1971,10 @@ export function demoDonationLog(filters: {
   // llevan, y en producción lo hace la vista.
   const rows = demoDonationRows
     .filter((row) => {
+      // La del fondo no cuelga de ninguna publicación, y no aparece cuando se
+      // pregunta por una causa o por un municipio: no es de ninguno de los dos.
+      if (!row.case_id) return !filters.caseId && !filters.cityId;
+
       const caseRecord = demoCases.find((entry) => entry.id === row.case_id);
       const city = demoCities.find((entry) => entry.id === row.city_id);
       if (!caseRecord || !city) return false;
@@ -1969,8 +1986,8 @@ export function demoDonationLog(filters: {
       return true;
     })
     .map((row) => {
-      const caseRecord = demoCases.find((entry) => entry.id === row.case_id)!;
-      const city = demoCities.find((entry) => entry.id === row.city_id)!;
+      const caseRecord = demoCases.find((entry) => entry.id === row.case_id) ?? null;
+      const city = demoCities.find((entry) => entry.id === row.city_id) ?? null;
       const name = row.publish_name && row.donor_name.trim() ? row.donor_name : null;
       return {
         id: row.id,
@@ -1978,11 +1995,12 @@ export function demoDonationLog(filters: {
         donated_at: row.donated_at,
         donor_name: name,
         publish_name: row.publish_name,
-        case_id: caseRecord.id,
-        case_name: caseRecord.display_name,
-        city_id: city.id,
-        city_name: city.name,
-        city_slug: city.slug,
+        destination: row.destination,
+        case_id: caseRecord?.id ?? null,
+        case_name: caseRecord?.display_name ?? null,
+        city_id: city?.id ?? null,
+        city_name: city?.name ?? null,
+        city_slug: city?.slug ?? null,
       };
     })
     .sort((a, b) => {

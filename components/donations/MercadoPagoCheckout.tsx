@@ -9,10 +9,20 @@ import { formatCOP } from "@/lib/format";
 const PRESETS = [20_000, 50_000, 100_000, 200_000] as const;
 
 /**
- * El recuadro de Mercado Pago: el valor y el botón que abre el cobro.
+ * El recuadro de Mercado Pago: el valor, el nombre si se quiere, y el botón que
+ * abre el cobro.
  *
- * El correo lo pide la pasarela. Aquí solo hace falta cuánto, para no pedir
- * dos veces lo mismo y para que Donar lleve de una al checkout.
+ * El correo lo pide la pasarela, y el nombre podría pedirlo también: viene en
+ * los datos del pago. No se toma de ahí a propósito. El nombre de la factura es
+ * el del titular de la tarjeta —que a veces es la mamá, o la empresa— y
+ * publicarlo sería publicar un dato que esa persona dio para pagar y no para
+ * aparecer. Así que se pregunta aquí, y solo se manda si se marca la casilla.
+ *
+ * Los dos campos son opcionales y el botón funciona sin tocarlos: donar anónimo
+ * es un camino de primera clase y no un descuido. Van después del importe por
+ * eso mismo —lo que hace falta primero, lo que se ofrece después— y la casilla
+ * dice qué pasa si se marca, no qué pasa si no, porque lo que no se marca es lo
+ * normal. Es la misma forma que tiene el formulario de /ofrecer.
  */
 export function MercadoPagoCheckout({
   heading,
@@ -97,6 +107,29 @@ export function MercadoPagoCheckout({
           </span>
           <span className={field.hint}>En pesos colombianos. Mínimo $ 1.000.</span>
         </label>
+
+        <label className="block">
+          <span className={field.label}>Tu nombre (si quieres que aparezca)</span>
+          <input
+            name="donor_name"
+            maxLength={120}
+            autoComplete="name"
+            className={field.input}
+            placeholder="Como quieras que se lea"
+          />
+        </label>
+
+        <label className={field.checkboxRow}>
+          <input type="checkbox" name="publish_name" className={field.checkbox} />
+          <span>
+            Podéis publicar mi nombre en el registro de donaciones
+            <span className="mt-0.5 block text-xs text-muted">
+              Sin esta casilla la donación aparece igual, con su valor y su fecha, pero sin decir de
+              quién viene. El nombre no se guarda en ningún caso si no la marcas.
+            </span>
+          </span>
+        </label>
+
         {state && "error" in state && <p className={alertBox}>{state.error}</p>}
         <button type="submit" disabled={pending} className={`${button.invite} w-full`}>
           {pending ? "Abriendo Mercado Pago…" : "Donar"}

@@ -14,37 +14,25 @@ import type { DonationLogEntry } from "@/lib/types";
 type Scope = "portal" | "city" | "case";
 
 /**
- * Nombres de muestra cuando la fila llega sin firmar. La lista de la referencia
- * es gente con nombre, no un muro de anónimas; mientras el registro se diseña
- * con filas vacías, cada id cae siempre en el mismo nombre para que no baile
- * entre visitas.
+ * Aquí había doce nombres inventados —«Lucía Restrepo», «Hernán Palacios»— con
+ * los que se rellenaba la fila que llegaba sin firmar, para que el registro se
+ * pudiera diseñar sin quedarse en un muro de anónimas. Se fueron el día que el
+ * webhook empezó a escribir donaciones de verdad, y hay que dejar escrito por
+ * qué, porque volver a ponerlos es fácil y la pantalla se ve mejor con ellos.
+ *
+ * Una donación anónima es la de alguien que NO marcó la casilla que autoriza
+ * publicar su nombre. Ponerle uno inventado no es una decisión de diseño: es el
+ * portal afirmando quién dio ese dinero. Y hace algo peor que mentir sobre una
+ * fila —dinamita las demás—: si un nombre de esta lista puede ser un relleno,
+ * ninguno de los otros vale como prueba de nada, y este registro existe
+ * exactamente para que se pueda comprobar a dónde va el dinero.
+ *
+ * Sin nombre se dice que no hay nombre. La regla está escrita tres veces en el
+ * camino de este dato: la casilla del formulario, `publish_name` en la tabla
+ * (0017) y el `case` sin `else` de la vista (0021), que devuelve nulo para que
+ * la plantilla diga «anónima». Esta es la plantilla.
  */
-const INVENTED_DONORS = [
-  "Lucía Restrepo",
-  "Hernán Palacios",
-  "Yulieth Mena",
-  "Jairo Rivas",
-  "Sofía Caicedo",
-  "Paola Mosquera",
-  "Carmen Lozano",
-  "Diego Murillo",
-  "Ana Isabel Córdoba",
-  "Wilmer Caicedo",
-  "Marta Hinestroza",
-  "Carlos Vélez",
-] as const;
-
-function inventedDonor(id: string): string {
-  let hash = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
-  }
-  return INVENTED_DONORS[hash % INVENTED_DONORS.length];
-}
-
-function listedDonor(row: DonationLogEntry): string {
-  return row.donor_name?.trim() || inventedDonor(row.id);
-}
+const ANONYMOUS = "Donación anónima";
 
 /**
  * El registro de donaciones confirmadas.
@@ -168,20 +156,28 @@ function donorInitial(name: string): string {
 }
 
 function DonationEntry({ row, scope }: { row: DonationLogEntry; scope: Scope }) {
-  const who = listedDonor(row);
-  const initial = donorInitial(who);
+  const named = row.donor_name?.trim() ?? "";
+  const who = named || ANONYMOUS;
 
   return (
     <article className="flex gap-3 py-3.5">
+      {/* Sin nombre, el círculo se queda sin letra. Es lo que hay: la inicial de
+          «Donación anónima» sería una A que se lee como el nombre de alguien. */}
       <span
         aria-hidden
         className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-land font-display text-[14px] text-ink"
       >
-        {initial}
+        {named ? donorInitial(named) : ""}
       </span>
 
       <div className="min-w-0 flex-1">
-        <h3 className="text-[15px] font-medium leading-snug text-ink">{who}</h3>
+        <h3
+          className={`text-[15px] leading-snug ${
+            named ? "font-medium text-ink" : "text-muted"
+          }`}
+        >
+          {who}
+        </h3>
         <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 font-display text-[17px] leading-snug tabular-nums text-ink">
           {formatCOP(row.amount_cop)}
           <span className="font-sans text-[12px] font-normal text-faint" suppressHydrationWarning>
@@ -189,7 +185,20 @@ function DonationEntry({ row, scope }: { row: DonationLogEntry; scope: Scope }) 
           </span>
         </p>
 
-        {scope !== "case" && (
+        {/* A dónde fue. En la ficha de una causa no se repite su nombre, y en un
+            municipio no se nombra el pueblo. Al fondo general no se le pone
+            enlace a la causa que no tiene: se dice lo que es y se remite a la
+            página donde se explica qué hace el equipo con ese dinero. */}
+        {scope !== "case" && row.destination === "fondo" && (
+          <p className="mt-1 text-[13px] leading-relaxed text-muted">
+            Al{" "}
+            <Link href="/donaciones" className="text-body underline-offset-2 hover:underline">
+              fondo general
+            </Link>
+          </p>
+        )}
+
+        {scope !== "case" && row.destination === "causa" && row.case_id && (
           <p className="mt-1 text-[13px] leading-relaxed text-muted">
             Para{" "}
             <Link

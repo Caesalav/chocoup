@@ -394,6 +394,14 @@ export type OfferRecord = {
  * porque el campo no era un nombre— y la plantilla lo dice. No se deduce: si
  * llegara la cadena vacía fingiendo un nombre, también se leería como anónima.
  */
+/**
+ * A dónde va una donación: a una familia o al fondo general que reparte el
+ * equipo. No es un detalle de pantalla, es una columna con dos restricciones
+ * detrás: 'causa' exige una causa y 'fondo' exige que no haya ninguna. Ver
+ * supabase/migrations/0022_donacion_al_fondo.sql.
+ */
+export type DonationDestination = "causa" | "fondo";
+
 export type DonationLogEntry = {
   id: string;
   amount_cop: number;
@@ -402,11 +410,18 @@ export type DonationLogEntry = {
   /** Nulo si la donación es anónima. */
   donor_name: string | null;
   publish_name: boolean;
-  case_id: string;
-  case_name: string;
-  city_id: string;
-  city_name: string;
-  city_slug: string;
+  destination: DonationDestination;
+  /**
+   * La causa y su municipio, o nulos los cinco cuando la donación fue al fondo
+   * general. Nulo aquí NO significa «una causa que no se puede enseñar»: la
+   * vista no publica una donación cuya causa no esté publicada, ni siquiera sin
+   * nombrarla. Significa que no había causa. Ver 0022.
+   */
+  case_id: string | null;
+  case_name: string | null;
+  city_id: string | null;
+  city_name: string | null;
+  city_slug: string | null;
 };
 
 /** Oferta con el contexto al que apunta, para la bandeja del equipo. */

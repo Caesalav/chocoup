@@ -34,10 +34,12 @@ import type { BudgetProgress } from "./budget";
  *     auditar línea a línea en la misma ficha.
  *
  *   - LO RECIBIDO (`donated`): el dinero que ha entrado. Sale de las donaciones
- *     confirmadas, y esas solo entran por el webhook de pagos: el disparador
+ *     confirmadas, y esas solo entran por el webhook de pagos
+ *     (`app/api/mercadopago/webhook/route.ts`): el disparador
  *     `donations_are_webhook_only` (0017) impide que un importe llegue desde
- *     cualquier otra puerta, y 0021 lo repite. Hoy no hay webhook escrito, así
- *     que en producción esta cifra es cero en todas las causas.
+ *     cualquier otra puerta, y 0021 lo repite. Sin `MP_WEBHOOK_SECRET` puesta
+ *     esta cifra es cero en todas las causas aunque la gente done, porque el
+ *     webhook no acepta un aviso sin firma.
  *
  * Un porcentaje es lo único de esta pantalla que se lee sin leer, y por tanto lo
  * que el portal afirma. Se le da a la cifra que el portal puede defender.
@@ -133,10 +135,10 @@ export function moneyProgress(budget: BudgetProgress): MoneyProgress {
  * Cuánto ha entrado y DE DÓNDE SALE ESA CIFRA, o nulo si no hay ninguna que
  * explicar.
  *
- * Nulo es el estado normal en producción: sin pasarela conectada no ha entrado
- * nada, y entonces esta línea no existe. Callar es lo correcto —lo que no se
- * puede hacer es escribir «$0 recaudados», que suena a fracaso cuando lo que
- * pasa es que todavía no hay por dónde recaudar—.
+ * Nulo es el estado de una causa a la que todavía no ha entrado nada, y
+ * entonces esta línea no existe. Callar es lo correcto —lo que no se puede
+ * hacer es escribir «$0 recaudados», que suena a fracaso cuando lo que pasa es
+ * que esa causa acaba de publicarse—.
  *
  * La procedencia es lo importante de la frase, y se dice remitiendo al registro y
  * no al mecanismo. La cifra es exactamente la suma de las filas de

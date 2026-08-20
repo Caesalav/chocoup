@@ -101,7 +101,11 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
         </div>
       </section>
 
-      <section className="flex flex-col px-5 py-8 sm:px-8 lg:h-full lg:overflow-y-auto lg:px-10 lg:py-12">
+      {/* `pb-12` y no `py-8`: la última pieza de esta columna es el botón de la
+          vista previa, y con 32 px debajo queda tocando el filo inferior de la
+          pantalla, que en un teléfono es justo donde se posa la barra de
+          direcciones del navegador. */}
+      <section className="flex flex-col px-5 pb-12 pt-8 sm:px-8 lg:h-full lg:overflow-y-auto lg:px-10 lg:py-12">
         <header className="enters">
           <Logo className="text-[26px] text-ink" />
 

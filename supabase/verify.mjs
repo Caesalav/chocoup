@@ -214,6 +214,7 @@ const MIGRATIONS = [
   "migrations/0019_muro_de_ofertas.sql",
   "migrations/0020_presupuesto.sql",
   "migrations/0021_registro_de_donaciones.sql",
+  "migrations/0022_donacion_al_fondo.sql",
 ];
 const migration = (file) => readFileSync(join(HERE, file), "utf8");
 
@@ -3662,6 +3663,104 @@ check(
   JSON.stringify(donationPrivsRestored),
 );
 
+// --- La donación al fondo, y las dos formas de perder de vista el dinero ---
+//
+// 0022 deja entrar la donación que no elige familia, y lo que hay que comprobar
+// no es que entre —eso es una columna menos obligatoria— sino que siga siendo
+// imposible lo que 0017 escribió el `not null` para impedir: que el dinero de una
+// familia acabe en el fondo común sin que nadie lo haya decidido.
+await asService();
+await sql(`insert into public.donations
+  (destination, amount_cop, status, provider, payment_ref, donor_name, publish_name, settled_at)
+  values ('fondo', 200000, 'confirmada', 'pasarela', 'pago-fondo-001', 'Aura Bermúdez', true, now())`);
+
+await expectError(
+  "Una donación a una causa que llega sin la causa no entra: falla en voz alta en vez de irse al fondo",
+  `insert into public.donations (amount_cop, provider, payment_ref)
+     values (70000, 'pasarela', 'pago-sin-causa')`,
+  "donations_destination_consistent",
+);
+
+await expectError(
+  "Y una al fondo que llega con una causa pegada tampoco: son dos flujos confundidos",
+  `insert into public.donations (destination, case_id, amount_cop, provider, payment_ref)
+     select 'fondo', id, 70000, 'pasarela', 'pago-fondo-con-causa'
+     from public.cases where display_name = 'Familia Rentería'`,
+  "donations_destination_consistent",
+);
+
+// El fragmento que se espera no es el nombre de la restricción, y es a propósito:
+// las dos se solapan —la de consistencia nombra los dos destinos, así que un
+// tercero la incumple siempre— y cuál de las dos salta primero lo decide
+// Postgres. Lo que se comprueba es que un destino inventado no entra; que la
+// restricción del vocabulario siga escrita se comprueba en la línea siguiente,
+// porque el día que alguien afloje la de consistencia esta es la que queda.
+await expectError(
+  "Un destino inventado no es un destino",
+  `insert into public.donations (destination, amount_cop, provider, payment_ref)
+     values ('reserva', 70000, 'pasarela', 'pago-destino-raro')`,
+  "violates check constraint",
+);
+
+await asPostgres();
+const destinationChecks = await one(`select count(*)::int as n from pg_constraint
+  where conrelid = 'public.donations'::regclass
+    and conname in ('donations_destination_valid', 'donations_destination_consistent')`);
+check(
+  "El destino lo guardan dos restricciones y no una: el vocabulario y su acuerdo con la causa",
+  destinationChecks.n === 2,
+  `n=${destinationChecks.n}`,
+);
+await asService();
+
+// La del fondo sale en el registro general, sin causa y sin municipio, y dice
+// que es del fondo con una palabra y no con un hueco.
+await asAnon();
+const fundRow = await one(`select destination, donor_name, amount_cop, case_id, case_name, city_slug
+  from public.donation_log where amount_cop = 200000`);
+check(
+  "La donación al fondo sale en el registro, dicha por su nombre y sin causa ni municipio",
+  fundRow.destination === "fondo" &&
+    fundRow.donor_name === "Aura Bermúdez" &&
+    fundRow.case_id === null &&
+    fundRow.case_name === null &&
+    fundRow.city_slug === null,
+  JSON.stringify(fundRow),
+);
+
+// Y el agujero que abren los `left join`: una donación a una causa sin publicar
+// no puede sobrevivir en el registro con las columnas de la causa vacías, porque
+// eso es exactamente una donación al fondo mal leída. Publicar el dinero de una
+// familia que no ha consentido aparecer es la única cosa que este portal no
+// puede hacer, y aquí es donde se comprueba que no la hace.
+await asPostgres();
+await sql(`insert into public.cases (city_id, display_name, story, published, consent_to_publish)
+  select id, 'Familia Sin Publicar', 'Una ficha que todavía no está lista.', false, false
+  from public.cities where slug = 'quibdo'`);
+await asService();
+await sql(`insert into public.donations
+  (case_id, amount_cop, status, provider, payment_ref, donor_name, publish_name, settled_at)
+  select id, 310000, 'confirmada', 'pasarela', 'pago-sin-publicar', 'Nadie Debe Ver Esto', true, now()
+  from public.cases where display_name = 'Familia Sin Publicar'`);
+
+await asAnon();
+const hiddenDonation = await one(`select
+  count(*) filter (where amount_cop = 310000)::int          as la_fila,
+  count(*) filter (where destination = 'fondo')::int        as del_fondo
+  from public.donation_log`);
+check(
+  "Una donación a una causa sin publicar no sale del registro, ni disfrazada de donación al fondo",
+  hiddenDonation.la_fila === 0 && hiddenDonation.del_fondo === 1,
+  JSON.stringify(hiddenDonation),
+);
+
+// Se deshace, para que las comprobaciones de más abajo cuenten las causas que
+// contaban antes. La donación se va primero: el `on delete restrict` de 0017 no
+// deja borrar una causa que recibió dinero, y eso ya está comprobado aparte.
+await asPostgres();
+await sql(`delete from public.donations where payment_ref = 'pago-sin-publicar';
+  delete from public.cases where display_name = 'Familia Sin Publicar';`);
+
 // ===========================================================================
 // El tablero: el recado del momento y el movimiento hacia un pueblo
 // ===========================================================================
@@ -3810,11 +3909,18 @@ check(
   `n=${aidAfterUnpublish.n}`,
 );
 
-const donationAfterUnpublish = await one("select count(*)::int as n from public.donation_log");
+// Lo que queda es la donación al fondo, que no pertenece a ningún pueblo y no
+// cuenta nada de nadie. Es el mismo recorte que se le hace a lo prometido justo
+// debajo: se cuenta lo que sí tenía municipio, porque contar el total diría cero
+// solo mientras nadie done al fondo.
+const donationAfterUnpublish = await one(`select
+  count(*)::int                                      as n,
+  count(*) filter (where city_name is not null)::int as con_municipio
+  from public.donation_log`);
 check(
-  "Al despublicar el municipio, sus donaciones salen del registro público",
-  donationAfterUnpublish.n === 0,
-  `n=${donationAfterUnpublish.n}`,
+  "Al despublicar el municipio, sus donaciones salen del registro público y solo queda la del fondo",
+  donationAfterUnpublish.con_municipio === 0 && donationAfterUnpublish.n === 1,
+  JSON.stringify(donationAfterUnpublish),
 );
 
 // Lo mismo con lo prometido, y hay que comprobarlo aparte: son dos vistas con dos
