@@ -1,7 +1,6 @@
 import { WaitlistForm } from "@/components/coming-soon/WaitlistForm";
 import { PreviewUnlock } from "@/components/coming-soon/PreviewUnlock";
 import { SupportSignup } from "@/components/coming-soon/SupportSignup";
-import { DonationsAnchor } from "@/components/coming-soon/DonationsAnchor";
 import { Logo } from "@/components/Logo";
 import { ChocoMap } from "@/components/map/ChocoMap";
 import { MapStatus } from "@/components/map/MapStatus";
@@ -83,42 +82,23 @@ const LESSON_PRIORITY = LESSON_BOARD.filter(
 const LESSON_DOCUMENTED = LESSON_BOARD.filter((shape) => shape.city).length;
 
 /**
- * Qué va a ser esto, en tres renglones.
+ * Qué va a ser esto, en tres palabras y no en tres tarjetas.
  *
- * Estaba escrito como tres pasos con un icono grande cada uno y ocupaba media
- * columna. Ahora la columna la manda el formulario de apuntarse, así que esto
- * se cuenta corto y debajo: quien llega a ofrecer ayuda no necesita el manual
- * del portal antes de dejar su nombre, y quien sí quiere saber qué es esto lo
- * lee después sin haber tenido que bajar por delante de tres tarjetas.
+ * Aquí había tres pasos con icono, titular y párrafo, y ocupaban media columna
+ * por debajo del formulario. El objetivo de esta pantalla es que quepa entera
+ * sin bajar, así que el manual del portal se queda en lo que de verdad añade:
+ * las tres cosas que va a ser, dichas de corrido en la entradilla. Lo que
+ * contaban los párrafos —cómo se lee el color, que el mapa solo cambia cuando
+ * el equipo confirma— ya lo dice la leyenda del atlas, que está en la otra
+ * columna y a la vista.
  */
-const LESSONS = [
-  {
-    Icon: MapIcon,
-    title: "Un mapa de los treinta municipios",
-    body: "El color dice cuánto falta en cada pueblo. Gris no es que esté bien: es que todavía no hemos llegado.",
-  },
-  {
-    Icon: CasesIcon,
-    title: "Casos reales, con consentimiento",
-    body: "Personas, colegios, animales y fundaciones. El dinero entra por Mercado Pago y queda registrado para cada causa.",
-  },
-  {
-    Icon: OfferIcon,
-    title: "Ayudar sin fingir que ya llegó",
-    body: "El color del mapa solo cambia cuando el equipo confirma lo que se hizo.",
-  },
-] as const;
+const WHAT: { Icon: (props: { className?: string }) => React.ReactElement; label: string }[] = [
+  { Icon: MapIcon, label: "Los 30 municipios" },
+  { Icon: CasesIcon, label: "Casos con consentimiento" },
+  { Icon: OfferIcon, label: "Comprobable" },
+];
 
-export function ComingSoon({
-  state,
-  donationCount = 0,
-  donationTotal = 0,
-}: {
-  state: "recibido" | "correo" | null;
-  /** Para el ancla `#donaciones`, a la que apunta el correo de agradecimiento. */
-  donationCount?: number;
-  donationTotal?: number;
-}) {
+export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
   return (
     <div className="lg:grid lg:h-svh lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,36rem)] lg:overflow-hidden">
       {/* El marco oscuro, y por qué el mapa va dentro de una hoja clara.
@@ -182,63 +162,65 @@ export function ComingSoon({
           después del titular es apuntarse —voluntariado, profesión o recurso—,
           que es lo que el equipo puede usar hoy; el correo de aviso queda
           debajo, para quien no puede ofrecer nada todavía. */}
-      <section className="flex flex-col px-5 pb-12 pt-8 sm:px-8 lg:h-full lg:overflow-y-auto lg:px-10 lg:py-12">
-        <header className="enters">
-          <Logo className="text-[26px] text-ink" />
+      {/* El aire de arriba y abajo depende del ALTO de la ventana, no del ancho.
+          
+          Esta columna tiene que caber entera sin bajar, y lo que decide si cabe
+          es cuántos píxeles verticales hay: en un portátil de 1024×700 sobraban
+          58 y en uno de 1280×800 no sobraba ninguno, con el mismo `lg:`. Con un
+          único padding hay que elegir entre apretar las pantallas grandes o
+          desbordar las pequeñas. Así que se aprieta por omisión y se suelta a
+          partir de 820 px de alto, que es donde empieza a haber sitio. */}
+      <section className="flex flex-col px-5 pb-12 pt-8 sm:px-8 lg:h-full lg:overflow-y-auto lg:px-10 lg:py-5 lg:[@media(min-height:820px)]:py-10">
+        {/* `lg:mt-auto` aquí y `lg:mb-auto` en la última pieza: así se centra la
+            columna cuando sobra alto, sin usar `justify-center`.
+            
+            La diferencia solo se ve con el formulario abierto: en un contenedor
+            que hace scroll, `justify-center` recorta por ARRIBA lo que no cabe y
+            esa parte ya no se alcanza con la rueda. Un margen automático se
+            resuelve a cero en cuanto el contenido desborda, así que centra
+            mientras sobra sitio y se aparta cuando falta. */}
+        <header className="enters lg:mt-auto">
+          <div className="flex flex-wrap items-center gap-3">
+            <Logo className="text-[24px] text-ink" />
+            <p className="inline-flex items-center gap-2 rounded-full bg-brote px-3 py-1 text-[12px] font-medium text-ink">
+              <span aria-hidden className="size-1.5 rounded-full bg-selva" />
+              En construcción
+            </p>
+          </div>
 
-          <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-brote px-3.5 py-1.5 text-[12px] font-medium text-ink">
-            <span aria-hidden className="size-1.5 rounded-full bg-selva" />
-            En construcción
-          </p>
-
-          <h1 className="mt-4 font-display text-[32px] leading-[0.95] text-ink sm:text-[40px] lg:text-[42px]">
+          <h1 className="mt-3 font-display text-[28px] leading-[0.95] text-ink sm:text-[33px]">
             El tablero todavía no es público. La ayuda sí hace falta ya.
           </h1>
-          <p className="mt-4 max-w-[36rem] text-[16px] leading-relaxed text-body">
-            Después del terremoto estamos armando un mapa compartido del Chocó:
-            dónde falta, qué se ha cubierto y quién lo hizo. Todavía no se puede
-            entrar, pero el equipo ya está en campo y puede usar lo que ofrezcas
-            desde hoy.
+          <p className="mt-2.5 max-w-[38rem] text-[14px] leading-relaxed text-body">
+            Un mapa compartido del Chocó después del terremoto: los treinta
+            municipios, casos documentados con consentimiento y cada peso
+            comprobable. Todavía no se puede entrar, pero el equipo ya está en
+            campo.
           </p>
         </header>
 
-        <div className="enters enters-1 mt-7">
+        <div className="enters enters-1 mt-4">
           <SupportSignup />
         </div>
 
-        <div className="enters enters-2 mt-5">
+        <div className="enters enters-2 mt-3">
           <WaitlistForm state={state} />
         </div>
 
-        {/* El aterrizaje del botón «Ver el registro de donaciones» de los
-            correos ya enviados. Va después del formulario porque no es una
-            acción: es una respuesta para quien llega buscándola. */}
-        <div className="enters enters-2 mt-5">
-          <DonationsAnchor count={donationCount} totalCop={donationTotal} />
-        </div>
-
-        <ul className="enters enters-3 mt-8 space-y-3.5 border-t border-line pt-6">
-          <li className="text-[13px] font-medium uppercase tracking-wide text-faint">
-            Qué va a ser esto
-          </li>
-          {LESSONS.map(({ Icon, title, body }) => (
-            <li key={title} className="flex gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brote text-ink">
-                <Icon className="size-4.5" />
-              </span>
-              <div className="min-w-0 pt-0.5">
-                <p className="text-[15px] font-medium leading-tight text-ink">
-                  {title}
-                </p>
-                <p className="mt-1 text-[13px] leading-relaxed text-muted">
-                  {body}
-                </p>
-              </div>
+        {/* Las tres cosas que va a ser, en una fila. Eran tres tarjetas con
+            párrafo y ocupaban media columna por debajo del pliegue. */}
+        <ul className="enters enters-3 mt-3 flex flex-wrap gap-x-4 gap-y-2">
+          {WHAT.map(({ Icon, label }) => (
+            <li key={label} className="flex items-center gap-1.5 text-[12px] text-muted">
+              <Icon className="size-4 text-accent" />
+              {label}
             </li>
           ))}
         </ul>
 
-        <PreviewUnlock />
+        <div className="lg:mb-auto">
+          <PreviewUnlock />
+        </div>
       </section>
     </div>
   );

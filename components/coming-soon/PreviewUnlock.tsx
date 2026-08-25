@@ -33,7 +33,7 @@ export function PreviewUnlock() {
         type="button"
         aria-label="Continuar"
         onClick={() => setOpen(true)}
-        className="group mt-6 flex size-11 shrink-0 items-center justify-start rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="group mt-2 flex size-11 shrink-0 items-center justify-start rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <span
           aria-hidden

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { ComingSoon } from "@/components/coming-soon/ComingSoon";
 import { SITE_NAME } from "@/lib/constants";
-import { countDonationLog, getDonationTotal } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -27,17 +26,6 @@ export default async function ComingSoonPage({
 }: {
   searchParams: Promise<{ avisos?: string }>;
 }) {
-  const [{ avisos }, donationCount, donationTotal] = await Promise.all([
-    searchParams,
-    countDonationLog(),
-    getDonationTotal(),
-  ]);
-
-  return (
-    <ComingSoon
-      state={parseSignupState(avisos)}
-      donationCount={donationCount}
-      donationTotal={donationTotal}
-    />
-  );
+  const { avisos } = await searchParams;
+  return <ComingSoon state={parseSignupState(avisos)} />;
 }

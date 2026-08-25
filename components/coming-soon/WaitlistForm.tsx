@@ -1,5 +1,5 @@
 import { subscribeToUpdates } from "@/app/(public)/ofrecer/actions";
-import { alertBox, button, field } from "@/components/ui/styles";
+import { alertBox, button } from "@/components/ui/styles";
 import { SITE_NAME } from "@/lib/constants";
 
 /**
@@ -21,16 +21,29 @@ export function WaitlistForm({ state }: { state: "recibido" | "correo" | null })
    * usar hoy. Ahora es un panel con filete y un titular menor, y el color de
    * esta columna se lo quedan las tres pastillas de arriba.
    */
+  /**
+   * Baja de tono a propósito, y es una decisión de jerarquía y no de estilo.
+   *
+   * Esto era un bloque macizo de `lavanda` con el titular al mismo tamaño que
+   * el de apuntarse. Puesto debajo del formulario de ofrecer ayuda, el bloque
+   * de color se llevaba la mirada: la acción SECUNDARIA —dejar un correo y
+   * esperar— pesaba más que la principal, que es lo único que el equipo puede
+   * usar hoy. Ahora es un panel con filete y un titular menor, y el color de
+   * esta columna se lo quedan las tres pastillas de arriba.
+   *
+   * Y va en una línea: titular, correo y botón en la misma fila cuando cabe.
+   * Tres párrafos y un campo debajo son cuatro renglones de alto para pedir un
+   * dato, y esta pantalla tiene que caber entera sin bajar.
+   */
   return (
-    <section className="rounded-3xl border border-line bg-canvas p-5" aria-labelledby="aviso-apertura">
-      <h2 id="aviso-apertura" className="font-display text-[17px] leading-tight text-ink">
-        ¿Todavía no puedes ofrecer nada?
+    <section className="rounded-2xl border border-line bg-canvas p-4" aria-labelledby="aviso-apertura">
+      <h2 id="aviso-apertura" className="text-[14px] font-medium leading-tight text-ink">
+        ¿Todavía no puedes ofrecer nada?{" "}
+        <span className="font-normal text-muted">
+          Te avisamos cuando el tablero se abra. Solo lo ve el equipo de{" "}
+          {SITE_NAME}.
+        </span>
       </h2>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-        Déjanos un correo y te escribimos el día que el tablero sea público.
-        Solo lo ve el equipo de {SITE_NAME}, no se publica, y nunca te vamos a
-        pedir dinero por correo.
-      </p>
 
       {state === "recibido" && (
         <p
@@ -47,7 +60,7 @@ export function WaitlistForm({ state }: { state: "recibido" | "correo" | null })
       )}
 
       {state !== "recibido" && (
-        <form action={subscribeToUpdates} className="mt-4">
+        <form action={subscribeToUpdates} className="mt-3">
           <input type="hidden" name="desde" value="/proximamente" />
           <input
             type="text"
@@ -58,27 +71,28 @@ export function WaitlistForm({ state }: { state: "recibido" | "correo" | null })
             className="absolute left-[-9999px] size-0"
           />
 
-          <label className="block">
-            <span className={field.label}>Tu correo</span>
-            <input
-              name="email"
-              type="email"
-              inputMode="email"
-              required
-              maxLength={200}
-              autoComplete="email"
-              className={field.input}
-              placeholder="nombre@correo.com"
-            />
-          </label>
-
           {/* Botón secundario y sin el aro que late. Los dos eran de cuando
               este era el único gesto de la pantalla; con el de apuntarse
               delante, un botón macizo que además parpadea compite con la
               acción que de verdad sirve hoy. */}
-          <button type="submit" className={`${button.secondary} mt-3`}>
-            Avísame
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="min-w-[12rem] flex-1">
+              <span className="sr-only">Tu correo</span>
+              <input
+                name="email"
+                type="email"
+                inputMode="email"
+                required
+                maxLength={200}
+                autoComplete="email"
+                className="mt-0 h-11 w-full rounded-lg border border-line bg-panel-high px-3.5 text-[14px] text-ink placeholder:text-faint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                placeholder="nombre@correo.com"
+              />
+            </label>
+            <button type="submit" className={`${button.secondary} min-h-11 shrink-0 px-5`}>
+              Avísame
+            </button>
+          </div>
         </form>
       )}
     </section>

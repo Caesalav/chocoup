@@ -83,21 +83,24 @@ export function SupportSignup() {
   return (
     <section
       aria-labelledby="apuntarse"
-      className="rounded-3xl border border-line-strong bg-panel-high p-5 shadow-card sm:p-6"
+      className="rounded-3xl border border-line-strong bg-panel-high p-4 shadow-card sm:p-5"
     >
-      <p className="text-[13px] font-medium uppercase tracking-wide text-accent">
+      {/* Aquí había un párrafo que decía «el tablero todavía no está abierto,
+          pero el equipo ya está en campo». Es la misma frase del titular y de
+          la entradilla, tres renglones más abajo: se ha ido, y lo que queda es
+          la instrucción, que es lo único que esta tarjeta tiene que añadir. */}
+      <p className="text-[12px] font-medium uppercase tracking-wide text-accent">
         Se puede ayudar ya
       </p>
-      <h2 id="apuntarse" className="mt-1 font-display text-[26px] leading-tight text-ink">
+      <h2 id="apuntarse" className="mt-0.5 font-display text-[24px] leading-tight text-ink">
         Apúntate ahora
       </h2>
-      <p className="mt-2 text-[14px] leading-relaxed text-body">
-        El tablero todavía no está abierto, pero el equipo ya está en campo y la
-        ayuda hace falta desde hoy. Déjanos lo que puedes aportar y te
-        escribimos.
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+        Elige qué puedes aportar. Son pocas preguntas y el contacto no se
+        publica nunca.
       </p>
 
-      <ul className="mt-5 grid grid-cols-3 gap-2.5">
+      <ul className="mt-4 grid grid-cols-3 gap-2.5">
         {SUPPORT_KINDS.map((kind) => {
           const Icon = ICONS[kind.value];
           const selected = chosen === kind.value;
@@ -109,12 +112,12 @@ export function SupportSignup() {
                 type="button"
                 aria-pressed={selected}
                 onClick={() => setChosen(selected ? null : kind.value)}
-                className={`flex size-full min-h-[7.5rem] flex-col items-start gap-2.5 rounded-2xl border p-3.5 text-left ${lifts} hover:-translate-y-1 hover:shadow-lift active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${skin} ${
+                className={`flex size-full min-h-[5.25rem] flex-col items-start gap-1.5 rounded-2xl border p-3 text-left ${lifts} hover:-translate-y-1 hover:shadow-lift active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${skin} ${
                   selected ? `ring-2 ring-offset-2 ring-offset-panel-high ${ring}` : ""
                 }`}
               >
-                <span className={`flex size-10 items-center justify-center rounded-xl ${chip}`}>
-                  <Icon className="size-5.5" />
+                <span className={`flex size-9 items-center justify-center rounded-xl ${chip}`}>
+                  <Icon className="size-5" />
                 </span>
                 <span className="text-[13px] font-medium leading-tight">{kind.label}</span>
               </button>
@@ -133,12 +136,7 @@ export function SupportSignup() {
               que preguntan otra cosa. */}
           <SupportForm key={meta.value} kind={meta.value} from="/proximamente" />
         </div>
-      ) : (
-        <p className="mt-4 text-[13px] leading-relaxed text-muted">
-          Elige uno de los tres para ver qué necesitamos saber. Son pocas
-          preguntas y el contacto no se publica nunca.
-        </p>
-      )}
+      ) : null}
     </section>
   );
 }
