@@ -597,6 +597,37 @@ export async function getDonationLog(filters: {
 }
 
 /** Cuántas donaciones confirmadas hay, sin recortar a las de la lista. */
+/**
+ * Cuánto suman las donaciones confirmadas del portal.
+ *
+ * Se lee de la vista y no de la tabla, igual que todo lo demás de este archivo:
+ * el público no tiene permiso sobre `donations` y esta función corre también en
+ * la landing, que es la pantalla más pública que hay. Lo que la vista deja
+ * fuera —lo pendiente, las causas sin publicar— queda fuera también del total,
+ * que es lo correcto: es la misma cifra que respalda las filas que se enseñan.
+ *
+ * Suma en memoria y no con un `sum()` de Postgres porque PostgREST no agrega
+ * sobre una vista sin una función aparte, y son decenas de filas. El día que
+ * sean miles, esto es una función en la base y no un bucle más largo.
+ */
+export async function getDonationTotal(filters: {
+  caseId?: string;
+  cityId?: string;
+} = {}): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+  let query = supabase.from(DONATION_LOG_VIEW).select("amount_cop");
+  if (filters.caseId) query = query.eq("case_id", filters.caseId);
+  if (filters.cityId) query = query.eq("city_id", filters.cityId);
+
+  const { data, error } = await query;
+  if (error || !data) return 0;
+
+  return (data as { amount_cop: number }[]).reduce(
+    (sum, row) => sum + (Number(row.amount_cop) || 0),
+    0,
+  );
+}
+
 export async function countDonationLog(filters: {
   caseId?: string;
   cityId?: string;

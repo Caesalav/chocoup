@@ -11,19 +11,25 @@ import { SITE_NAME } from "@/lib/constants";
  * aunque el JavaScript no cargue.
  */
 export function WaitlistForm({ state }: { state: "recibido" | "correo" | null }) {
+  /**
+   * Baja de tono a propósito, y es una decisión de jerarquía y no de estilo.
+   *
+   * Esto era un bloque macizo de `lavanda` con el titular al mismo tamaño que
+   * el de apuntarse. Puesto debajo del formulario de ofrecer ayuda, el bloque
+   * de color se llevaba la mirada: la acción SECUNDARIA —dejar un correo y
+   * esperar— pesaba más que la principal, que es lo único que el equipo puede
+   * usar hoy. Ahora es un panel con filete y un titular menor, y el color de
+   * esta columna se lo quedan las tres pastillas de arriba.
+   */
   return (
-    <section className="rounded-3xl bg-lavanda p-5 sm:p-6" aria-labelledby="aviso-apertura">
-      <h2 id="aviso-apertura" className="font-display text-[22px] leading-tight text-ink">
-        Avísame cuando se abra
+    <section className="rounded-3xl border border-line bg-canvas p-5" aria-labelledby="aviso-apertura">
+      <h2 id="aviso-apertura" className="font-display text-[17px] leading-tight text-ink">
+        ¿Todavía no puedes ofrecer nada?
       </h2>
-      <p className="mt-2 text-[14px] leading-relaxed text-body">
-        Déjanos un correo y te escribimos el día que el tablero sea público. Si más
-        adelante hay algo que se pueda comprobar en el portal, usamos esta misma lista:
-        escribimos poco, y nunca te vamos a pedir dinero por correo.
-      </p>
-      <p className="mt-2 text-[13px] leading-relaxed text-muted">
-        Solo lo ve el equipo de {SITE_NAME}. No se publica. Si quieres que lo borremos,
-        dímelo cuando el portal esté abierto y lo quitamos.
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+        Déjanos un correo y te escribimos el día que el tablero sea público.
+        Solo lo ve el equipo de {SITE_NAME}, no se publica, y nunca te vamos a
+        pedir dinero por correo.
       </p>
 
       {state === "recibido" && (
@@ -66,11 +72,13 @@ export function WaitlistForm({ state }: { state: "recibido" | "correo" | null })
             />
           </label>
 
-          <div className="relative mt-4 inline-flex pulse-ring">
-            <button type="submit" className={button.primary}>
-              Avísame
-            </button>
-          </div>
+          {/* Botón secundario y sin el aro que late. Los dos eran de cuando
+              este era el único gesto de la pantalla; con el de apuntarse
+              delante, un botón macizo que además parpadea compite con la
+              acción que de verdad sirve hoy. */}
+          <button type="submit" className={`${button.secondary} mt-3`}>
+            Avísame
+          </button>
         </form>
       )}
     </section>

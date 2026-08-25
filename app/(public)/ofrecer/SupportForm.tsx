@@ -17,6 +17,49 @@ function Honeypot() {
   );
 }
 
+/**
+ * De qué pantalla sale el envío.
+ *
+ * Viaja en el formulario porque la acción no puede saberlo de otra forma, y la
+ * acción lo necesita para una sola decisión: si redirige a la pantalla de
+ * gracias o si contesta sin moverse. Desde la landing tiene que contestar,
+ * porque /ofrecer/gracias está detrás del cerrojo. Está explicado en
+ * support-actions.ts.
+ */
+function From({ from }: { from?: string }) {
+  return from ? <input type="hidden" name="desde" value={from} /> : null;
+}
+
+/**
+ * Lo que se ve cuando el envío salió bien y no hubo redirección.
+ *
+ * Sustituye al formulario entero en vez de ponerse encima: dejarlo debajo de
+ * un formulario todavía relleno invita a darle otra vez, y son dos filas en la
+ * bandeja del equipo para la misma persona.
+ */
+function Sent() {
+  return (
+    <div
+      role="status"
+      className="mt-6 rounded-2xl border border-selva/20 bg-brote p-5 text-selva"
+    >
+      <p className="font-display text-[20px] leading-tight">Recibido, gracias.</p>
+      <p className="mt-2 text-[14px] leading-relaxed">
+        Ya está en la bandeja del equipo. Te escribimos al correo que dejaste
+        cuando podamos encajarte. No publicamos tu contacto.
+      </p>
+    </div>
+  );
+}
+
+function isSent(state: SupportFormState): boolean {
+  return state !== null && "ok" in state;
+}
+
+function errorOf(state: SupportFormState): string | null {
+  return state !== null && "error" in state ? state.error : null;
+}
+
 function ContactFields() {
   return (
     <>
@@ -37,15 +80,18 @@ function ContactFields() {
   );
 }
 
-export function VolunteerForm() {
+export function VolunteerForm({ from }: { from?: string }) {
   const [state, action, pending] = useActionState<SupportFormState, FormData>(
     submitSupportOffer,
     null,
   );
 
+  if (isSent(state)) return <Sent />;
+
   return (
     <form action={action} className="mt-8 space-y-5">
       <input type="hidden" name="kind" value="voluntario" />
+      <From from={from} />
       <Honeypot />
       <ContactFields />
       <label className="block">
@@ -83,7 +129,7 @@ export function VolunteerForm() {
         <span className={field.label}>Algo más que debamos saber</span>
         <textarea name="message" rows={3} className={field.textarea} />
       </label>
-      {state?.error && <p className={alertBox}>{state.error}</p>}
+      {errorOf(state) && <p className={alertBox}>{errorOf(state)}</p>}
       <button type="submit" disabled={pending} className={button.invite}>
         {pending ? "Enviando…" : "Enviar"}
       </button>
@@ -91,15 +137,18 @@ export function VolunteerForm() {
   );
 }
 
-export function ProfessionForm() {
+export function ProfessionForm({ from }: { from?: string }) {
   const [state, action, pending] = useActionState<SupportFormState, FormData>(
     submitSupportOffer,
     null,
   );
 
+  if (isSent(state)) return <Sent />;
+
   return (
     <form action={action} className="mt-8 space-y-5">
       <input type="hidden" name="kind" value="profesion" />
+      <From from={from} />
       <Honeypot />
       <ContactFields />
       <label className="block">
@@ -137,7 +186,7 @@ export function ProfessionForm() {
         <span className={field.label}>En qué puedes ayudar concretamente</span>
         <textarea name="message" rows={3} className={field.textarea} />
       </label>
-      {state?.error && <p className={alertBox}>{state.error}</p>}
+      {errorOf(state) && <p className={alertBox}>{errorOf(state)}</p>}
       <button type="submit" disabled={pending} className={button.invite}>
         {pending ? "Enviando…" : "Enviar"}
       </button>
@@ -145,15 +194,18 @@ export function ProfessionForm() {
   );
 }
 
-export function ResourceForm() {
+export function ResourceForm({ from }: { from?: string }) {
   const [state, action, pending] = useActionState<SupportFormState, FormData>(
     submitSupportOffer,
     null,
   );
 
+  if (isSent(state)) return <Sent />;
+
   return (
     <form action={action} className="mt-8 space-y-5">
       <input type="hidden" name="kind" value="recurso" />
+      <From from={from} />
       <Honeypot />
       <ContactFields />
       <label className="block">
@@ -195,7 +247,7 @@ export function ResourceForm() {
         <span className={field.label}>Algo más</span>
         <textarea name="message" rows={3} className={field.textarea} />
       </label>
-      {state?.error && <p className={alertBox}>{state.error}</p>}
+      {errorOf(state) && <p className={alertBox}>{errorOf(state)}</p>}
       <button type="submit" disabled={pending} className={button.invite}>
         {pending ? "Enviando…" : "Enviar"}
       </button>
@@ -203,8 +255,12 @@ export function ResourceForm() {
   );
 }
 
-export function SupportForm({ kind }: { kind: SupportOfferKind }) {
-  if (kind === "voluntario") return <VolunteerForm />;
-  if (kind === "profesion") return <ProfessionForm />;
-  return <ResourceForm />;
+/**
+ * `from` solo lo pasa la landing. En /ofrecer se omite, y entonces la acción se
+ * comporta como siempre: guarda y redirige a la pantalla de gracias.
+ */
+export function SupportForm({ kind, from }: { kind: SupportOfferKind; from?: string }) {
+  if (kind === "voluntario") return <VolunteerForm from={from} />;
+  if (kind === "profesion") return <ProfessionForm from={from} />;
+  return <ResourceForm from={from} />;
 }

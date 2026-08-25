@@ -7,7 +7,24 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supportKindMeta } from "@/lib/support";
 import type { SupportOfferKind } from "@/lib/types";
 
-export type SupportFormState = { error: string } | null;
+/**
+ * Lo que la acción devuelve, y por qué hay un `ok` además del error.
+ *
+ * En /ofrecer no hacía falta: al guardar se redirige a /ofrecer/gracias y esta
+ * función no vuelve nunca con éxito. Desde la landing sí hace falta, porque esa
+ * pantalla de gracias está DETRÁS DEL CERROJO (`isGatePublicPath` no la deja
+ * pasar): redirigir allí a alguien que acaba de apuntarse lo mandaría de vuelta
+ * a «el tablero todavía no es público», que se lee como que su formulario no se
+ * envió. Así que desde ahí no se redirige: se contesta, y la pantalla lo dice
+ * sin moverse.
+ */
+export type SupportFormState = { error: string } | { ok: true } | null;
+
+/**
+ * Desde dónde se envió. Solo se distingue una: la landing, que es la única que
+ * no puede redirigir. Cualquier otra cosa se trata como /ofrecer.
+ */
+const FROM_LANDING = "/proximamente";
 
 function text(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -23,7 +40,15 @@ export async function submitSupportOffer(
   _previous: SupportFormState,
   formData: FormData,
 ): Promise<SupportFormState> {
-  if (text(formData, "website")) redirect("/ofrecer/gracias");
+  const fromLanding = text(formData, "desde") === FROM_LANDING;
+
+  // La trampa para robots: se contesta como si hubiera salido bien y no se
+  // guarda nada. Desde la landing no se puede redirigir, así que se miente
+  // igual pero sin moverse.
+  if (text(formData, "website")) {
+    if (fromLanding) return { ok: true };
+    redirect("/ofrecer/gracias");
+  }
 
   const kind = text(formData, "kind") as SupportOfferKind;
   if (!supportKindMeta(kind)) return { error: "Elige una de las tres formas de ofrecer." };
@@ -101,6 +126,8 @@ export async function submitSupportOffer(
   if (error) {
     return { error: "No pudimos guardar tu oferta. Inténtalo de nuevo en un momento." };
   }
+
+  if (fromLanding) return { ok: true };
 
   redirect("/ofrecer/gracias");
 }

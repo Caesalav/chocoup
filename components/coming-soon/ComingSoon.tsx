@@ -1,5 +1,7 @@
 import { WaitlistForm } from "@/components/coming-soon/WaitlistForm";
 import { PreviewUnlock } from "@/components/coming-soon/PreviewUnlock";
+import { SupportSignup } from "@/components/coming-soon/SupportSignup";
+import { DonationsAnchor } from "@/components/coming-soon/DonationsAnchor";
 import { Logo } from "@/components/Logo";
 import { ChocoMap } from "@/components/map/ChocoMap";
 import { MapStatus } from "@/components/map/MapStatus";
@@ -80,28 +82,43 @@ const LESSON_PRIORITY = LESSON_BOARD.filter(
 ).length;
 const LESSON_DOCUMENTED = LESSON_BOARD.filter((shape) => shape.city).length;
 
+/**
+ * Qué va a ser esto, en tres renglones.
+ *
+ * Estaba escrito como tres pasos con un icono grande cada uno y ocupaba media
+ * columna. Ahora la columna la manda el formulario de apuntarse, así que esto
+ * se cuenta corto y debajo: quien llega a ofrecer ayuda no necesita el manual
+ * del portal antes de dejar su nombre, y quien sí quiere saber qué es esto lo
+ * lee después sin haber tenido que bajar por delante de tres tarjetas.
+ */
 const LESSONS = [
   {
-    n: "1",
     Icon: MapIcon,
     title: "Un mapa de los treinta municipios",
-    body: "El color dice cuánto falta por cubrir en cada pueblo. Gris no es que esté bien: es que todavía no hemos llegado.",
+    body: "El color dice cuánto falta en cada pueblo. Gris no es que esté bien: es que todavía no hemos llegado.",
   },
   {
-    n: "2",
     Icon: CasesIcon,
     title: "Casos reales, con consentimiento",
-    body: "Personas, colegios, animales, fundaciones. El dinero entra por Mercado Pago, a la cuenta de ChocóUp, y queda registrado para cada causa.",
+    body: "Personas, colegios, animales y fundaciones. El dinero entra por Mercado Pago y queda registrado para cada causa.",
   },
   {
-    n: "3",
     Icon: OfferIcon,
     title: "Ayudar sin fingir que ya llegó",
-    body: "Quien puede ayudar lo ofrece. El color del mapa solo cambia cuando el equipo lo confirma.",
+    body: "El color del mapa solo cambia cuando el equipo confirma lo que se hizo.",
   },
 ] as const;
 
-export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
+export function ComingSoon({
+  state,
+  donationCount = 0,
+  donationTotal = 0,
+}: {
+  state: "recibido" | "correo" | null;
+  /** Para el ancla `#donaciones`, a la que apunta el correo de agradecimiento. */
+  donationCount?: number;
+  donationTotal?: number;
+}) {
   return (
     <div className="lg:grid lg:h-svh lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,36rem)] lg:overflow-hidden">
       <section
@@ -144,7 +161,15 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
       {/* `pb-12` y no `py-8`: la última pieza de esta columna es el botón de la
           vista previa, y con 32 px debajo queda tocando el filo inferior de la
           pantalla, que en un teléfono es justo donde se posa la barra de
-          direcciones del navegador. */}
+          direcciones del navegador.
+
+          El orden de esta columna cambió, y el motivo es lo único que importa
+          de esta pantalla: antes iba titular, tres pasos explicando el portal,
+          y al final un campo de correo para avisar cuando abriera. O sea que a
+          quien llegaba ofreciendo ayuda se le pedía esperar. Ahora lo primero
+          después del titular es apuntarse —voluntariado, profesión o recurso—,
+          que es lo que el equipo puede usar hoy; el correo de aviso queda
+          debajo, para quien no puede ofrecer nada todavía. */}
       <section className="flex flex-col px-5 pb-12 pt-8 sm:px-8 lg:h-full lg:overflow-y-auto lg:px-10 lg:py-12">
         <header className="enters">
           <Logo className="text-[26px] text-ink" />
@@ -155,37 +180,51 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
           </p>
 
           <h1 className="mt-4 font-display text-[32px] leading-[0.95] text-ink sm:text-[40px] lg:text-[42px]">
-            El tablero del Chocó todavía no es público
+            El tablero todavía no es público. La ayuda sí hace falta ya.
           </h1>
           <p className="mt-4 max-w-[36rem] text-[16px] leading-relaxed text-body">
-            Después del terremoto, un mapa compartido: dónde falta, qué se ha
-            cubierto y cómo ayudar. Lo estamos armando con el equipo en campo.
-            Aún no se puede entrar.
+            Después del terremoto estamos armando un mapa compartido del Chocó:
+            dónde falta, qué se ha cubierto y quién lo hizo. Todavía no se puede
+            entrar, pero el equipo ya está en campo y puede usar lo que ofrezcas
+            desde hoy.
           </p>
         </header>
 
-        <ol className="enters enters-1 mt-6 space-y-4">
-          {LESSONS.map(({ n, Icon, title, body }) => (
-            <li key={n} className="flex gap-4">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brote text-ink">
-                <Icon className="size-5" />
-                <span className="sr-only">Paso {n}. </span>
+        <div className="enters enters-1 mt-7">
+          <SupportSignup />
+        </div>
+
+        <div className="enters enters-2 mt-5">
+          <WaitlistForm state={state} />
+        </div>
+
+        {/* El aterrizaje del botón «Ver el registro de donaciones» de los
+            correos ya enviados. Va después del formulario porque no es una
+            acción: es una respuesta para quien llega buscándola. */}
+        <div className="enters enters-2 mt-5">
+          <DonationsAnchor count={donationCount} totalCop={donationTotal} />
+        </div>
+
+        <ul className="enters enters-3 mt-8 space-y-3.5 border-t border-line pt-6">
+          <li className="text-[13px] font-medium uppercase tracking-wide text-faint">
+            Qué va a ser esto
+          </li>
+          {LESSONS.map(({ Icon, title, body }) => (
+            <li key={title} className="flex gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brote text-ink">
+                <Icon className="size-4.5" />
               </span>
               <div className="min-w-0 pt-0.5">
-                <p className="font-display text-[18px] leading-tight text-ink">
+                <p className="text-[15px] font-medium leading-tight text-ink">
                   {title}
                 </p>
-                <p className="mt-1 text-[14px] leading-relaxed text-muted">
+                <p className="mt-1 text-[13px] leading-relaxed text-muted">
                   {body}
                 </p>
               </div>
             </li>
           ))}
-        </ol>
-
-        <div className="enters enters-2 mt-8 lg:mt-auto lg:pt-8">
-          <WaitlistForm state={state} />
-        </div>
+        </ul>
 
         <PreviewUnlock />
       </section>

@@ -47,11 +47,35 @@ export function isSiteOpen(): boolean {
  * datos también. Lo que pasa el cerrojo es una puerta por la que entra un
  * aviso, no una por la que sale información.
  */
+/**
+ * La ficha de una causa: `/ciudades/<municipio>/casos/<uuid>`.
+ *
+ * Pasa el cerrojo, y hay que dejar escrito por qué, porque parece lo contrario
+ * de tener el portal cerrado.
+ *
+ * El correo de agradecimiento que recibe quien dona enlaza a la ficha de la
+ * familia a la que fue su dinero: «tu aporte llega completo a ‹nombre›», con el
+ * nombre enlazado. Ese correo lo manda el webhook en el momento del pago, o
+ * sea, EXACTAMENTE mientras el portal está cerrado, que es su estado normal.
+ * Sin esta excepción, el portal le promete a alguien que acaba de dar dinero
+ * que puede comprobar a dónde fue, y el enlace le contesta que esto todavía no
+ * es público. Es la misma clase de fallo silencioso que el del webhook: nada
+ * falla, y la promesa no se cumple.
+ *
+ * Lo que se abre es UNA ficha por enlace, no el tablero. El identificador es un
+ * UUID que no se adivina, y desde la ficha no se llega a ninguna otra: los
+ * enlaces de la cabecera y del pie vuelven a caer en el cerrojo. Quien tiene el
+ * enlace es quien pagó por esa causa.
+ */
+const CASE_PATH =
+  /^\/ciudades\/[a-z0-9-]+\/casos\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function isGatePublicPath(pathname: string): boolean {
   return (
     pathname === "/proximamente" ||
     pathname === "/entrar" ||
     pathname === PAYMENT_WEBHOOK_PATH ||
-    pathname.startsWith("/auth/")
+    pathname.startsWith("/auth/") ||
+    CASE_PATH.test(pathname)
   );
 }
