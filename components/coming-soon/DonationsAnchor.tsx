@@ -36,21 +36,29 @@ export function DonationsAnchor({
   if (count === 0) return null;
 
   return (
+    /* Panel callado y no un bloque macizo de `brote`. En verde entero esto era
+       lo más llamativo de la columna, por encima del formulario de apuntarse, y
+       la jerarquía quedaba al revés: la pantalla gritaba una cifra a todo el
+       que llega y susurraba la acción que de verdad sirve. El lima se queda en
+       la pastilla del importe, que es lo que hay que encontrar de un vistazo
+       cuando se llega buscándolo desde el correo. */
     <section
       id="donaciones"
       aria-labelledby="donaciones-titulo"
-      className="scroll-mt-6 rounded-3xl border border-selva/20 bg-brote p-5"
+      className="scroll-mt-6 rounded-3xl border border-line bg-canvas p-5"
     >
-      <h2 id="donaciones-titulo" className="font-display text-[17px] leading-tight text-selva">
+      <h2 id="donaciones-titulo" className="font-display text-[17px] leading-tight text-ink">
         Las donaciones sí están registradas
       </h2>
-      <p className="mt-2 font-display text-[26px] leading-none tabular-nums text-selva">
-        {formatCOP(totalCop)}
+      <p className="mt-3 inline-flex items-baseline gap-2 rounded-full bg-brote px-3.5 py-1.5">
+        <span className="font-display text-[20px] leading-none tabular-nums text-selva">
+          {formatCOP(totalCop)}
+        </span>
+        <span className="text-[12px] text-selva/80">
+          en {count === 1 ? "una donación" : `${count} donaciones`}
+        </span>
       </p>
-      <p className="mt-1 text-[13px] leading-relaxed text-selva/80">
-        en {count === 1 ? "una donación confirmada" : `${count} donaciones confirmadas`}.
-      </p>
-      <p className="mt-3 text-[13px] leading-relaxed text-selva/80">
+      <p className="mt-3 text-[13px] leading-relaxed text-muted">
         El registro con el detalle se abre junto con el tablero. Si donaste, el
         correo que te enviamos lleva el enlace a la ficha de la familia a la que
         fue tu aporte, y ahí aparece con su valor y su fecha.

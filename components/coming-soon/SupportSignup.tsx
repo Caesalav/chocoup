@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SupportForm } from "@/app/(public)/ofrecer/SupportForm";
 import { OfferIcon, ProfessionIcon, ResourceIcon } from "@/components/ui/icons";
+import { lifts } from "@/components/ui/styles";
 import { SUPPORT_KINDS } from "@/lib/support";
 import type { SupportOfferKind } from "@/lib/types";
 
@@ -39,22 +40,39 @@ const ICONS: Record<SupportOfferKind, (props: { className?: string }) => React.R
 };
 
 /**
- * Cada camino con su color, los mismos de /ofrecer para que sea reconocible
- * cuando el portal abra: lavanda el voluntariado, liana la profesión, selva el
- * recurso. Elegido lleva el bloque macizo; sin elegir, papel con filete.
+ * Cada camino con su color, y LO LLEVA SIEMPRE.
+ *
+ * Aquí las tres nacían en blanco y solo se pintaban al pulsarlas. Sonaba
+ * razonable —el color como señal de «elegido»— y en pantalla salía al revés de
+ * lo que hace falta: la pieza más importante de la landing era la más apagada,
+ * tres rectángulos vacíos que no invitan a tocar nada, y el color aparecía
+ * justo después de que la persona ya hubiera decidido.
+ *
+ * Son los mismos tres bloques de /ofrecer —lavanda el voluntariado, liana la
+ * profesión, selva el recurso—, así que quien vea el portal abierto reconoce
+ * los caminos, y quien vea solo esto ya sabe que son tres cosas distintas y no
+ * tres botones iguales.
+ *
+ * Elegido no se dice con color, porque el color ya está gastado en decir cuál
+ * es cuál. Se dice con un aro de tinta alrededor, que es lo que MARCA.md usa
+ * para el estado elegido en un sistema donde las superficies están demasiado
+ * juntas para señalarlo con relleno.
  */
-const TILES: Record<SupportOfferKind, { on: string; off: string }> = {
+const TILES: Record<SupportOfferKind, { skin: string; chip: string; ring: string }> = {
   voluntario: {
-    on: "bg-lavanda text-ink border-ink/15",
-    off: "bg-panel-high text-body border-line hover:border-ink/30 hover:text-ink",
+    skin: "bg-lavanda text-ink border-ink/10",
+    chip: "bg-paper/55",
+    ring: "ring-ink/70",
   },
   profesion: {
-    on: "bg-liana text-selva border-selva/25",
-    off: "bg-panel-high text-body border-line hover:border-ink/30 hover:text-ink",
+    skin: "bg-liana text-selva border-selva/20",
+    chip: "bg-paper/40",
+    ring: "ring-selva",
   },
   recurso: {
-    on: "bg-selva text-luz border-selva",
-    off: "bg-panel-high text-body border-line hover:border-ink/30 hover:text-ink",
+    skin: "bg-selva text-luz border-luz/10",
+    chip: "bg-luz/15",
+    ring: "ring-selva",
   },
 };
 
@@ -63,8 +81,14 @@ export function SupportSignup() {
   const meta = SUPPORT_KINDS.find((entry) => entry.value === chosen) ?? null;
 
   return (
-    <section aria-labelledby="apuntarse" className="rounded-3xl border border-line bg-panel p-5 sm:p-6">
-      <h2 id="apuntarse" className="font-display text-[22px] leading-tight text-ink">
+    <section
+      aria-labelledby="apuntarse"
+      className="rounded-3xl border border-line-strong bg-panel-high p-5 shadow-card sm:p-6"
+    >
+      <p className="text-[13px] font-medium uppercase tracking-wide text-accent">
+        Se puede ayudar ya
+      </p>
+      <h2 id="apuntarse" className="mt-1 font-display text-[26px] leading-tight text-ink">
         Apúntate ahora
       </h2>
       <p className="mt-2 text-[14px] leading-relaxed text-body">
@@ -73,11 +97,11 @@ export function SupportSignup() {
         escribimos.
       </p>
 
-      <ul className="mt-4 grid grid-cols-3 gap-2">
+      <ul className="mt-5 grid grid-cols-3 gap-2.5">
         {SUPPORT_KINDS.map((kind) => {
           const Icon = ICONS[kind.value];
           const selected = chosen === kind.value;
-          const skin = TILES[kind.value];
+          const { skin, chip, ring } = TILES[kind.value];
 
           return (
             <li key={kind.value}>
@@ -85,11 +109,13 @@ export function SupportSignup() {
                 type="button"
                 aria-pressed={selected}
                 onClick={() => setChosen(selected ? null : kind.value)}
-                className={`flex size-full min-h-[6.5rem] flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-[background-color,border-color,color,translate] duration-150 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                  selected ? skin.on : skin.off
+                className={`flex size-full min-h-[7.5rem] flex-col items-start gap-2.5 rounded-2xl border p-3.5 text-left ${lifts} hover:-translate-y-1 hover:shadow-lift active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${skin} ${
+                  selected ? `ring-2 ring-offset-2 ring-offset-panel-high ${ring}` : ""
                 }`}
               >
-                <Icon className="size-6" />
+                <span className={`flex size-10 items-center justify-center rounded-xl ${chip}`}>
+                  <Icon className="size-5.5" />
+                </span>
                 <span className="text-[13px] font-medium leading-tight">{kind.label}</span>
               </button>
             </li>

@@ -121,18 +121,29 @@ export function ComingSoon({
 }) {
   return (
     <div className="lg:grid lg:h-svh lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,36rem)] lg:overflow-hidden">
+      {/* El marco oscuro, y por qué el mapa va dentro de una hoja clara.
+          
+          Esta columna era papel sobre papel: el atlas flotaba sobre el mismo
+          fondo que el resto de la página y la mitad izquierda de la pantalla se
+          leía como un hueco. Ahora es un bloque macizo de `selva` con cintas
+          —el gesto de la marca, el mismo de /ofrecer— y dentro una hoja de
+          papel con el mapa.
+
+          La hoja no es decoración: el atlas está DIBUJADO PARA PAPEL. Sus
+          rótulos son `fill-muted` con filo de `paper` y el país es
+          `fill-tierra`, así que puesto directamente sobre el verde oscuro los
+          nombres de los pueblos dejarían de leerse. La leyenda y el marcador sí
+          van sobre el marco, y por eso llevan `tone="oscuro"`, que es la
+          variante que esas dos piezas ya traían. */}
       <section
         aria-label="Cómo se va a leer el mapa"
-        className="map-board relative overflow-hidden bg-paper px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"
+        className="map-board cintas relative overflow-hidden bg-selva px-4 pb-5 pt-5 sm:px-6 sm:pb-6 lg:flex lg:h-full lg:flex-col lg:p-7"
       >
-        <p className="enters relative text-[13px] tracking-wide text-muted">
+        <p className="enters relative text-[13px] tracking-wide text-luz/70">
           {SITE_NAME}
         </p>
 
-        {/* El mismo atlas que /mapa, y por lo tanto sobre el mismo papel: el
-            país se lee porque va en verde-gris sobre el campo, no porque el
-            campo sea de otro color. */}
-        <div className="enters enters-1 relative mt-4 h-[min(48svh,26rem)] overflow-hidden lg:mt-5 lg:h-0 lg:flex-1">
+        <div className="enters enters-1 relative mt-4 h-[min(48svh,26rem)] overflow-hidden rounded-2xl bg-paper p-3 lg:mt-5 lg:h-0 lg:flex-1">
           <ChocoMap
             pins={LESSON_PINS}
             activeSlug="quibdo"
@@ -140,8 +151,8 @@ export function ComingSoon({
           />
         </div>
 
-        <div className="enters enters-2 relative mt-4 border-t border-ink/10 pt-2.5">
-          <NeedsLegend />
+        <div className="enters enters-2 relative mt-4 pt-0.5">
+          <NeedsLegend tone="oscuro" />
           <div className="mt-2">
             <MapStatus
               priority={LESSON_PRIORITY}
@@ -149,9 +160,10 @@ export function ComingSoon({
               total={LESSON_BOARD.length}
               updatedAt={null}
               label="Marcador del mapa de muestra"
+              tone="oscuro"
             />
           </div>
-          <p className="mt-2 text-[12px] leading-relaxed text-muted">
+          <p className="mt-2 text-[12px] leading-relaxed text-luz/70">
             Un ejemplo de lectura con cifras de muestra, no el tablero real. El
             de verdad todavía no es público.
           </p>
