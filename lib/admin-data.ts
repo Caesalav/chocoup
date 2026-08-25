@@ -20,6 +20,7 @@ import type {
   SupportOffer,
   SupportOfferKind,
   OfferWithContext,
+  PaymentNotice,
   Photo,
   TeamMemberEntry,
 } from "./types";
@@ -436,7 +437,7 @@ export async function getAdminDonations(): Promise<AdminDonation[]> {
   const { data, error } = await supabase
     .from("donations")
     .select(
-      "id, amount_cop, status, donor_name, publish_name, provider, payment_ref, created_at, settled_at, case_id, cases(display_name, city_id, cities(name, slug))",
+      "id, amount_cop, status, donor_name, publish_name, provider, payment_ref, created_at, settled_at, destination, source, case_id, cases(display_name, city_id, cities(name, slug))",
     )
     .order("created_at", { ascending: false });
 
@@ -452,7 +453,9 @@ export async function getAdminDonations(): Promise<AdminDonation[]> {
     payment_ref: string;
     created_at: string;
     settled_at: string | null;
-    case_id: string;
+    destination: AdminDonation["destination"];
+    source: AdminDonation["source"];
+    case_id: string | null;
     cases: {
       display_name: string;
       city_id: string;
@@ -460,22 +463,55 @@ export async function getAdminDonations(): Promise<AdminDonation[]> {
     } | null;
   };
 
-  return (data as unknown as Row[])
-    .filter((row) => row.cases?.cities)
-    .map((row) => ({
-      id: row.id,
-      amount_cop: Number(row.amount_cop),
-      status: row.status,
-      donor_name: row.donor_name,
-      publish_name: row.publish_name,
-      provider: row.provider,
-      payment_ref: row.payment_ref,
-      created_at: row.created_at,
-      settled_at: row.settled_at,
-      case_id: row.case_id,
-      case_name: row.cases!.display_name,
-      city_id: row.cases!.city_id,
-      city_name: row.cases!.cities!.name,
-      city_slug: row.cases!.cities!.slug,
-    }));
+  /**
+   * Aquí había un `.filter((row) => row.cases?.cities)` y se ha ido, porque
+   * escondía dinero.
+   *
+   * Estaba para que los tipos cuadraran —`AdminDonation` prometía causa y
+   * municipio no nulos— y el efecto era que una donación al fondo general, que
+   * por definición no tiene causa, no llegaba a la lista de coordinación. La
+   * fila estaba en la base, el importe contaba en los totales, y la única
+   * pantalla donde se mira quién donó no la enseñaba. Un filtro puesto por
+   * comodidad del tipo, borrando la mitad del registro.
+   *
+   * Ahora no se descarta ninguna fila. Lo que no se pudo resolver llega nulo y
+   * la pantalla lo dice, que es lo que hay que hacer con lo que no se sabe.
+   */
+  return (data as unknown as Row[]).map((row) => ({
+    id: row.id,
+    amount_cop: Number(row.amount_cop),
+    status: row.status,
+    donor_name: row.donor_name,
+    publish_name: row.publish_name,
+    provider: row.provider,
+    payment_ref: row.payment_ref,
+    created_at: row.created_at,
+    settled_at: row.settled_at,
+    destination: row.destination,
+    source: row.source,
+    case_id: row.case_id,
+    case_name: row.cases?.display_name ?? null,
+    city_id: row.cases?.city_id ?? null,
+    city_name: row.cases?.cities?.name ?? null,
+    city_slug: row.cases?.cities?.slug ?? null,
+  }));
+}
+
+/**
+ * Los últimos avisos de pago que llegaron, con lo que se decidió (0025).
+ *
+ * Es la pantalla que faltaba el 23 de agosto: sin ella, «no aparece mi
+ * donación» no se puede responder más que mirando el extracto de la pasarela.
+ * Solo coordinación, como la tabla.
+ */
+export async function getPaymentNotices(limit = 50): Promise<PaymentNotice[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("payment_notices")
+    .select("id, received_at, provider, payment_ref, kind, request_id, signature, outcome, detail, donation_id")
+    .order("received_at", { ascending: false })
+    .limit(Math.min(Math.max(limit, 1), 200));
+
+  if (error || !data) return [];
+  return data as unknown as PaymentNotice[];
 }

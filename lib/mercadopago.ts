@@ -18,6 +18,7 @@ import type { DonationDestination } from "./types";
 
 const PREFERENCES_URL = "https://api.mercadopago.com/checkout/preferences";
 const PAYMENTS_URL = "https://api.mercadopago.com/v1/payments";
+const PAYMENTS_SEARCH_URL = "https://api.mercadopago.com/v1/payments/search";
 
 export function mercadoPagoAccessToken(): string {
   return process.env.MP_ACCESS_TOKEN?.trim() ?? "";
@@ -194,6 +195,12 @@ export type MercadoPagoPayment = {
   transaction_amount: number;
   external_reference: string | null;
   date_approved: string | null;
+  /**
+   * Cuándo se intentó el pago, que no es cuándo se aprobó. Lo usa la
+   * conciliación para poder ordenar también lo que sigue pendiente, que no
+   * tiene fecha de aprobación.
+   */
+  date_created?: string | null;
   live_mode: boolean;
   metadata: Record<string, unknown> | null;
   /**
@@ -233,6 +240,52 @@ export async function fetchPayment(paymentId: string): Promise<MercadoPagoPaymen
   }
 
   return (await response.json()) as MercadoPagoPayment;
+}
+
+/**
+ * Todos los pagos de los últimos días, para poder comparar.
+ *
+ * Es la otra mitad de la conciliación, y hace falta porque preguntar de uno en
+ * uno solo sirve cuando ya se sabe qué preguntar. El 23 de agosto el portal no
+ * sabía ni que existían: había ocho pagos cobrados y la tabla vacía, así que
+ * ninguna consulta por identificador los habría encontrado. Lo único que los
+ * encuentra es pedir la lista y restarle lo que ya está escrito.
+ *
+ * La ventana va en días y no en fechas concretas porque es como se usa —«mira
+ * la última semana»— y porque `NOW-15DAYS` lo resuelve Mercado Pago con su
+ * reloj, que es el que fecha los pagos. Su API guarda doce meses; más allá de
+ * eso esto devuelve vacío y no un error, y por eso el panel dice qué ventana
+ * miró.
+ */
+export async function searchPayments(days: number): Promise<MercadoPagoPayment[] | null> {
+  const token = mercadoPagoAccessToken();
+  if (!token) return null;
+
+  const window = Math.min(Math.max(Math.trunc(days), 1), 365);
+  const params = new URLSearchParams({
+    sort: "date_created",
+    criteria: "desc",
+    range: "date_created",
+    begin_date: `NOW-${window}DAYS`,
+    end_date: "NOW",
+    // El techo que admite Mercado Pago. Con más de cincuenta pagos en la
+    // ventana, la conciliación ve los cincuenta más recientes y hay que
+    // estrecharla; decirlo es trabajo del panel.
+    limit: "50",
+  });
+
+  const response = await fetch(`${PAYMENTS_SEARCH_URL}?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    console.error("mercadopago search", response.status);
+    return null;
+  }
+
+  const body = (await response.json()) as { results?: MercadoPagoPayment[] };
+  return body.results ?? [];
 }
 
 /**

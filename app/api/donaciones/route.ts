@@ -5,6 +5,17 @@ const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * Sin caché, y escrito aunque hoy sea el valor por omisión.
+ *
+ * Es la ruta que sostiene la palabra «en tiempo real» de las tres listas. Una
+ * respuesta cacheada aquí no falla: contesta 200 con la lista de antes, así que
+ * quien acaba de donar sigue sin verse y no hay ningún error en ningún sitio
+ * donde mirarlo. Es el mismo modo de fallar silencioso que dejó ocho pagos sin
+ * registrar, y una línea es barata comparada con volver a buscarlo.
+ */
+export const dynamic = "force-dynamic";
+
+/**
  * El registro público de donaciones, para que las listas se actualicen solas.
  *
  * El público no puede suscribirse a `public.donations` —0017 se lo niega— así

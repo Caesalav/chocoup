@@ -35,10 +35,29 @@ import { supabaseEnv } from "./env";
  * necesita es un webhook que, sin clave, responde que no está listo y lo deja
  * escrito en el registro.
  * ---------------------------------------------------------------------------
+ * DOS NOMBRES PARA LA MISMA CLAVE, Y POR QUÉ SE ACEPTAN LOS DOS
+ *
+ * Supabase cambió el sistema de claves: las de siempre eran dos JWT largos
+ * (`anon` y `service_role`) y las nuevas son `sb_publishable_…` y
+ * `sb_secret_…`. Los proyectos nuevos —este es de agosto— nacen solo con las
+ * nuevas, así que en el panel NO hay ninguna clave que se llame
+ * «service_role»: lo que hay es una clave secreta, que hace exactamente lo
+ * mismo y que la librería acepta en el mismo sitio.
+ *
+ * Se leen los dos nombres porque este archivo ya costó $1.125.000. La variable
+ * se llamaba `SUPABASE_SERVICE_ROLE_KEY` y en producción no estaba puesta; el
+ * webhook devolvía «no estoy listo» y las donaciones no se registraban. Un
+ * nombre que no coincide con lo que el panel de Supabase enseña es una forma
+ * fácil de repetirlo: alguien busca «service role», no lo encuentra, y lo deja.
+ * Que valgan los dos hace que ponerla bien no dependa de saber esta historia.
+ * ---------------------------------------------------------------------------
  */
 export function createSupabaseAdminClient() {
   const { url } = supabaseEnv();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "";
+  const key =
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    "";
   if (!url || !key) return null;
 
   return createClient(url, key, {

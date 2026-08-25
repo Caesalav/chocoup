@@ -173,15 +173,19 @@ export default async function CasePage({ params }: Props) {
             shareTitle={shareTitle}
             donorLabel={lastGive ? donorLine(lastGive) : null}
             donorHref={donorHref}
+            amounts={donations.map((row) => row.amount_cop)}
           >
-            {budget.goal > 0 ? (
-              <CaseMoneyTrack progress={progress} nextUp={firstPendingItem(budgetItems)} />
-            ) : (
-              <p className="text-[14px] leading-relaxed text-muted">
-                Todavía no hay un presupuesto anotado para esta causa: el equipo ya la documentó y
-                está cerrando precios.
-              </p>
-            )}
+            {/* Sin meta ya no se sustituye la pista por una frase. Aquí decía
+                «el equipo está cerrando precios» y nada más, así que una causa
+                con dinero dentro se leía igual que una vacía: lo recibido no
+                aparecía en ninguna parte de la ficha. `CaseMoneyTrack` decide
+                qué forma toca —con meta, los tres tramos; sin meta, un tramo
+                por aportación— y las dos dicen cuánto ha entrado. */}
+            <CaseMoneyTrack
+              progress={progress}
+              nextUp={firstPendingItem(budgetItems)}
+              amounts={donations.map((row) => row.amount_cop)}
+            />
 
             {lastGive && (
               <p className="mt-3">

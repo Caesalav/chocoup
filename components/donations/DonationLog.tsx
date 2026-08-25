@@ -86,7 +86,12 @@ export function DonationLog({
     const tick = async () => {
       if (typeof document !== "undefined" && document.hidden) return;
       try {
-        const response = await fetch(`/api/donaciones?${params.toString()}`);
+        // `no-store` y no el valor por omisión: sin esto el navegador puede
+        // servir la respuesta anterior de su propia caché, y entonces el sondeo
+        // corre cada quince segundos para devolver siempre la misma lista.
+        const response = await fetch(`/api/donaciones?${params.toString()}`, {
+          cache: "no-store",
+        });
         if (!response.ok) return;
         const body = (await response.json()) as { donations?: DonationLogEntry[] };
         setPolled(body.donations ?? []);

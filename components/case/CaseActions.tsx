@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MoneyTrackFill } from "@/components/case/CaseMoneyTrack";
+import { MoneyTrackFill, OpenMoneyTrack } from "@/components/case/CaseMoneyTrack";
 import { DonateLink, DonateOverlay } from "@/components/donations/DonateOverlay";
 import { ShareLink } from "@/components/ShareLink";
 import { button } from "@/components/ui/styles";
@@ -28,6 +28,12 @@ type Props = {
   /** «Lucía Restrepo donó $150 mil». Lleva al registro. */
   donorLabel?: string | null;
   donorHref?: string;
+  /**
+   * Lo que puso cada persona. La barra fija lo usa cuando la causa no tiene
+   * meta: sin esto se quedaba en blanco, y una causa con dinero dentro llevaba
+   * la misma barra fija que una vacía.
+   */
+  amounts?: number[];
   children: React.ReactNode;
 };
 
@@ -123,6 +129,7 @@ export function CaseActions({
   shareTitle,
   donorLabel,
   donorHref,
+  amounts = [],
   children,
 }: Props) {
   const action = moneyAction(progress);
@@ -161,15 +168,30 @@ export function CaseActions({
       }`}
     >
       <div className="w-full max-w-[420px] rounded-[28px] border border-line bg-panel-high/95 p-2.5 shadow-float backdrop-blur">
-        {progress.goal > 0 && (
+        {(progress.goal > 0 || progress.raised > 0) && (
           <div className="px-1.5 pb-2.5 pt-0.5">
-            <MoneyTrackFill progress={progress} className="h-1.5" />
+            {progress.goal > 0 ? (
+              <MoneyTrackFill progress={progress} className="h-1.5" />
+            ) : (
+              <OpenMoneyTrack amounts={amounts} className="h-1.5" />
+            )}
             <p className="mt-2 text-[13px] leading-snug text-muted">
-              <span className="font-medium text-ink">
-                {shortCOP(progress.raised > 0 ? progress.raised : progress.delivered)}{" "}
-                {progress.raised > 0 ? "donados" : "entregados"}
-              </span>{" "}
-              <span className="text-faint">de {shortCOP(progress.goal)}</span>
+              {progress.goal > 0 ? (
+                <>
+                  <span className="font-medium text-ink">
+                    {shortCOP(progress.raised > 0 ? progress.raised : progress.delivered)}{" "}
+                    {progress.raised > 0 ? "donados" : "entregados"}
+                  </span>{" "}
+                  <span className="text-faint">de {shortCOP(progress.goal)}</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-ink">
+                    {shortCOP(progress.raised)} recibidos
+                  </span>{" "}
+                  <span className="text-faint">sin meta</span>
+                </>
+              )}
             </p>
             {donorLabel && donorHref && (
               <p className="mt-0.5 truncate">

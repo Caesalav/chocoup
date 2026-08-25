@@ -434,6 +434,15 @@ export type DonationLogEntry = {
  */
 export type DonationStatus = "pendiente" | "confirmada" | "fallida" | "reembolsada";
 
+/**
+ * Cómo se enteró el portal de un pago. Ver 0025.
+ *
+ * No hay un valor para «lo escribió una persona», y esa ausencia es la regla de
+ * 0017 dicha en el sistema de tipos: las dos formas son preguntarle a Mercado
+ * Pago, y se diferencian solo en quién empezó la conversación.
+ */
+export type DonationSource = "webhook" | "conciliacion";
+
 export type AdminDonation = {
   id: string;
   amount_cop: number;
@@ -444,11 +453,48 @@ export type AdminDonation = {
   payment_ref: string;
   created_at: string;
   settled_at: string | null;
-  case_id: string;
-  case_name: string;
-  city_id: string;
-  city_name: string;
-  city_slug: string;
+  /** A una causa o al fondo general. Ver `DonationDestination`. */
+  destination: DonationDestination;
+  /** Cómo se enteró el portal: avisó la pasarela, o se le preguntó (0025). */
+  source: DonationSource;
+  /**
+   * La causa y su municipio, o nulos los cinco cuando la donación fue al fondo
+   * general.
+   *
+   * Aquí estaban como no nulos, y esa mentira del tipo tenía consecuencias:
+   * `getAdminDonations` descartaba con un `.filter()` toda fila que no
+   * resolviera causa y municipio para que los tipos cuadraran, así que las
+   * donaciones al fondo —que por definición no tienen causa— no aparecían en la
+   * lista de coordinación. Dinero registrado en la base y ausente de la única
+   * pantalla donde se mira. Nulo aquí significa «fue al fondo», y quien pinte
+   * esta forma tiene que decirlo.
+   */
+  case_id: string | null;
+  case_name: string | null;
+  city_id: string | null;
+  city_name: string | null;
+  city_slug: string | null;
+};
+
+/**
+ * Un aviso de pago tal como quedó apuntado (0025).
+ *
+ * No lleva nombres ni correos, y no es un descuido: la bitácora existe para
+ * poder reconstruir qué hizo el servidor con un aviso, no para guardar una
+ * lista de quién donó. Eso está en `donations`, con sus permisos.
+ */
+export type PaymentNotice = {
+  id: string;
+  received_at: string;
+  provider: string;
+  /** El identificador del pago, o vacío si el aviso no traía ninguno. */
+  payment_ref: string;
+  kind: string;
+  request_id: string;
+  signature: "valida" | "invalida" | "ausente";
+  outcome: string;
+  detail: string;
+  donation_id: string | null;
 };
 
 /** Oferta con el contexto al que apunta, para la bandeja del equipo. */

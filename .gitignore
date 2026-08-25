@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# capturas locales de verificación: no van al repo ni al deploy
+/capturas-verificacion
+
 # supabase CLI cache
 supabase/.temp
 
