@@ -256,11 +256,174 @@ export function ResourceForm({ from }: { from?: string }) {
 }
 
 /**
+ * La fundación, que es el único de los cuatro que no pregunta por una persona
+ * sino por una organización.
+ *
+ * De ahí que no use `ContactFields`: ahí «Tu nombre» es quien ofrece, y aquí
+ * quien ofrece es la entidad. Se pregunta el nombre legal —el que sirve para
+ * comprobar que existe— y aparte quién responde al teléfono, que son dos datos
+ * distintos y meterlos en un solo campo obliga al equipo a adivinar cuál tiene
+ * delante cuando llama.
+ *
+ * El NIT es opcional a propósito: media ayuda del Chocó la mueven colectivos
+ * sin formalizar, y exigirlo dejaría fuera justo a quien ya está en el pueblo.
+ * Está explicado en 0026.
+ */
+export function FoundationForm({ from }: { from?: string }) {
+  const [state, action, pending] = useActionState<SupportFormState, FormData>(
+    submitSupportOffer,
+    null,
+  );
+
+  if (isSent(state)) return <Sent />;
+
+  return (
+    <form action={action} className="mt-8 space-y-5">
+      <input type="hidden" name="kind" value="fundacion" />
+      <From from={from} />
+      <Honeypot />
+
+      <label className="block">
+        <span className={field.label}>Nombre legal de la fundación</span>
+        <input
+          name="legal_name"
+          required
+          minLength={2}
+          maxLength={200}
+          className={field.input}
+          placeholder="Corporación para el Desarrollo del Atrato"
+        />
+      </label>
+      <label className="block">
+        <span className={field.label}>Cómo se les conoce</span>
+        <input
+          name="display_name"
+          maxLength={200}
+          className={field.input}
+          placeholder="Atrato Vive"
+        />
+        <span className={field.hint}>Déjalo vacío si es el mismo nombre.</span>
+      </label>
+      <label className="block">
+        <span className={field.label}>NIT</span>
+        <input name="nit" maxLength={40} className={field.input} placeholder="901234567-8" />
+        <span className={field.hint}>
+          Si todavía no están formalizados, déjalo vacío: se pueden apuntar igual.
+        </span>
+      </label>
+
+      <label className="block">
+        <span className={field.label}>Quién responde</span>
+        <input
+          name="contact_name"
+          required
+          minLength={2}
+          maxLength={120}
+          className={field.input}
+          autoComplete="name"
+        />
+        <span className={field.hint}>Por quién preguntamos cuando llamemos.</span>
+      </label>
+      <label className="block">
+        <span className={field.label}>Correo</span>
+        <input name="email" type="email" required className={field.input} autoComplete="email" />
+        <span className={field.hint}>No se publica.</span>
+      </label>
+      <label className="block">
+        <span className={field.label}>Teléfono o WhatsApp</span>
+        <input name="phone" className={field.input} autoComplete="tel" placeholder="300 123 4567" />
+      </label>
+      {/* `site_url` y no `website`, que sería el nombre natural: `website` ya lo
+          usa la trampa para robots de `Honeypot`, que va antes en el
+          formulario. Con dos campos del mismo nombre, `formData.get("website")`
+          devuelve el primero —la trampa, siempre vacía— y la dirección que
+          escribió la fundación se pierde sin un solo error. Pasó, y solo se vio
+          mirando la fila en la base. */}
+      <label className="block">
+        <span className={field.label}>Página o red social</span>
+        <input name="site_url" maxLength={300} className={field.input} placeholder="atratovive.org" />
+      </label>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <label className="block">
+          <span className={field.label}>Dónde está la sede</span>
+          <input name="city_name" className={field.input} placeholder="Quibdó" />
+        </label>
+        <label className="block">
+          <span className={field.label}>En qué ayudan sobre todo</span>
+          <select name="category" className={field.select} defaultValue="otro">
+            {NEED_CATEGORIES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="block">
+        <span className={field.label}>Dónde trabajan</span>
+        <input
+          name="coverage"
+          maxLength={400}
+          className={field.input}
+          placeholder="El medio Atrato, cinco veredas de Bojayá…"
+        />
+      </label>
+
+      <label className="block">
+        <span className={field.label}>A qué se dedican</span>
+        <textarea
+          name="focus"
+          required
+          rows={3}
+          className={field.textarea}
+          placeholder="Qué hacen y desde cuándo, en pocas palabras."
+        />
+      </label>
+      <label className="block">
+        <span className={field.label}>Qué pueden aportar ahora</span>
+        <textarea
+          name="offering"
+          rows={3}
+          className={field.textarea}
+          placeholder="Diez voluntarios, una bodega en Istmina, un camión, brigada médica…"
+        />
+        <span className={field.hint}>
+          Es lo que nos deja saber a quién llamar cuando falte algo concreto.
+        </span>
+      </label>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <label className="block">
+          <span className={field.label}>Cuánta gente son</span>
+          <input name="team_size" maxLength={80} className={field.input} placeholder="12 personas" />
+        </label>
+        <label className="block">
+          <span className={field.label}>Desde qué año</span>
+          <input name="founded_year" maxLength={20} className={field.input} placeholder="2018" />
+        </label>
+      </div>
+
+      <label className="block">
+        <span className={field.label}>Algo más que debamos saber</span>
+        <textarea name="message" rows={3} className={field.textarea} />
+      </label>
+
+      {errorOf(state) && <p className={alertBox}>{errorOf(state)}</p>}
+      <button type="submit" disabled={pending} className={button.invite}>
+        {pending ? "Enviando…" : "Enviar"}
+      </button>
+    </form>
+  );
+}
+
+/**
  * `from` solo lo pasa la landing. En /ofrecer se omite, y entonces la acción se
  * comporta como siempre: guarda y redirige a la pantalla de gracias.
  */
 export function SupportForm({ kind, from }: { kind: SupportOfferKind; from?: string }) {
   if (kind === "voluntario") return <VolunteerForm from={from} />;
   if (kind === "profesion") return <ProfessionForm from={from} />;
+  if (kind === "fundacion") return <FoundationForm from={from} />;
   return <ResourceForm from={from} />;
 }

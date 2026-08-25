@@ -28,6 +28,16 @@ export const MONEY_REVIEW_PATH = "/admin/casos/dinero";
 /** La lista de correos de avisos, dentro de Verificación de recursos. */
 export const SIGNUPS_PATH = "/admin/recursos/avisos";
 
+/**
+ * Las fundaciones que se ofrecen a ayudar, dentro de Ofertas.
+ *
+ * Va aquí y no como una pestaña más de la bandeja porque no es una bandeja: es
+ * una lista de fichas que se editan y que llevan un estado de revisión. La
+ * pantalla de ofertas remite a esta, para que quien busque «fundación» la
+ * encuentre desde donde la buscaría.
+ */
+export const FOUNDATIONS_PATH = "/admin/recursos/fundaciones";
+
 export type AdminSectionKey = "ciudades" | "casos" | "recursos";
 
 type Icon = (props: { className?: string }) => ReactElement;

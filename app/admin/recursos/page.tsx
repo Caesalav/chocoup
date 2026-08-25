@@ -6,8 +6,8 @@ import { getSupportOffers } from "@/lib/admin-data";
 import { SIGNUPS_PATH } from "@/lib/admin-sections";
 import { NEED_CATEGORIES } from "@/lib/constants";
 import { contactHref, formatDate, plural } from "@/lib/format";
-import { SUPPORT_KINDS } from "@/lib/support";
-import type { SupportOfferKind } from "@/lib/types";
+import { FOUNDATIONS_PATH } from "@/lib/admin-sections";
+import { OFFER_KINDS, type OfferKind } from "@/lib/support";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,12 @@ type Props = {
   searchParams: Promise<{ tab?: string; q?: string; lugar?: string; orden?: string; categoria?: string }>;
 };
 
-function isKind(value: string | undefined): value is SupportOfferKind {
+/**
+ * `OfferKind` y no `SupportOfferKind`: las fundaciones no entran en esta
+ * bandeja. Sus filas están en otra tabla (0026) y se gestionan en su propia
+ * pantalla, así que una pestaña aquí enseñaría siempre cero.
+ */
+function isKind(value: string | undefined): value is OfferKind {
   return value === "voluntario" || value === "profesion" || value === "recurso";
 }
 
@@ -25,7 +30,7 @@ function isSort(value: string | undefined): value is "fecha" | "nombre" | "lugar
 
 export default async function ResourcesPage({ searchParams }: Props) {
   const { tab, q: rawQ, lugar: rawPlace, orden: rawSort, categoria: rawCategory } = await searchParams;
-  const kind: SupportOfferKind = isKind(tab) ? tab : "voluntario";
+  const kind: OfferKind = isKind(tab) ? tab : "voluntario";
   const q = (rawQ ?? "").trim().toLowerCase().slice(0, 80);
   const place = (rawPlace ?? "").trim().toLowerCase().slice(0, 80);
   const sort = isSort(rawSort) ? rawSort : "fecha";
@@ -105,8 +110,11 @@ export default async function ResourcesPage({ searchParams }: Props) {
         Icon={PledgeIcon}
       />
       <p className="mt-3 max-w-prose text-[14px] leading-relaxed text-muted">
-        Lo que la gente deja en /ofrecer. No se acepta ni se niega: se busca y se llama. Los avisos
-        de correo siguen en{" "}
+        Lo que la gente deja en /ofrecer. No se acepta ni se niega: se busca y se llama. Las{" "}
+        <Link href={FOUNDATIONS_PATH} className="text-accent hover:underline">
+          fundaciones
+        </Link>{" "}
+        van aparte, porque esas sí se revisan y se editan. Los avisos de correo siguen en{" "}
         <Link href={SIGNUPS_PATH} className="text-accent hover:underline">
           avisos
         </Link>
@@ -114,7 +122,7 @@ export default async function ResourcesPage({ searchParams }: Props) {
       </p>
 
       <nav aria-label="Tipo de oferta" className="mt-8 flex flex-wrap gap-2">
-        {SUPPORT_KINDS.map((entry) => (
+        {OFFER_KINDS.map((entry) => (
           <Link
             key={entry.value}
             href={queryFor({ tab: entry.value })}
@@ -191,7 +199,7 @@ export default async function ResourcesPage({ searchParams }: Props) {
 
       <p className="mt-6 text-sm text-muted">
         {plural(rows.length, "oferta", "ofertas")}
-        {q || place || category ? " con este filtro" : ` en ${SUPPORT_KINDS.find((entry) => entry.value === kind)?.label.toLowerCase()}`}
+        {q || place || category ? " con este filtro" : ` en ${OFFER_KINDS.find((entry) => entry.value === kind)?.label.toLowerCase()}`}
       </p>
 
       {rows.length === 0 ? (

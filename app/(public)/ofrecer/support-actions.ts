@@ -2,9 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { NEED_CATEGORIES } from "@/lib/constants";
-import { looksLikeEmail } from "@/lib/format";
+import { externalUrl, looksLikeEmail } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { supportKindMeta } from "@/lib/support";
+import { isFoundationKind, supportKindMeta } from "@/lib/support";
 import type { SupportOfferKind } from "@/lib/types";
 
 /**
@@ -51,7 +51,15 @@ export async function submitSupportOffer(
   }
 
   const kind = text(formData, "kind") as SupportOfferKind;
-  if (!supportKindMeta(kind)) return { error: "Elige una de las tres formas de ofrecer." };
+  if (!supportKindMeta(kind)) return { error: "Elige una de las cuatro formas de ofrecer." };
+
+  // Una fundación no es una oferta: es una ficha, y vive en su propia tabla.
+  // Se desvía aquí arriba, antes de validar nada de lo demás, porque no
+  // comparte ni un campo con los otros tres: allí «tu nombre» es una persona y
+  // aquí es una organización. Ver 0026.
+  if (isFoundationKind(kind)) {
+    return submitFoundation(formData, fromLanding);
+  }
 
   const person_name = text(formData, "person_name");
   const email = text(formData, "email").toLowerCase();
@@ -125,6 +133,72 @@ export async function submitSupportOffer(
 
   if (error) {
     return { error: "No pudimos guardar tu oferta. Inténtalo de nuevo en un momento." };
+  }
+
+  if (fromLanding) return { ok: true };
+
+  redirect("/ofrecer/gracias");
+}
+
+/**
+ * Registrar una fundación (0026).
+ *
+ * Escribe en `public.foundations` y no en `support_offers`, y lo hace con el
+ * cliente normal: la fila entra por la política de inserción pública, que
+ * además exige `status = 'pendiente'` y `notes = ''`. Aquí NO se mandan esas
+ * dos columnas —se dejan en su valor por omisión— y esa omisión es la que hace
+ * que la política se cumpla sola: no hay forma de que este formulario ascienda
+ * una fundación a verificada, porque nunca escribe ese campo.
+ */
+async function submitFoundation(
+  formData: FormData,
+  fromLanding: boolean,
+): Promise<SupportFormState> {
+  const legal_name = text(formData, "legal_name");
+  const contact_name = text(formData, "contact_name");
+  const email = text(formData, "email").toLowerCase();
+  const focus = text(formData, "focus");
+  const category = text(formData, "category") || "otro";
+
+  if (legal_name.length < 2) return { error: "Escribe el nombre de la fundación." };
+  if (contact_name.length < 2) return { error: "Escribe el nombre de quien responde." };
+  if (!looksLikeEmail(email)) return { error: "Escribe un correo válido." };
+  if (focus.length < 4) return { error: "Cuéntanos a qué se dedican." };
+  if (!NEED_CATEGORIES.some((option) => option.value === category)) {
+    return { error: "Elige en qué ayudan sobre todo." };
+  }
+
+  // Cada campo con su tope, los mismos que la tabla. Se comprueban aquí para
+  // que un texto largo se conteste con una frase y no con un error de la base.
+  const row = {
+    legal_name: legal_name.slice(0, 200),
+    display_name: text(formData, "display_name").slice(0, 200),
+    nit: text(formData, "nit").slice(0, 40),
+    contact_name: contact_name.slice(0, 120),
+    email: email.slice(0, 200),
+    phone: text(formData, "phone").slice(0, 200),
+    // Pasa por `externalUrl` como el canal de donación (0011): lo que no sea
+    // http o https no llega nunca a un `href` del panel.
+    //
+    // El campo se llama `site_url` y no `website` porque `website` es la trampa
+    // para robots, que va antes en el mismo formulario: leerlo por ese nombre
+    // devolvía siempre la trampa vacía. Está explicado en SupportForm.tsx.
+    website: externalUrl(text(formData, "site_url")).slice(0, 300),
+    city_name: text(formData, "city_name").slice(0, 120),
+    coverage: text(formData, "coverage").slice(0, 400),
+    focus: focus.slice(0, 800),
+    category,
+    offering: text(formData, "offering").slice(0, 800),
+    team_size: text(formData, "team_size").slice(0, 80),
+    founded_year: text(formData, "founded_year").slice(0, 20),
+    message: text(formData, "message").slice(0, 2000),
+  };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("foundations").insert(row);
+
+  if (error) {
+    return { error: "No pudimos guardar la fundación. Inténtalo de nuevo en un momento." };
   }
 
   if (fromLanding) return { ok: true };

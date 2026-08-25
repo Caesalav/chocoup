@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SupportForm } from "@/app/(public)/ofrecer/SupportForm";
-import { OfferIcon, ProfessionIcon, ResourceIcon } from "@/components/ui/icons";
+import { OfferIcon, ProfessionIcon, ResourceIcon, TownIcon } from "@/components/ui/icons";
 import { lifts } from "@/components/ui/styles";
 import { SUPPORT_KINDS } from "@/lib/support";
 import type { SupportOfferKind } from "@/lib/types";
@@ -37,6 +37,7 @@ const ICONS: Record<SupportOfferKind, (props: { className?: string }) => React.R
   voluntario: OfferIcon,
   profesion: ProfessionIcon,
   recurso: ResourceIcon,
+  fundacion: TownIcon,
 };
 
 /**
@@ -74,6 +75,15 @@ const TILES: Record<SupportOfferKind, { skin: string; chip: string; ring: string
     chip: "bg-luz/15",
     ring: "ring-selva",
   },
+  // La fundación entra como cuarta y no tiene bloque propio en /ofrecer, así
+  // que toma el `ciruela` de la familia lavanda: es el otro oscuro de la
+  // paleta, se distingue de `selva` sin abrir un color nuevo, y deja la pareja
+  // de oscuros abajo y la de claros arriba en la rejilla de dos por dos.
+  fundacion: {
+    skin: "bg-ciruela text-panel-high border-ink/10",
+    chip: "bg-panel-high/15",
+    ring: "ring-ciruela",
+  },
 };
 
 export function SupportSignup() {
@@ -100,7 +110,12 @@ export function SupportSignup() {
         publica nunca.
       </p>
 
-      <ul className="mt-4 grid grid-cols-3 gap-2.5">
+      {/* Los cuatro en una fila, y medido: la rejilla de dos por dos añadía 93
+          px de alto y esta pantalla dejaba de caber sin bajar, que es su única
+          condición. En fila caben porque las pastillas usan el rótulo corto
+          —«Voluntario» y no «Voluntariado»— y porque son más bajas; a cambio
+          hay menos sitio, y por eso el icono y el texto se aprietan. */}
+      <ul className="mt-4 grid grid-cols-4 gap-2">
         {SUPPORT_KINDS.map((kind) => {
           const Icon = ICONS[kind.value];
           const selected = chosen === kind.value;
@@ -112,14 +127,14 @@ export function SupportSignup() {
                 type="button"
                 aria-pressed={selected}
                 onClick={() => setChosen(selected ? null : kind.value)}
-                className={`flex size-full min-h-[5.25rem] flex-col items-start gap-1.5 rounded-2xl border p-3 text-left ${lifts} hover:-translate-y-1 hover:shadow-lift active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${skin} ${
+                className={`flex size-full min-h-[4.75rem] flex-col items-start gap-1.5 rounded-xl border p-2.5 text-left ${lifts} hover:-translate-y-1 hover:shadow-lift active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${skin} ${
                   selected ? `ring-2 ring-offset-2 ring-offset-panel-high ${ring}` : ""
                 }`}
               >
-                <span className={`flex size-9 items-center justify-center rounded-xl ${chip}`}>
-                  <Icon className="size-5" />
+                <span className={`flex size-7 items-center justify-center rounded-lg ${chip}`}>
+                  <Icon className="size-4" />
                 </span>
-                <span className="text-[13px] font-medium leading-tight">{kind.label}</span>
+                <span className="text-[12px] font-medium leading-tight">{kind.short}</span>
               </button>
             </li>
           );

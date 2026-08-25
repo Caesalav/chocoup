@@ -50,7 +50,15 @@ export type CaseKind = "persona" | "colegio" | "animal" | "fundacion";
 export type OfferStatus = "pendiente" | "aceptada" | "rechazada" | "retirada";
 
 /** Las tres formas de ofrecer ayuda desde /ofrecer. */
-export type SupportOfferKind = "voluntario" | "profesion" | "recurso";
+/**
+ * Los cuatro caminos para ofrecer ayuda.
+ *
+ * `fundacion` es el único que no acaba en `support_offers`: escribe en
+ * `public.foundations` (0026), porque una organización es una ficha que se
+ * mantiene y no una nota que se lee una vez. Comparte formulario y pantalla con
+ * los otros tres, y ahí acaba el parecido.
+ */
+export type SupportOfferKind = "voluntario" | "profesion" | "recurso" | "fundacion";
 
 export type SupportOffer = {
   id: string;
@@ -74,6 +82,53 @@ export type SupportOffer = {
   can_deliver: boolean;
   category: string;
   created_at: string;
+};
+
+/**
+ * En qué punto de la revisión está una fundación (0026).
+ *
+ * Nace en `pendiente` y solo coordinación la mueve. No hay un estado
+ * intermedio del tipo «en revisión»: o el equipo comprobó que existe y hace lo
+ * que dice, o todavía no lo ha hecho.
+ */
+export type FoundationStatus = "pendiente" | "verificada" | "descartada";
+
+/**
+ * Una fundación o colectivo que se ofrece a ayudar.
+ *
+ * NO ES UN DESTINO DE DINERO. 0015 quitó las fundaciones del portal
+ * precisamente para que no lo fueran, y esta forma no tiene canal ni enlace de
+ * recaudación: lo que ofrece es gente, bodega, transporte o presencia en un
+ * municipio. Está explicado entero en 0026.
+ */
+export type Foundation = {
+  id: string;
+  /** El nombre registrado, el que sirve para comprobar que existe. */
+  legal_name: string;
+  /** Cómo se la conoce. Vacío cuando coincide con el legal. */
+  display_name: string;
+  /** Vacío es normal: mucha ayuda la mueven colectivos sin formalizar. */
+  nit: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  website: string;
+  /** Dónde está la sede. */
+  city_name: string;
+  /** Dónde trabaja, en sus palabras: «el medio Atrato». */
+  coverage: string;
+  focus: string;
+  category: string;
+  /** Qué puede poner encima de la mesa. Es lo que la hace accionable. */
+  offering: string;
+  team_size: string;
+  founded_year: string;
+  message: string;
+  status: FoundationStatus;
+  /** La libreta del equipo. No la escribe quien se apunta. */
+  notes: string;
+  created_at: string;
+  updated_at: string;
 };
 
 /**

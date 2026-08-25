@@ -13,6 +13,7 @@ import type {
   Case,
   City,
   FeedbackNote,
+  Foundation,
   Need,
   NeedOption,
   NewsletterSignup,
@@ -495,6 +496,41 @@ export async function getAdminDonations(): Promise<AdminDonation[]> {
     city_name: row.cases?.cities?.name ?? null,
     city_slug: row.cases?.cities?.slug ?? null,
   }));
+}
+
+/**
+ * Las fundaciones que se han apuntado (0026).
+ *
+ * Las lee el equipo entero, igual que las ofertas: quien documenta un municipio
+ * necesita saber qué organización trabaja allí. Editarlas es de coordinación, y
+ * eso lo decide la RLS, no esta función.
+ *
+ * Vienen las tres situaciones —pendiente, verificada, descartada— y sin
+ * recortar por estado a propósito: la pantalla filtra, pero lo descartado tiene
+ * que poder mirarse, porque «ya la descartamos y por qué» es justo lo que hace
+ * falta cuando la misma fundación se apunta otra vez.
+ */
+export async function getFoundations(): Promise<Foundation[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("foundations")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+  return data as unknown as Foundation[];
+}
+
+export async function getFoundation(id: string): Promise<Foundation | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("foundations")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as unknown as Foundation;
 }
 
 /**

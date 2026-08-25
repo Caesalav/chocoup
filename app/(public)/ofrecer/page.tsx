@@ -1,6 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { DonationIcon, OfferIcon, ProfessionIcon, ResourceIcon } from "@/components/ui/icons";
+import {
+  DonationIcon,
+  OfferIcon,
+  ProfessionIcon,
+  ResourceIcon,
+  TownIcon,
+} from "@/components/ui/icons";
 import { blockOffer } from "@/components/ui/styles";
 import { SUPPORT_KINDS } from "@/lib/support";
 import type { SupportOfferKind } from "@/lib/types";
@@ -31,6 +37,13 @@ const TILES: Record<
     Icon: ResourceIcon,
     tile: "bg-selva text-luz border-luz/10 hover:bg-accent-strong",
     chip: "bg-luz/15",
+  },
+  // El mismo `ciruela` que en la landing, para que el cuarto camino sea el
+  // mismo color en las dos pantallas donde aparece.
+  fundacion: {
+    Icon: TownIcon,
+    tile: "bg-ciruela text-panel-high border-ink/10 hover:brightness-110",
+    chip: "bg-panel-high/15",
   },
 };
 
