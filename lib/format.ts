@@ -1,8 +1,24 @@
 import { PHOTO_BUCKET } from "./constants";
 import { supabaseEnv } from "./supabase/env";
 
-/** El bucket es público, así que basta la URL directa del CDN. */
+/**
+ * El bucket es público, así que basta la URL directa del CDN.
+ *
+ * Salvo las fotos de muestra, que no están en Storage: viven en `public/demo`
+ * y se sirven desde el propio dominio. Es una rama de tres líneas y hace falta
+ * porque el tablero de muestra tiene que poder llenarse sin subir un solo
+ * archivo al bucket real, que es donde están las fotos de campo de verdad y
+ * cuyo cupo de 1 GB se mide en el panel.
+ *
+ * Los paisajes no muestran daños y los retratos son caras de archivo, no de las
+ * familias de los textos: una foto de muestra no puede parecer el retrato de
+ * alguien que perdió la casa.
+ */
 export function photoUrl(storagePath: string): string {
+  if (storagePath.startsWith("demo/")) {
+    return `/${storagePath}.jpg`;
+  }
+
   const { url } = supabaseEnv();
   if (!url) return "";
   return `${url}/storage/v1/object/public/${PHOTO_BUCKET}/${storagePath}`;
