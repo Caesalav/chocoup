@@ -17,13 +17,16 @@ function text(formData: FormData, key: string): string {
  * ---------------------------------------------------------------------------
  * LA CLAVE YA NO ESTÁ EN ESTE ARCHIVO, Y HAY QUE EXPLICAR POR QUÉ
  *
- * Aquí había `const PREVIEW_PASSWORD = "HolaMundo"`, con una nota que decía
- * «la clave vive aquí, no en el HTML: el botón de la landing no dice qué hay
- * que escribir». Lo del HTML era cierto y lo otro no servía de nada: ESTE
- * REPOSITORIO ES PÚBLICO. La clave estaba en github.com/Caesalav/chocoup, en
- * este mismo archivo, legible por cualquiera que abriera la carpeta. O sea que
- * el cerrojo que esconde las fichas de las familias se saltaba leyendo el
- * código, y no había forma de cambiar la clave sin desplegar.
+ * Aquí había una constante `PREVIEW_PASSWORD` con la clave escrita, y una nota
+ * que decía «la clave vive aquí, no en el HTML: el botón de la landing no dice
+ * qué hay que escribir». Lo del HTML era cierto y lo otro no servía de nada:
+ * ESTE REPOSITORIO ES PÚBLICO. La clave estaba en este mismo archivo, legible
+ * por cualquiera que abriera la carpeta en GitHub. O sea que el cerrojo que
+ * esconde las fichas de las familias se saltaba leyendo el código, y encima no
+ * había forma de cambiarla sin desplegar.
+ *
+ * Y no se repite aquí ni como ejemplo: un comentario que cita la clave la
+ * publica igual que la constante que sustituye.
  *
  * Ahora la clave es `SITE_PREVIEW_SECRET`, que vive en el entorno y no viaja al
  * repositorio. Se puede cambiar en un minuto desde el panel de Vercel, sin
