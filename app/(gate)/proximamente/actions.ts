@@ -6,16 +6,33 @@ import { GATE_PREVIEW_COOKIE } from "@/lib/site-gate";
 
 export type PreviewState = { error: string } | null;
 
-const PREVIEW_PASSWORD = "HolaMundo";
-
 function text(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
 }
 
 /**
- * Abre el tablero de muestra sin ser del equipo. La clave vive aquí, no en
- * el HTML: el botón de la landing no dice qué hay que escribir.
+ * Abre el tablero sin ser del equipo, con la clave que abre la puerta.
+ *
+ * ---------------------------------------------------------------------------
+ * LA CLAVE YA NO ESTÁ EN ESTE ARCHIVO, Y HAY QUE EXPLICAR POR QUÉ
+ *
+ * Aquí había `const PREVIEW_PASSWORD = "HolaMundo"`, con una nota que decía
+ * «la clave vive aquí, no en el HTML: el botón de la landing no dice qué hay
+ * que escribir». Lo del HTML era cierto y lo otro no servía de nada: ESTE
+ * REPOSITORIO ES PÚBLICO. La clave estaba en github.com/Caesalav/chocoup, en
+ * este mismo archivo, legible por cualquiera que abriera la carpeta. O sea que
+ * el cerrojo que esconde las fichas de las familias se saltaba leyendo el
+ * código, y no había forma de cambiar la clave sin desplegar.
+ *
+ * Ahora la clave es `SITE_PREVIEW_SECRET`, que vive en el entorno y no viaja al
+ * repositorio. Se puede cambiar en un minuto desde el panel de Vercel, sin
+ * tocar código.
+ *
+ * SIN LA VARIABLE PUESTA NO ABRE NADIE, y es la decisión correcta: la
+ * alternativa —dejar una clave escrita como respaldo— es volver a publicarla.
+ * El equipo entra por /entrar con su sesión, que no depende de esto.
+ * ---------------------------------------------------------------------------
  */
 export async function unlockPreview(
   _previous: PreviewState,
@@ -24,10 +41,14 @@ export async function unlockPreview(
   if (text(formData, "website")) redirect("/proximamente");
 
   const password = text(formData, "password");
-  const envSecret = process.env.SITE_PREVIEW_SECRET?.trim();
-  const ok = password === PREVIEW_PASSWORD || (envSecret != null && password === envSecret);
+  const secret = process.env.SITE_PREVIEW_SECRET?.trim() ?? "";
 
-  if (!ok) {
+  if (!secret) {
+    console.error("vista previa: falta SITE_PREVIEW_SECRET, la clave no puede abrir");
+    return { error: "La clave no está configurada. Avisa al equipo." };
+  }
+
+  if (password !== secret) {
     return { error: "Esa clave no abre." };
   }
 

@@ -5,8 +5,23 @@ import { unlockPreview, type PreviewState } from "@/app/(gate)/proximamente/acti
 import { alertBox, button, field } from "@/components/ui/styles";
 
 /**
- * El punto discreto de la landing: sin etiqueta, casi del color del papel.
- * Abre un campo de clave. Quien no lo busca no lo ve.
+ * La puerta con clave de la landing.
+ *
+ * ---------------------------------------------------------------------------
+ * DEJA DE SER UN PUNTO INVISIBLE, Y NO ES UN CAPRICHO
+ *
+ * Era un punto de 8 px al 7 % de opacidad y sin etiqueta, con la idea de que
+ * «quien no lo busca no lo ve». El problema es que quien SÍ lo buscaba tampoco
+ * lo veía: el equipo no conseguía entrar en su propio portal, que es el único
+ * uso que tiene esta puerta.
+ *
+ * Ahora es una línea legible y pequeña. Sigue siendo discreta —texto de 12 px
+ * en gris, al final de la columna, sin botón ni recuadro— pero se encuentra
+ * mirando. Y esconderla ya no aportaba seguridad: lo que protege el tablero es
+ * la clave, que hasta hoy estaba escrita en un repositorio público y ahora vive
+ * en el entorno (ver actions.ts). Un cerrojo se sostiene por la llave, no por
+ * disimular la cerradura.
+ * ---------------------------------------------------------------------------
  */
 export function PreviewUnlock() {
   const [open, setOpen] = useState(false);
@@ -31,14 +46,14 @@ export function PreviewUnlock() {
          topada y no desborda. */
       <button
         type="button"
-        aria-label="Continuar"
         onClick={() => setOpen(true)}
-        className="group mt-2 flex size-11 shrink-0 items-center justify-start rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="group mt-3 inline-flex min-h-11 shrink-0 items-center gap-2 self-start rounded-full text-[12px] text-faint transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <span
           aria-hidden
-          className="size-2 rounded-full bg-ink/[0.07] transition-colors group-hover:bg-ink/20"
+          className="size-1.5 rounded-full bg-ink/20 transition-colors group-hover:bg-ink/50"
         />
+        Entrar con clave
       </button>
     );
   }

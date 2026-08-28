@@ -218,7 +218,13 @@ export function ComingSoon({ state }: { state: "recibido" | "correo" | null }) {
           ))}
         </ul>
 
-        <div className="lg:mb-auto">
+        {/* `shrink-0` en el envoltorio y no solo en el botón de dentro. La
+            columna desborda en cuanto se abre uno de los cuatro formularios, y
+            entonces el reparto del flex le come el alto a este hijo: es el mismo
+            fallo que PreviewUnlock ya documenta —un botón sin alto no se puede
+            pulsar— y al meterlo en un div para centrar la columna, el div se
+            quedó sin la protección que el botón sí tenía. */}
+        <div className="shrink-0 lg:mb-auto">
           <PreviewUnlock />
         </div>
       </section>
